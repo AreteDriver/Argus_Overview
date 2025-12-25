@@ -1,4 +1,4 @@
-# EVE Overview Pro v2.1 Ultimate Edition
+# EVE Veles Eyes v2.1 Ultimate Edition
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
@@ -14,7 +14,7 @@
 
 ## ☕ Support Development
 
-If you find EVE Overview Pro useful, consider supporting development:
+If you find EVE Veles Eyes useful, consider supporting development:
 
 - **In-Game**: Send ISK donations to **AreteDriver** in EVE Online
 - **Buy Me a Coffee**: [buymeacoffee.com/aretedriver](https://buymeacoffee.com/aretedriver)
@@ -25,7 +25,7 @@ Your support helps keep this project maintained and improving! o7
 
 ## 🌟 **v2.1 Ultimate Edition - 6 Major Features!**
 
-This release transforms EVE Overview Pro into the **most powerful multi-boxing tool** available for EVE Online on Linux.
+This release transforms EVE Veles Eyes into the **most powerful multi-boxing tool** available for EVE Online on Linux.
 
 ### ✅ **NEW in v2.1:**
 
@@ -234,12 +234,12 @@ MIT License - See LICENSE file
 
 - Check documentation
 - Review troubleshooting section
-- Check logs: `~/.config/eve-overview-pro/eve-overview-pro.log`
+- Check logs: `~/.config/eve-veles-eyes/eve-veles-eyes.log`
 - Report issues with full details
 
 ---
 
 **Fly safe, capsuleers! o7**
 
-*EVE Overview Pro v2.1 Ultimate Edition*
+*EVE Veles Eyes v2.1 Ultimate Edition*
 *The Complete Professional Solution for Linux Multi-Boxing*

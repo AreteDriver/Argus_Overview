@@ -22,7 +22,7 @@ class MainWindowV21(QMainWindow):
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger(__name__)
-        self.setWindowTitle("EVE Overview Pro v2.1 Ultimate Edition")
+        self.setWindowTitle("EVE Veles Eyes v2.1 Ultimate Edition")
         self.setMinimumSize(1000, 700)
 
         # Initialize core modules (singleton instances)
@@ -78,7 +78,7 @@ class MainWindowV21(QMainWindow):
         help_menu = menubar.addMenu("&Help")
 
         # About action
-        about_action = help_menu.addAction("&About EVE Overview Pro")
+        about_action = help_menu.addAction("&About EVE Veles Eyes")
         about_action.triggered.connect(self._show_about_dialog)
 
         help_menu.addSeparator()
@@ -91,11 +91,11 @@ class MainWindowV21(QMainWindow):
 
         # Documentation
         docs_action = help_menu.addAction("&Documentation")
-        docs_action.triggered.connect(lambda: self._open_url("https://github.com/AreteDriver/eve-overview-pro#readme"))
+        docs_action.triggered.connect(lambda: self._open_url("https://github.com/AreteDriver/EVE_VelesEyes#readme"))
 
         # Report Issue
         issue_action = help_menu.addAction("&Report Issue")
-        issue_action.triggered.connect(lambda: self._open_url("https://github.com/AreteDriver/eve-overview-pro/issues"))
+        issue_action.triggered.connect(lambda: self._open_url("https://github.com/AreteDriver/EVE_VelesEyes/issues"))
 
     def _show_about_dialog(self):
         """Show About dialog"""
