@@ -466,7 +466,8 @@ class SettingsSyncTab(QWidget):
             from datetime import datetime
             dt = datetime.fromtimestamp(latest)
             return dt.strftime("%Y-%m-%d %H:%M")
-        except:
+        except (OSError, ValueError) as e:
+            self.logger.debug(f"Could not get last sync time: {e}")
             return "N/A"
 
     def _select_team(self):

@@ -16,9 +16,10 @@
 
 If you find EVE Overview Pro useful, consider supporting development:
 
-**[Buy Me a Coffee ☕](https://buymeacoffee.com/aretedriver)**
+- **In-Game**: Send ISK donations to **AreteDriver** in EVE Online
+- **Buy Me a Coffee**: [buymeacoffee.com/aretedriver](https://buymeacoffee.com/aretedriver)
 
-Your support helps keep this project maintained and improving!
+Your support helps keep this project maintained and improving! o7
 
 ---
 

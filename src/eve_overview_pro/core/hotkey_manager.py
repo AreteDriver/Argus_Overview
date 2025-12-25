@@ -40,8 +40,8 @@ class HotkeyManager(QObject):
         if self.listener:
             try:
                 self.listener.stop()
-            except:
-                pass
+            except Exception:
+                pass  # Ignore errors when stopping old listener
         
         if not self.hotkeys:
             return
@@ -75,8 +75,8 @@ class HotkeyManager(QObject):
             try:
                 self.listener.stop()
                 self.listener = None
-            except:
-                pass
+            except Exception:
+                pass  # Ignore errors during shutdown
     
     def parse_key_combo(self, combo_string: str) -> str:
         """Parse human-readable key combo"""
