@@ -1,6 +1,6 @@
 # Pinned versions for reproducible builds
 PySide6==6.6.1
 python-xlib==0.33
-Pillow==10.2.0
+Pillow==10.4.0
 pynput==1.7.7
 numpy==1.26.4
