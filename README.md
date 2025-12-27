@@ -1,8 +1,8 @@
-# EVE Veles Eyes v2.1 Ultimate Edition
+# EVE Veles Eyes v2.2 Ultimate Edition
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
-![Version](https://img.shields.io/badge/version-2.1.0-blue)
+![Version](https://img.shields.io/badge/version-2.2.0-blue)
 ![Python](https://img.shields.io/badge/python-3.8+-green)
 ![License](https://img.shields.io/badge/license-MIT-orange)
 ![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows-lightgrey)
@@ -23,54 +23,121 @@ Your support helps keep this project maintained and improving! o7
 
 ---
 
-## 🌟 **v2.1 Ultimate Edition - 6 Major Features!**
+## 🌟 **v2.2 Ultimate Edition - Major UX Overhaul!**
 
-This release transforms EVE Veles Eyes into the **most powerful multi-boxing tool** available for EVE Online on Linux.
+This release focuses on **usability, automation, and polish** with 14 new features!
 
-### ✅ **NEW in v2.1:**
+### ✅ **NEW in v2.2:**
 
-#### 1. **Layout Presets** ⭐⭐⭐⭐⭐
+#### 1. **System Tray Integration** ⭐⭐⭐⭐⭐
+- Orange "V" icon in system tray
+- Minimize to tray instead of closing
+- Quick access menu (Show/Hide, Profiles, Settings)
+- Double-click to show/hide main window
+- Notifications for new characters
+
+#### 2. **One-Click Import** ⭐⭐⭐⭐⭐
+- Scan and import ALL EVE windows with one button
+- Automatically detects character names from window titles
+- Skip duplicates automatically
+- Shows count of imported characters
+
+#### 3. **Auto-Discovery** ⭐⭐⭐⭐⭐
+- Background process scans every 5 seconds (configurable)
+- Automatically adds new EVE windows when they launch
+- Shows notification for each new character
+- No more manual adding required!
+
+#### 4. **Per-Character Hotkeys** ⭐⭐⭐⭐
+- Bind Ctrl+1 to "Main Character", Ctrl+2 to "Scout Alt"
+- Global hotkeys work even when EVE has focus
+- Configure in settings.json
+
+#### 5. **Position Lock** ⭐⭐⭐⭐
+- Lock thumbnail positions to prevent accidental moves
+- Lock button in toolbar + Ctrl+Shift+L hotkey
+- Visual lock icon on thumbnails when locked
+
+#### 6. **Custom Labels** ⭐⭐⭐⭐
+- Right-click thumbnail → "Set Label..."
+- Display "Scout", "Logi", "DPS" instead of character names
+- Persists across sessions
+
+#### 7. **Hover Effects** ⭐⭐⭐
+- Opacity fade on hover (30% default, configurable)
+- See through thumbnails to underlying windows
+- Smooth transitions
+
+#### 8. **Activity Indicators** ⭐⭐⭐
+- Small colored dot on each thumbnail
+- Green = focused, Yellow = recent activity, Gray = idle
+- Quickly identify active windows
+
+#### 9. **Session Timers** ⭐⭐⭐
+- Optional "2h 15m" display on thumbnails
+- Shows how long each character has been logged in
+- Enable in settings
+
+#### 10. **Themes** ⭐⭐⭐
+- Dark (default), Light, EVE (orange accents)
+- Configure in settings.json
+- Affects all UI elements
+
+#### 11. **Quick Minimize/Restore All** ⭐⭐⭐
+- Ctrl+Shift+M: Minimize all EVE windows
+- Ctrl+Shift+R: Restore all EVE windows
+- Tray notifications show count
+
+#### 12. **Hot Reload Config** ⭐⭐⭐
+- Edit settings.json while running
+- Click "Reload Config" in tray menu
+- Changes apply without restart
+
+#### 13. **Enhanced Context Menu** ⭐⭐⭐
+- Focus Window, Minimize, Close (with confirmation)
+- Set Label, Zoom Level
+- Remove from Preview
+
+#### 14. **Smart Position Inheritance** ⭐⭐⭐
+- New thumbnails position relative to existing ones
+- Fills right-to-left, then starts new row
+- Respects screen boundaries
+- Grid snapping (10px)
+
+---
+
+### From v2.1:
+
+#### Layout Presets ⭐⭐⭐⭐⭐
 - Save and restore complete window arrangements
-- Named layouts for different activities (Mining, PvP, Market)
+- Named layouts for different activities
 - One-click switching between configurations
-- Per-layout performance settings
 
-#### 2. **Auto-Tiling & Grid Layouts** ⭐⭐⭐⭐⭐
+#### Auto-Tiling & Grid Layouts ⭐⭐⭐⭐⭐
 - Professional grid patterns: 2x2, 3x1, 1x3, 4x1
 - Main+Sides pattern for focus gameplay
 - Cascade layout for quick overview
-- Configurable spacing and monitor selection
-- Fill screen/monitor efficiently
 
-#### 3. **Team & Character Management** ⭐⭐⭐⭐⭐
-- Full character database (even offline characters!)
-- Account grouping (3 characters per account)
-- Activity-based teams (Mining, PvP, Exploration)
-- Drag-and-drop team builder
+#### Team & Character Management ⭐⭐⭐⭐⭐
+- Full character database
+- Account grouping
+- Activity-based teams
 - Auto-assignment when characters log in
-- Link teams to layouts
 
-#### 4. **Visual Activity Alerts** ⭐⭐⭐⭐
+#### Visual Activity Alerts ⭐⭐⭐⭐
 - Red flash detection (damage/combat alerts!)
 - Screen change monitoring
-- Configurable thresholds
 - Visual border flashing
-- Sound alerts (optional)
 
-#### 5. **Multi-Monitor Support** ⭐⭐⭐⭐
+#### Multi-Monitor Support ⭐⭐⭐⭐
 - Auto-detect all monitors
 - Per-monitor layouts
-- "Send to Monitor X" command
 - Spread windows across monitors
-- Remember monitor assignments
 
-#### 6. **EVE Settings Sync** ⭐⭐⭐⭐⭐
+#### EVE Settings Sync ⭐⭐⭐⭐⭐
 - Copy keybindings between characters
-- Sync UI layouts
-- Copy overview settings  
-- Sync all game settings
+- Sync UI layouts, overview settings
 - Batch sync to entire team
-- Automatic backups before sync
 
 ---
 
@@ -241,5 +308,5 @@ MIT License - See LICENSE file
 
 **Fly safe, capsuleers! o7**
 
-*EVE Veles Eyes v2.1 Ultimate Edition*
+*EVE Veles Eyes v2.2 Ultimate Edition*
 *The Complete Professional Solution for Linux Multi-Boxing*

@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
 """
-EVE Overview Pro v2.1 Ultimate Edition
+EVE Veles Eyes v2.2 Ultimate Edition
 Main entry point with professional UI and all features
+
+v2.2 Features:
+- System tray with minimize-to-tray
+- One-click EVE window import
+- Auto-discovery of new EVE clients
+- Per-character hotkeys
+- Thumbnail hover effects (opacity/zoom)
+- Activity indicators
+- Session timers
+- Custom labels for characters
+- Themes (Dark, Light, EVE)
+- Hot reload configuration
+- Position lock for thumbnails
 """
 import sys
 import logging
@@ -59,7 +72,7 @@ def main():
     setup_logging()
     
     logger = logging.getLogger(__name__)
-    logger.info("Starting EVE Overview Pro v2.1 Ultimate Edition")
+    logger.info("Starting EVE Veles Eyes v2.2 Ultimate Edition")
     
     # Create application
     app = QApplication(sys.argv)

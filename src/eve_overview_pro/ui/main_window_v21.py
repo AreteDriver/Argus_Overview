@@ -1,9 +1,11 @@
 """
-Main Window v2.1 with Tabbed Interface
+Main Window v2.2 with Tabbed Interface
 Production implementation with all core modules integrated
+v2.2: Added system tray, auto-discovery, themes, hotkey enhancements
 """
-from PySide6.QtWidgets import QMainWindow, QTabWidget, QWidget, QVBoxLayout, QLabel
-from PySide6.QtCore import Slot
+from PySide6.QtWidgets import QMainWindow, QTabWidget, QWidget, QVBoxLayout, QLabel, QApplication
+from PySide6.QtCore import Slot, Qt
+from PySide6.QtGui import QCloseEvent
 import logging
 
 # Import core modules
@@ -13,16 +15,19 @@ from eve_overview_pro.core.alert_detector import AlertDetector
 from eve_overview_pro.core.window_capture_threaded import WindowCaptureThreaded
 from eve_overview_pro.core.hotkey_manager import HotkeyManager
 from eve_overview_pro.core.eve_settings_sync import EVESettingsSync
+from eve_overview_pro.core.discovery import AutoDiscovery
 from eve_overview_pro.ui.settings_manager import SettingsManager
+from eve_overview_pro.ui.tray import SystemTray
+from eve_overview_pro.ui.themes import get_theme_manager
 
 
 class MainWindowV21(QMainWindow):
-    """Main application window with tabbed interface"""
+    """Main application window with tabbed interface v2.2"""
 
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger(__name__)
-        self.setWindowTitle("EVE Veles Eyes v2.1 Ultimate Edition")
+        self.setWindowTitle("EVE Veles Eyes v2.2 Ultimate Edition")
         self.setMinimumSize(1000, 700)
 
         # Initialize core modules (singleton instances)
@@ -35,9 +40,21 @@ class MainWindowV21(QMainWindow):
         self.settings_sync = EVESettingsSync()
         self.settings_manager = SettingsManager()
 
+        # v2.2: Auto-discovery
+        self.auto_discovery = AutoDiscovery(
+            interval_seconds=self.settings_manager.get("general.auto_discovery_interval", 5)
+        )
+
+        # v2.2: Theme manager
+        self.theme_manager = get_theme_manager()
+
         # Validate and apply settings
         self.settings_manager.validate()
         self._apply_initial_settings()
+
+        # v2.2: Apply theme from settings
+        theme = self.settings_manager.get("appearance.theme", "dark")
+        self.theme_manager.apply_theme(theme)
 
         # Create menu bar
         self._create_menu_bar()
@@ -53,7 +70,7 @@ class MainWindowV21(QMainWindow):
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
 
-        # Create tabs (will be implemented progressively)
+        # Create tabs
         self._create_main_tab()
         self._create_characters_tab()
         self._create_layouts_tab()
@@ -63,12 +80,192 @@ class MainWindowV21(QMainWindow):
         # Connect cross-tab signals
         self._connect_signals()
 
+        # v2.2: Create system tray
+        self._create_system_tray()
+
+        # v2.2: Register hotkeys
+        self._register_hotkeys()
+
         # Start systems
-        self.logger.info("Starting capture system and hotkey manager...")
+        self.logger.info("Starting capture system, hotkey manager, and auto-discovery...")
         self.capture_system.start()
         self.hotkey_manager.start()
 
-        self.logger.info("Main window v2.1 initialized successfully")
+        # v2.2: Start auto-discovery if enabled
+        if self.settings_manager.get("general.auto_discovery", True):
+            self.auto_discovery.new_character_found.connect(self._on_new_character_discovered)
+            self.auto_discovery.start()
+
+        self.logger.info("Main window v2.2 initialized successfully")
+
+    def _create_system_tray(self):
+        """Create system tray icon (v2.2)"""
+        self.system_tray = SystemTray(self)
+
+        # Connect tray signals
+        self.system_tray.show_hide_requested.connect(self._toggle_visibility)
+        self.system_tray.toggle_thumbnails_requested.connect(self._toggle_thumbnails)
+        self.system_tray.profile_selected.connect(self._on_profile_selected)
+        self.system_tray.settings_requested.connect(self._show_settings)
+        self.system_tray.reload_config_requested.connect(self._reload_config)
+        self.system_tray.quit_requested.connect(self._quit_application)
+
+        # Load saved profiles
+        profiles = self.layout_manager.get_all_presets()
+        self.system_tray.set_profiles(list(profiles.keys()))
+
+        # Show tray icon
+        self.system_tray.show()
+        self.logger.info("System tray initialized")
+
+    def _register_hotkeys(self):
+        """Register global hotkeys (v2.2)"""
+        # Minimize all
+        minimize_combo = self.settings_manager.get("hotkeys.minimize_all", "<ctrl>+<shift>+m")
+        self.hotkey_manager.register_hotkey("minimize_all", minimize_combo, self._minimize_all_windows)
+
+        # Restore all
+        restore_combo = self.settings_manager.get("hotkeys.restore_all", "<ctrl>+<shift>+r")
+        self.hotkey_manager.register_hotkey("restore_all", restore_combo, self._restore_all_windows)
+
+        # Toggle thumbnails
+        toggle_combo = self.settings_manager.get("hotkeys.toggle_thumbnails", "<ctrl>+<shift>+t")
+        self.hotkey_manager.register_hotkey("toggle_thumbnails", toggle_combo, self._toggle_thumbnails)
+
+        # Toggle lock
+        lock_combo = self.settings_manager.get("hotkeys.toggle_lock", "<ctrl>+<shift>+l")
+        self.hotkey_manager.register_hotkey("toggle_lock", lock_combo, self._toggle_lock)
+
+        # Register per-character hotkeys
+        char_hotkeys = self.settings_manager.get("character_hotkeys", {})
+        for char_name, combo in char_hotkeys.items():
+            def make_callback(name=char_name):
+                return lambda: self._activate_character(name)
+            self.hotkey_manager.register_hotkey(f"char_{char_name}", combo, make_callback())
+
+        self.logger.info(f"Registered {len(char_hotkeys)} per-character hotkeys")
+
+    @Slot()
+    def _toggle_visibility(self):
+        """Toggle main window visibility"""
+        if self.isVisible():
+            self.hide()
+        else:
+            self.show()
+            self.raise_()
+            self.activateWindow()
+
+    @Slot()
+    def _toggle_thumbnails(self):
+        """Toggle thumbnail visibility"""
+        if hasattr(self, 'main_tab'):
+            self.main_tab.toggle_thumbnails_visibility()
+
+    @Slot()
+    def _toggle_lock(self):
+        """Toggle position lock"""
+        if hasattr(self, 'main_tab') and hasattr(self.main_tab, 'lock_btn'):
+            self.main_tab.lock_btn.click()
+
+    @Slot(str)
+    def _on_profile_selected(self, profile_name: str):
+        """Handle profile selection from tray"""
+        self.logger.info(f"Profile selected from tray: {profile_name}")
+        preset = self.layout_manager.load_preset(profile_name)
+        if preset:
+            self.system_tray.set_current_profile(profile_name)
+            self.system_tray.show_notification("Profile Loaded", f"Loaded: {profile_name}")
+
+    @Slot()
+    def _show_settings(self):
+        """Show settings tab"""
+        self.show()
+        self.raise_()
+        self.tabs.setCurrentIndex(4)  # Settings tab
+
+    @Slot()
+    def _reload_config(self):
+        """Reload configuration (v2.2 hot reload)"""
+        self.logger.info("Reloading configuration...")
+        self.settings_manager.load_settings()
+        self._apply_initial_settings()
+
+        # Re-apply theme
+        theme = self.settings_manager.get("appearance.theme", "dark")
+        self.theme_manager.apply_theme(theme)
+
+        # Update auto-discovery
+        if self.settings_manager.get("general.auto_discovery", True):
+            self.auto_discovery.set_interval(
+                self.settings_manager.get("general.auto_discovery_interval", 5)
+            )
+            if not self.auto_discovery.scan_timer.isActive():
+                self.auto_discovery.start()
+        else:
+            self.auto_discovery.stop()
+
+        self.system_tray.show_notification("Config Reloaded", "Settings have been reloaded")
+        self.logger.info("Configuration reloaded successfully")
+
+    @Slot()
+    def _quit_application(self):
+        """Quit the application"""
+        self.logger.info("Quit requested from tray")
+        QApplication.quit()
+
+    @Slot()
+    def _minimize_all_windows(self):
+        """Minimize all EVE windows (v2.2)"""
+        if hasattr(self, 'main_tab'):
+            count = 0
+            for window_id in self.main_tab.window_manager.preview_frames.keys():
+                if self.capture_system.minimize_window(window_id):
+                    count += 1
+            self.logger.info(f"Minimized {count} EVE windows")
+            self.system_tray.show_notification("Windows Minimized", f"Minimized {count} windows")
+
+    @Slot()
+    def _restore_all_windows(self):
+        """Restore all EVE windows (v2.2)"""
+        if hasattr(self, 'main_tab'):
+            count = 0
+            for window_id in self.main_tab.window_manager.preview_frames.keys():
+                if self.capture_system.restore_window(window_id):
+                    count += 1
+            self.logger.info(f"Restored {count} EVE windows")
+            self.system_tray.show_notification("Windows Restored", f"Restored {count} windows")
+
+    def _activate_character(self, char_name: str):
+        """Activate window for a specific character (v2.2 per-character hotkeys)"""
+        if hasattr(self, 'main_tab'):
+            for window_id, frame in self.main_tab.window_manager.preview_frames.items():
+                if frame.character_name == char_name:
+                    self.capture_system.activate_window(window_id)
+                    self.logger.info(f"Activated character: {char_name}")
+                    return
+        self.logger.warning(f"Character not found: {char_name}")
+
+    @Slot(str, str, str)
+    def _on_new_character_discovered(self, char_name: str, window_id: str, window_title: str):
+        """Handle new character discovered by auto-discovery (v2.2)"""
+        self.logger.info(f"Auto-discovered new character: {char_name}")
+
+        # Add to main tab if not already there
+        if hasattr(self, 'main_tab'):
+            if window_id not in self.main_tab.window_manager.preview_frames:
+                frame = self.main_tab.window_manager.add_window(window_id, char_name)
+                if frame:
+                    frame.window_activated.connect(self.main_tab._on_window_activated)
+                    frame.window_removed.connect(self.main_tab._on_window_removed)
+                    self.main_tab.preview_layout.addWidget(frame)
+                    self.main_tab._update_status()
+
+                    # Show notification
+                    if self.settings_manager.get("general.show_notifications", True):
+                        self.system_tray.show_notification(
+                            "New Character Detected",
+                            f"Added: {char_name}"
+                        )
 
     def _create_menu_bar(self):
         """Create menu bar with Help menu"""
@@ -142,7 +339,8 @@ class MainWindowV21(QMainWindow):
         self.main_tab = MainTab(
             self.capture_system,
             self.character_manager,
-            self.alert_detector
+            self.alert_detector,
+            settings_manager=self.settings_manager
         )
         self.tabs.addTab(self.main_tab, "Main")
 
@@ -288,15 +486,36 @@ class MainWindowV21(QMainWindow):
         # Route to appropriate action
         # Will be implemented as tabs are completed
 
-    def closeEvent(self, event):
-        """Handle application close"""
-        self.logger.info("Shutting down EVE Overview Pro...")
+    def closeEvent(self, event: QCloseEvent):
+        """Handle application close - v2.2 minimize to tray support"""
+        # Check if we should minimize to tray instead of closing
+        if self.settings_manager.get("general.minimize_to_tray", True):
+            if hasattr(self, 'system_tray') and self.system_tray.is_visible():
+                self.logger.info("Minimizing to system tray")
+                self.hide()
+                self.system_tray.show_notification(
+                    "Still Running",
+                    "EVE Veles Eyes is still running in the system tray"
+                )
+                event.ignore()
+                return
+
+        # Actually closing the application
+        self.logger.info("Shutting down EVE Veles Eyes v2.2...")
 
         # Stop systems
+        if hasattr(self, 'auto_discovery'):
+            self.auto_discovery.stop()
+
         if hasattr(self, 'capture_system'):
             self.capture_system.stop()
+
         if hasattr(self, 'hotkey_manager'):
             self.hotkey_manager.stop()
+
+        # Hide tray icon
+        if hasattr(self, 'system_tray'):
+            self.system_tray.hide()
 
         # Save settings
         if hasattr(self, 'settings_manager'):
