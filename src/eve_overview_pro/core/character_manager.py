@@ -280,6 +280,49 @@ class CharacterManager:
         """Get characters currently logged in (with window IDs)"""
         return [char for char in self.characters.values() if char.window_id]
     
+    # Import from EVE files
+    def import_from_eve_sync(self, eve_characters: List) -> int:
+        """Import characters discovered from EVE installation files
+
+        Args:
+            eve_characters: List of EVECharacterInfo objects from EVESettingsSync
+
+        Returns:
+            Number of new characters imported
+        """
+        imported = 0
+
+        for eve_char in eve_characters:
+            char_name = eve_char.character_name
+
+            # Skip if already exists
+            if char_name in self.characters:
+                # Update last_seen if we have new data
+                if eve_char.last_seen:
+                    self.characters[char_name].last_seen = eve_char.last_seen.isoformat()
+                continue
+
+            # Create new character entry
+            character = Character(
+                name=char_name,
+                account="",  # Unknown from files
+                role="DPS",  # Default role
+                notes=f"Imported from EVE. ID: {eve_char.character_id}",
+                is_main=False,
+                window_id=None,
+                last_seen=eve_char.last_seen.isoformat() if eve_char.last_seen else None
+            )
+
+            self.characters[char_name] = character
+            imported += 1
+            self.logger.info(f"Imported character from EVE: {char_name}")
+
+        if imported > 0:
+            self.save_data()
+            self.logger.info(f"Imported {imported} new characters from EVE files")
+
+        return imported
+
     # Auto-detection
     def auto_assign_windows(self, windows: List[tuple]) -> Dict[str, str]:
         """Auto-assign windows to characters based on window titles

@@ -354,7 +354,8 @@ class MainWindowV21(QMainWindow):
 
         self.characters_tab = CharactersTeamsTab(
             self.character_manager,
-            self.layout_manager
+            self.layout_manager,
+            settings_sync=self.settings_sync  # v2.2: Enable EVE folder scanning
         )
         self.tabs.addTab(self.characters_tab, "Characters & Teams")
 

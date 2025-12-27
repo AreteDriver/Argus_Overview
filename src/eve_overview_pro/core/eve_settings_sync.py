@@ -1,13 +1,15 @@
 """
 EVE Settings Synchronization
 Copies EVE Online client settings between characters
+Scans local EVE installation for ALL character data (even logged off)
 """
 import logging
 import shutil
 import json
+import re
 from pathlib import Path
-from typing import List, Dict, Optional
-from dataclasses import dataclass
+from typing import List, Dict, Optional, Tuple
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -15,39 +17,176 @@ from datetime import datetime
 class EVECharacterSettings:
     """EVE character settings location"""
     character_name: str
+    character_id: str
     settings_dir: Path
     core_char_file: Path
-    core_user_file: Path
+    core_user_file: Optional[Path] = None
+    user_id: Optional[str] = None
+    has_settings: bool = False
+    last_login: Optional[datetime] = None
+
+
+@dataclass
+class EVECharacterInfo:
+    """Basic character info extracted from EVE files"""
+    character_id: str
+    character_name: str
+    user_id: Optional[str] = None
+    settings_path: Optional[Path] = None
+    last_seen: Optional[datetime] = None
     has_settings: bool = False
 
 
 class EVESettingsSync:
-    """Manages EVE Online settings synchronization"""
-    
+    """Manages EVE Online settings synchronization and character discovery"""
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        
-        # Common EVE installation paths
-        self.eve_paths = [
-            Path.home() / '.eve' / 'wineenv' / 'drive_c' / 'users' / 'crossover' / 
+
+        # Steam/Proton paths (most common on Linux)
+        steam_base = Path.home() / '.steam' / 'debian-installation' / 'steamapps' / 'compatdata'
+        steam_alt = Path.home() / '.local' / 'share' / 'Steam' / 'steamapps' / 'compatdata'
+
+        # EVE Online Steam App ID is 8500
+        eve_steam_paths = [
+            steam_base / '8500' / 'pfx' / 'drive_c' / 'users' / 'steamuser' /
+            'AppData' / 'Local' / 'CCP' / 'EVE',
+            steam_alt / '8500' / 'pfx' / 'drive_c' / 'users' / 'steamuser' /
+            'AppData' / 'Local' / 'CCP' / 'EVE',
+        ]
+
+        # Steam game logs paths
+        self.eve_logs_paths = [
+            steam_base / '8500' / 'pfx' / 'drive_c' / 'users' / 'steamuser' /
+            'Documents' / 'EVE' / 'logs' / 'Gamelogs',
+            steam_alt / '8500' / 'pfx' / 'drive_c' / 'users' / 'steamuser' /
+            'Documents' / 'EVE' / 'logs' / 'Gamelogs',
+        ]
+
+        # Common EVE installation paths (Wine, CrossOver, native)
+        legacy_paths = [
+            Path.home() / '.eve' / 'wineenv' / 'drive_c' / 'users' / 'crossover' /
             'Local Settings' / 'Application Data' / 'CCP' / 'EVE',
-            
-            Path.home() / '.wine' / 'drive_c' / 'users' / Path.home().name / 
+
+            Path.home() / '.wine' / 'drive_c' / 'users' / Path.home().name /
             'Local Settings' / 'Application Data' / 'CCP' / 'EVE',
-            
+
+            Path.home() / '.wine' / 'drive_c' / 'users' / Path.home().name /
+            'AppData' / 'Local' / 'CCP' / 'EVE',
+
             Path.home() / 'EVE' / 'settings',
             Path.home() / '.local' / 'share' / 'CCP' / 'EVE',
         ]
-        
-        self.custom_paths = []
-        self.character_settings = {}
+
+        self.eve_paths = eve_steam_paths + legacy_paths
+
+        self.custom_paths: List[Path] = []
+        self.character_settings: Dict[str, EVECharacterSettings] = {}
+        self.character_id_to_name: Dict[str, str] = {}  # Cache of ID -> name mappings
+        self._load_character_names_from_logs()
         
     def add_custom_path(self, path: Path):
         """Add custom EVE settings path"""
         if path.exists() and path.is_dir():
             self.custom_paths.append(path)
             self.logger.info(f"Added custom EVE path: {path}")
-    
+
+    def _load_character_names_from_logs(self):
+        """Load character ID -> name mappings from game logs"""
+        for logs_dir in self.eve_logs_paths:
+            if not logs_dir.exists():
+                continue
+
+            self.logger.info(f"Scanning logs at: {logs_dir}")
+
+            for log_file in logs_dir.glob("*.txt"):
+                # Extract character ID from filename like 20251208_053612_94468033.txt
+                match = re.search(r'_(\d{7,})\.txt$', log_file.name)
+                if match:
+                    char_id = match.group(1)
+                    if char_id in self.character_id_to_name:
+                        continue  # Already have this one
+
+                    # Read first few lines to find Listener name
+                    try:
+                        with open(log_file, 'r', encoding='utf-8', errors='ignore') as f:
+                            for i, line in enumerate(f):
+                                if i > 10:  # Only check first 10 lines
+                                    break
+                                if 'Listener:' in line:
+                                    char_name = line.split('Listener:')[1].strip()
+                                    self.character_id_to_name[char_id] = char_name
+                                    break
+                    except Exception as e:
+                        self.logger.debug(f"Error reading log {log_file}: {e}")
+
+        self.logger.info(f"Loaded {len(self.character_id_to_name)} character names from logs")
+
+    def get_character_name(self, char_id: str) -> str:
+        """Get character name from ID, returns ID if not found"""
+        return self.character_id_to_name.get(char_id, f"Character_{char_id}")
+
+    def get_all_known_characters(self) -> List[EVECharacterInfo]:
+        """Get all known characters from EVE installation (even logged off ones)
+
+        This scans the EVE settings directory for core_char_*.dat files
+        and cross-references with game logs to get character names.
+
+        Returns:
+            List of EVECharacterInfo for all found characters
+        """
+        characters = []
+        all_paths = self.eve_paths + self.custom_paths
+
+        for base_path in all_paths:
+            if not base_path.exists():
+                continue
+
+            self.logger.info(f"Scanning for characters at: {base_path}")
+
+            # Look for tranquility (main server) settings
+            for server_dir in base_path.iterdir():
+                if not server_dir.is_dir():
+                    continue
+
+                # Look for settings_Default or similar
+                for settings_dir in server_dir.iterdir():
+                    if not settings_dir.is_dir():
+                        continue
+                    if not settings_dir.name.startswith('settings'):
+                        continue
+
+                    # Scan for core_char_*.dat files
+                    for char_file in settings_dir.glob("core_char_*.dat"):
+                        # Extract character ID from filename
+                        match = re.search(r'core_char_(\d+)\.dat$', char_file.name)
+                        if not match:
+                            continue
+
+                        char_id = match.group(1)
+                        char_name = self.get_character_name(char_id)
+
+                        # Get file modification time as last seen
+                        try:
+                            mtime = char_file.stat().st_mtime
+                            last_seen = datetime.fromtimestamp(mtime)
+                        except:
+                            last_seen = None
+
+                        char_info = EVECharacterInfo(
+                            character_id=char_id,
+                            character_name=char_name,
+                            settings_path=settings_dir,
+                            last_seen=last_seen,
+                            has_settings=True
+                        )
+                        characters.append(char_info)
+
+                        self.logger.debug(f"Found character: {char_name} (ID: {char_id})")
+
+        self.logger.info(f"Found {len(characters)} characters in EVE settings")
+        return characters
+
     def scan_for_characters(self) -> List[EVECharacterSettings]:
         """Scan for EVE character settings
         
