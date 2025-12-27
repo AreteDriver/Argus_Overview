@@ -16,11 +16,15 @@ class SettingsManager:
     """
 
     DEFAULT_SETTINGS = {
+        "version": "2.2",
         "general": {
             "start_with_system": False,
             "minimize_to_tray": True,
             "show_notifications": True,
-            "auto_save_interval": 5  # minutes
+            "auto_save_interval": 5,  # minutes
+            "auto_discovery": True,
+            "auto_discovery_interval": 5,  # seconds
+            "hot_reload": True
         },
         "performance": {
             "default_refresh_rate": 30,  # FPS
@@ -28,6 +32,16 @@ class SettingsManager:
             "enable_caching": True,
             "cache_size_mb": 100,
             "capture_quality": "medium"  # low, medium, high
+        },
+        "thumbnails": {
+            "opacity_on_hover": 0.3,
+            "zoom_on_hover": 1.5,
+            "lock_positions": False,
+            "show_labels": True,
+            "show_session_timer": False,
+            "show_activity_indicator": True,
+            "default_width": 280,
+            "default_height": 200
         },
         "alerts": {
             "enabled": True,
@@ -53,14 +67,20 @@ class SettingsManager:
             "activate_window_7": "<ctrl>+<alt>+7",
             "activate_window_8": "<ctrl>+<alt>+8",
             "activate_window_9": "<ctrl>+<alt>+9",
-            "minimize_all": "<ctrl>+<alt>+m",
-            "restore_all": "<ctrl>+<alt>+r",
+            "minimize_all": "<ctrl>+<shift>+m",
+            "restore_all": "<ctrl>+<shift>+r",
             "refresh_all": "<ctrl>+<alt>+f5",
             "next_layout": "<ctrl>+<alt>+]",
             "previous_layout": "<ctrl>+<alt>+[",
             "toggle_alerts": "<ctrl>+<alt>+a",
-            "toggle_always_on_top": "<ctrl>+<alt>+t"
+            "toggle_always_on_top": "<ctrl>+<alt>+t",
+            "toggle_thumbnails": "<ctrl>+<shift>+t",
+            "toggle_lock": "<ctrl>+<shift>+l",
+            "cycle_next": "<ctrl>+<tab>",
+            "cycle_prev": "<ctrl>+<shift>+<tab>"
         },
+        "character_hotkeys": {},
+        "character_labels": {},
         "appearance": {
             "theme": "dark",
             "font_size": 10,

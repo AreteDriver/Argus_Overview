@@ -1,8 +1,9 @@
 # -*- mode: python ; coding: utf-8 -*-
 """
-PyInstaller spec file for EVE Overview Pro Windows build
+PyInstaller spec file for EVE Veles Eyes v2.2 Windows build
 Creates standalone .exe with all dependencies bundled
 """
+import os
 
 block_cipher = None
 
@@ -11,8 +12,9 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
-        # Include any data files here
-        # ('assets/*', 'assets'),
+        # Include icon assets
+        ('../assets/icon_256.png', 'assets'),
+        ('../assets/icon_64.png', 'assets'),
     ],
     hiddenimports=[
         'PySide6.QtCore',
@@ -24,6 +26,8 @@ a = Analysis(
         'win32api',
         'PIL',
         'PIL.Image',
+        'pynput',
+        'pynput.keyboard',
     ],
     hookspath=[],
     hooksconfig={},
@@ -50,7 +54,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name='EVE-Overview-Pro',
+    name='EVE-Veles-Eyes',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -1,15 +1,19 @@
-# EVE Overview Pro v2.1 - Windows Edition
+# EVE Veles Eyes v2.2 - Windows Edition
 
-Multi-window preview and management tool for EVE Online on Windows.
+Professional multi-boxing tool for EVE Online on Windows.
 
 ## ✨ Features
 
 - **Real-time Window Preview**: 30 FPS capture of all EVE windows with async processing
 - **Character Management**: Organize characters, create teams, track accounts
+- **EVE Folder Scanning**: Import ALL characters from EVE installation (even logged off)
 - **Smart Layouts**: 7 grid patterns (2x2, 3x1, Main+Sides, Cascade, etc.)
 - **Alert Detection**: Visual alerts for red flashes (damage) and screen changes
 - **Settings Sync**: Synchronize EVE settings between characters with backup
 - **Global Hotkeys**: Control windows with customizable hotkey bindings
+- **System Tray**: Minimize to tray, quick access menu
+- **Auto-Discovery**: Automatically detect new EVE clients
+- **Themes**: Dark, Light, and EVE themes
 - **Multi-Monitor Support**: Works across multiple displays
 
 ## 📋 Requirements
@@ -22,7 +26,7 @@ Multi-window preview and management tool for EVE Online on Windows.
 
 ### Option 1: Download Release
 
-1. Download `EVE-Overview-Pro-v2.1-Windows.exe` from [Releases](https://github.com/AreteDriver/eve-overview-pro/releases)
+1. Download `EVE-Veles-Eyes-v2.2-Windows.exe` from [Releases](https://github.com/AreteDriver/EVE_VelesEyes/releases)
 2. Run the executable
 3. That's it! No installation needed.
 
@@ -30,8 +34,8 @@ Multi-window preview and management tool for EVE Online on Windows.
 
 ```cmd
 # Clone repository
-git clone https://github.com/AreteDriver/eve-overview-pro.git
-cd eve-overview-pro/windows
+git clone https://github.com/AreteDriver/EVE_VelesEyes.git
+cd EVE_VelesEyes/windows
 
 # Create virtual environment
 python -m venv venv

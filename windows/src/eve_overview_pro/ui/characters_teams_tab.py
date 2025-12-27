@@ -423,9 +423,11 @@ class TeamBuilder(QWidget):
         if not char:
             return
 
-        # Check if already in list
+        # Check if already in list (compare stored name, not display text)
         for i in range(self.member_list.count()):
-            if self.member_list.item(i).text() == char_name:
+            item = self.member_list.item(i)
+            stored_name = item.data(Qt.ItemDataRole.UserRole)
+            if stored_name == char_name:
                 self.logger.debug(f"Character {char_name} already in team")
                 return
 
@@ -560,12 +562,14 @@ class CharactersTeamsTab(QWidget):
     """Characters & Teams Tab"""
 
     team_selected = Signal(object)  # Team object
+    characters_imported = Signal(int)  # number imported
 
-    def __init__(self, character_manager, layout_manager, parent=None):
+    def __init__(self, character_manager, layout_manager, settings_sync=None, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.character_manager = character_manager
         self.layout_manager = layout_manager
+        self.settings_sync = settings_sync  # EVESettingsSync for folder scanning
 
         self._setup_ui()
 
@@ -614,6 +618,24 @@ class CharactersTeamsTab(QWidget):
         toolbar.addWidget(delete_btn)
 
         toolbar.addStretch()
+
+        # Scan EVE Folder button (if settings_sync available)
+        if self.settings_sync is not None:
+            scan_btn = QPushButton("📁 Scan EVE Folder")
+            scan_btn.setToolTip("Import ALL characters from EVE installation (even logged off)")
+            scan_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: #2d5a27;
+                    color: white;
+                    padding: 5px 10px;
+                    border-radius: 3px;
+                }
+                QPushButton:hover {
+                    background-color: #3d7a37;
+                }
+            """)
+            scan_btn.clicked.connect(self._scan_eve_folder)
+            toolbar.addWidget(scan_btn)
 
         layout.addLayout(toolbar)
 
@@ -723,6 +745,61 @@ class CharactersTeamsTab(QWidget):
             if self.character_manager.remove_character(char_name):
                 self.character_table.populate_table()
                 self.logger.info(f"Deleted character: {char_name}")
+
+    def _scan_eve_folder(self):
+        """Scan EVE installation folder and import all characters"""
+        if self.settings_sync is None:
+            QMessageBox.warning(self, "Error", "EVE Settings Sync not available.")
+            return
+
+        # Show progress message
+        QMessageBox.information(
+            self,
+            "Scanning EVE Folder",
+            "Scanning your EVE installation for character data...\n\n"
+            "This will import ALL characters that have logged in on this computer."
+        )
+
+        try:
+            # Get all characters from EVE files
+            eve_characters = self.settings_sync.get_all_known_characters()
+
+            if not eve_characters:
+                QMessageBox.warning(
+                    self,
+                    "No Characters Found",
+                    "No character data found in EVE installation.\n\n"
+                    "Make sure you have logged into EVE Online at least once."
+                )
+                return
+
+            # Import into character manager
+            imported = self.character_manager.import_from_eve_sync(eve_characters)
+
+            # Refresh table
+            self.character_table.populate_table()
+
+            # Show results
+            QMessageBox.information(
+                self,
+                "Import Complete",
+                f"Found {len(eve_characters)} characters in EVE files.\n"
+                f"Imported {imported} new characters.\n"
+                f"({len(eve_characters) - imported} were already in database)"
+            )
+
+            # Emit signal
+            self.characters_imported.emit(imported)
+
+            self.logger.info(f"EVE folder scan complete: {imported} new characters imported")
+
+        except Exception as e:
+            self.logger.error(f"EVE folder scan failed: {e}")
+            QMessageBox.critical(
+                self,
+                "Scan Failed",
+                f"Failed to scan EVE folder:\n{str(e)}"
+            )
 
     def _on_team_selected(self, team_name: str):
         """Handle team selection from dropdown"""

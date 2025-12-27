@@ -1,9 +1,9 @@
 @echo off
-REM EVE Overview Pro - Windows Build Script
+REM EVE Veles Eyes - Windows Build Script
 REM Creates standalone .exe using PyInstaller
 
 echo ==========================================
-echo EVE Overview Pro v2.1 - Windows Build
+echo EVE Veles Eyes v2.2 - Windows Build
 echo ==========================================
 echo.
 
@@ -39,16 +39,16 @@ echo This may take a few minutes...
 pyinstaller build.spec
 echo.
 
-if exist "dist\EVE-Overview-Pro.exe" (
+if exist "dist\EVE-Veles-Eyes.exe" (
     echo ==========================================
     echo Build Complete!
     echo ==========================================
     echo.
-    echo Executable created: dist\EVE-Overview-Pro.exe
+    echo Executable created: dist\EVE-Veles-Eyes.exe
     echo Size:
-    dir dist\EVE-Overview-Pro.exe | find "EVE-Overview-Pro.exe"
+    dir dist\EVE-Veles-Eyes.exe | find "EVE-Veles-Eyes.exe"
     echo.
-    echo You can now distribute dist\EVE-Overview-Pro.exe
+    echo You can now distribute dist\EVE-Veles-Eyes.exe
     echo.
 ) else (
     echo ==========================================
