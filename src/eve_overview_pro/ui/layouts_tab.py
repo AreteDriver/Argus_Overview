@@ -1,22 +1,22 @@
 """
-Layouts Tab - Layout preset management and grid patterns
-Allows saving/loading window arrangements and applying grid patterns
+Layouts Tab - Group-based window arrangement with drag-and-drop tiles
+Supports grid patterns, stacking, and custom positioning
 """
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
     QPushButton, QGroupBox, QLabel, QComboBox, QSpinBox, QDialog,
     QLineEdit, QTextEdit, QMessageBox, QSplitter, QGraphicsView,
-    QGraphicsScene, QGraphicsRectItem, QDialogButtonBox, QFormLayout
+    QGraphicsScene, QGraphicsRectItem, QDialogButtonBox, QFormLayout,
+    QCheckBox, QFrame, QScrollArea, QGridLayout
 )
-from PySide6.QtCore import Qt, Signal, QRectF
-from PySide6.QtGui import QColor, QPen, QBrush, QFont
+from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QMimeData
+from PySide6.QtGui import QColor, QPen, QBrush, QFont, QDrag, QPainter
 import logging
 import subprocess
 import re
 from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
 
-# Import GridPattern from core module
 from eve_overview_pro.core.layout_manager import GridPattern
 
 
@@ -37,8 +37,11 @@ def get_all_patterns():
         "3x1 Row",
         "1x3 Column",
         "4x1 Row",
+        "2x3 Grid",
+        "3x2 Grid",
         "Main + Sides",
         "Cascade",
+        "Stacked (All Same Position)",
         "Custom"
     ]
 
@@ -57,380 +60,229 @@ def pattern_display_to_enum(display_name: str) -> GridPattern:
     return mapping.get(display_name, GridPattern.CUSTOM)
 
 
-def pattern_enum_to_display(pattern: GridPattern) -> str:
-    """Convert GridPattern enum to display name"""
-    mapping = {
-        GridPattern.GRID_2X2: "2x2 Grid",
-        GridPattern.GRID_3X1: "3x1 Row",
-        GridPattern.GRID_1X3: "1x3 Column",
-        GridPattern.GRID_4X1: "4x1 Row",
-        GridPattern.MAIN_PLUS_SIDES: "Main + Sides",
-        GridPattern.CASCADE: "Cascade",
-        GridPattern.CUSTOM: "Custom"
-    }
-    return mapping.get(pattern, "Custom")
+class DraggableTile(QFrame):
+    """Draggable tile representing a character window"""
 
+    tile_moved = Signal(str, int, int)  # char_name, grid_row, grid_col
 
-class LayoutListItem(QWidget):
-    """Custom widget for layout list item with rich display"""
-
-    def __init__(self, preset, parent=None):
+    def __init__(self, char_name: str, color: QColor, parent=None):
         super().__init__(parent)
-        self.preset = preset
-        self._setup_ui()
+        self.char_name = char_name
+        self.color = color
+        self.grid_row = 0
+        self.grid_col = 0
+        self.is_stacked = False
 
-    def _setup_ui(self):
+        self.setFixedSize(120, 80)
+        self.setFrameStyle(QFrame.Shape.Box | QFrame.Shadow.Raised)
+        self.setLineWidth(2)
+        self._update_style()
+
+        # Layout
         layout = QVBoxLayout()
         layout.setContentsMargins(5, 5, 5, 5)
 
-        # Name (bold)
-        name_label = QLabel(self.preset.name)
-        font = QFont()
-        font.setBold(True)
-        font.setPointSize(11)
-        name_label.setFont(font)
-        layout.addWidget(name_label)
+        # Character name label
+        self.name_label = QLabel(char_name)
+        self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.name_label.setWordWrap(True)
+        self.name_label.setStyleSheet("font-weight: bold; font-size: 10pt;")
+        layout.addWidget(self.name_label)
 
-        # Description (2 lines max)
-        if self.preset.description:
-            desc_label = QLabel(self.preset.description[:100] + "..." if len(self.preset.description) > 100 else self.preset.description)
-            desc_label.setWordWrap(True)
-            desc_label.setStyleSheet("color: #888;")
-            layout.addWidget(desc_label)
-
-        # Window count and pattern
-        info_layout = QHBoxLayout()
-        window_count = len(self.preset.windows)
-        pattern_display = pattern_enum_to_display(self.preset.grid_pattern) if self.preset.grid_pattern else 'Custom'
-        info_label = QLabel(f"{window_count} windows | Pattern: {pattern_display}")
-        info_label.setStyleSheet("color: #666; font-size: 9pt;")
-        info_layout.addWidget(info_label)
-        info_layout.addStretch()
-        layout.addLayout(info_layout)
+        # Position label
+        self.pos_label = QLabel("(0, 0)")
+        self.pos_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.pos_label.setStyleSheet("color: #888; font-size: 8pt;")
+        layout.addWidget(self.pos_label)
 
         self.setLayout(layout)
 
+    def _update_style(self):
+        """Update tile appearance"""
+        bg_color = self.color.name()
+        border_color = self.color.darker(150).name()
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg_color};
+                border: 2px solid {border_color};
+                border-radius: 5px;
+            }}
+        """)
 
-class SaveLayoutDialog(QDialog):
-    """Dialog for saving current window layout as preset"""
+    def set_position(self, row: int, col: int):
+        """Set grid position"""
+        self.grid_row = row
+        self.grid_col = col
+        self.pos_label.setText(f"({row}, {col})")
 
-    def __init__(self, layout_manager, current_windows: Dict, parent=None):
-        super().__init__(parent)
-        self.layout_manager = layout_manager
-        self.current_windows = current_windows
-        self.logger = logging.getLogger(__name__)
-
-        self.setWindowTitle("Save Layout Preset")
-        self.setMinimumWidth(400)
-        self._setup_ui()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout()
-
-        # Form fields
-        form_layout = QFormLayout()
-
-        # Name
-        self.name_edit = QLineEdit()
-        self.name_edit.setPlaceholderText("e.g., Mining Fleet 2x2")
-        form_layout.addRow("Name:", self.name_edit)
-
-        # Description
-        self.description_edit = QTextEdit()
-        self.description_edit.setPlaceholderText("Optional description of this layout...")
-        self.description_edit.setMaximumHeight(80)
-        form_layout.addRow("Description:", self.description_edit)
-
-        # Refresh rate
-        self.refresh_rate_spin = QSpinBox()
-        self.refresh_rate_spin.setRange(1, 60)
-        self.refresh_rate_spin.setValue(30)
-        self.refresh_rate_spin.setSuffix(" FPS")
-        form_layout.addRow("Refresh Rate:", self.refresh_rate_spin)
-
-        # Grid pattern (auto-detected or custom)
-        self.pattern_combo = QComboBox()
-        self.pattern_combo.addItems(get_all_patterns())
-        detected_pattern = self._detect_pattern()
-        if detected_pattern:
-            index = self.pattern_combo.findText(detected_pattern)
-            if index >= 0:
-                self.pattern_combo.setCurrentIndex(index)
-        form_layout.addRow("Grid Pattern:", self.pattern_combo)
-
-        layout.addLayout(form_layout)
-
-        # Window count info
-        info_label = QLabel(f"Capturing positions for {len(self.current_windows)} windows")
-        info_label.setStyleSheet("color: #888; font-style: italic;")
-        layout.addWidget(info_label)
-
-        # Buttons
-        button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save |
-            QDialogButtonBox.StandardButton.Cancel
-        )
-        button_box.accepted.connect(self._save_layout)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
-
-        self.setLayout(layout)
-
-    def _detect_pattern(self) -> Optional[str]:
-        """Try to detect grid pattern from window positions"""
-        if len(self.current_windows) == 0:
-            return None
-
-        # Simple heuristic: check window count and rough alignment
-        count = len(self.current_windows)
-
-        if count == 4:
-            return "2x2 Grid"
-        elif count == 3:
-            return "3x1 Row"
-        elif count == 2:
-            return "Main + Sides"
-
-        return "Custom"
-
-    def _save_layout(self):
-        """Validate and save layout"""
-        name = self.name_edit.text().strip()
-        if not name:
-            QMessageBox.warning(self, "Invalid Input", "Layout name is required.")
-            return
-
-        # Check uniqueness
-        existing = self.layout_manager.get_all_presets()
-        if any(p.name == name for p in existing):
-            reply = QMessageBox.question(
-                self,
-                "Overwrite?",
-                f"Layout '{name}' already exists. Overwrite?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-            )
-            if reply == QMessageBox.StandardButton.No:
-                return
-
-        # Create preset
-        description = self.description_edit.toPlainText().strip()
-        refresh_rate = self.refresh_rate_spin.value()
-        pattern_display = self.pattern_combo.currentText()
-        pattern_enum = pattern_display_to_enum(pattern_display)
-
-        try:
-            preset = self.layout_manager.create_preset_from_current(
-                name=name,
-                description=description,
-                windows=self.current_windows,
-                grid_pattern=pattern_enum,
-                refresh_rate=refresh_rate
-            )
-            self.logger.info(f"Created layout preset: {name}")
-            self.accept()
-
-        except Exception as e:
-            self.logger.error(f"Failed to save layout: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to save layout: {e}")
+    def set_stacked(self, stacked: bool):
+        """Mark tile as stacked"""
+        self.is_stacked = stacked
+        if stacked:
+            self.pos_label.setText("(Stacked)")
 
 
-class GridPatternVisualizer(QGraphicsView):
-    """Visual preview of grid pattern layout"""
+class ArrangementGrid(QWidget):
+    """Grid for arranging character tiles"""
+
+    arrangement_changed = Signal(dict)  # {char_name: (row, col)}
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.scene = QGraphicsScene()
-        self.setScene(self.scene)
         self.logger = logging.getLogger(__name__)
+        self.tiles: Dict[str, DraggableTile] = {}
+        self.grid_rows = 3
+        self.grid_cols = 4
 
-        # Visual settings
-        from PySide6.QtGui import QPainter
-        self.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.setBackgroundBrush(QBrush(QColor(30, 30, 30)))
-        self.setMinimumHeight(300)
+        self._setup_ui()
 
-    def preview_layout(self, geometry_dict: Dict[str, Dict]):
-        """
-        Preview a layout from geometry dictionary
+    def _setup_ui(self):
+        """Setup grid UI"""
+        self.grid_layout = QGridLayout()
+        self.grid_layout.setSpacing(10)
+        self.grid_layout.setContentsMargins(10, 10, 10, 10)
 
-        Args:
-            geometry_dict: {window_id: {"x": x, "y": y, "width": w, "height": h}}
-        """
-        self.scene.clear()
+        # Create placeholder cells
+        for row in range(self.grid_rows):
+            for col in range(self.grid_cols):
+                cell = QFrame()
+                cell.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
+                cell.setMinimumSize(130, 90)
+                cell.setAcceptDrops(True)
+                cell.setStyleSheet("""
+                    QFrame {
+                        background-color: #2a2a2a;
+                        border: 1px dashed #555;
+                        border-radius: 3px;
+                    }
+                """)
+                self.grid_layout.addWidget(cell, row, col)
 
-        if not geometry_dict:
+        self.setLayout(self.grid_layout)
+
+    def set_grid_size(self, rows: int, cols: int):
+        """Resize the grid"""
+        self.grid_rows = rows
+        self.grid_cols = cols
+
+        # Clear and rebuild
+        while self.grid_layout.count():
+            item = self.grid_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        # Recreate cells
+        for row in range(rows):
+            for col in range(cols):
+                cell = QFrame()
+                cell.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
+                cell.setMinimumSize(130, 90)
+                cell.setStyleSheet("""
+                    QFrame {
+                        background-color: #2a2a2a;
+                        border: 1px dashed #555;
+                        border-radius: 3px;
+                    }
+                """)
+                self.grid_layout.addWidget(cell, row, col)
+
+        # Re-add tiles
+        for char_name, tile in self.tiles.items():
+            row = min(tile.grid_row, rows - 1)
+            col = min(tile.grid_col, cols - 1)
+            tile.set_position(row, col)
+            self.grid_layout.addWidget(tile, row, col)
+
+    def clear_tiles(self):
+        """Remove all tiles"""
+        for tile in list(self.tiles.values()):
+            self.grid_layout.removeWidget(tile)
+            tile.deleteLater()
+        self.tiles.clear()
+
+    def add_character(self, char_name: str, row: int = 0, col: int = 0):
+        """Add a character tile to the grid"""
+        if char_name in self.tiles:
             return
 
-        # Find bounds
-        min_x = min(g["x"] for g in geometry_dict.values())
-        min_y = min(g["y"] for g in geometry_dict.values())
-        max_x = max(g["x"] + g["width"] for g in geometry_dict.values())
-        max_y = max(g["y"] + g["height"] for g in geometry_dict.values())
-
-        # Scale to fit view
-        view_width = self.viewport().width() - 20
-        view_height = self.viewport().height() - 20
-
-        layout_width = max_x - min_x
-        layout_height = max_y - min_y
-
-        scale_x = view_width / layout_width if layout_width > 0 else 1
-        scale_y = view_height / layout_height if layout_height > 0 else 1
-        scale = min(scale_x, scale_y) * 0.9  # 90% to add margins
-
-        # Draw screen boundary
-        screen_rect = QGraphicsRectItem(
-            0, 0,
-            layout_width * scale,
-            layout_height * scale
-        )
-        screen_rect.setPen(QPen(QColor(100, 100, 100), 2))
-        screen_rect.setBrush(QBrush(QColor(40, 40, 40)))
-        self.scene.addItem(screen_rect)
-
-        # Draw windows
+        # Generate color based on character name hash
         colors = [
-            QColor(255, 100, 100, 150),
-            QColor(100, 255, 100, 150),
-            QColor(100, 100, 255, 150),
-            QColor(255, 255, 100, 150),
-            QColor(255, 100, 255, 150),
-            QColor(100, 255, 255, 150),
+            QColor(255, 100, 100, 200),
+            QColor(100, 255, 100, 200),
+            QColor(100, 100, 255, 200),
+            QColor(255, 255, 100, 200),
+            QColor(255, 100, 255, 200),
+            QColor(100, 255, 255, 200),
+            QColor(255, 165, 0, 200),
+            QColor(165, 100, 255, 200),
         ]
+        color = colors[hash(char_name) % len(colors)]
 
-        for idx, (window_id, geom) in enumerate(geometry_dict.items()):
-            x = (geom["x"] - min_x) * scale
-            y = (geom["y"] - min_y) * scale
-            w = geom["width"] * scale
-            h = geom["height"] * scale
+        tile = DraggableTile(char_name, color)
+        tile.set_position(row, col)
 
-            rect = QGraphicsRectItem(x, y, w, h)
-            color = colors[idx % len(colors)]
-            rect.setPen(QPen(color.darker(150), 2))
-            rect.setBrush(QBrush(color))
-            self.scene.addItem(rect)
+        self.tiles[char_name] = tile
+        self.grid_layout.addWidget(tile, row, col)
 
-            # Add window number label
-            from PySide6.QtWidgets import QGraphicsTextItem
-            label = QGraphicsTextItem(f"Window {idx + 1}")
-            label.setDefaultTextColor(QColor(255, 255, 255))
-            label.setPos(x + 5, y + 5)
-            self.scene.addItem(label)
+    def get_arrangement(self) -> Dict[str, Tuple[int, int]]:
+        """Get current arrangement as dict"""
+        return {
+            name: (tile.grid_row, tile.grid_col)
+            for name, tile in self.tiles.items()
+        }
 
-        # Fit in view
-        self.fitInView(self.scene.sceneRect(), Qt.AspectRatioMode.KeepAspectRatio)
-
-    def set_pattern_preview(self, pattern: str, window_count: int,
-                           screen_geometry: ScreenGeometry, spacing: int = 10):
-        """
-        Preview a grid pattern before applying
-
-        Args:
-            pattern: Grid pattern name
-            window_count: Number of windows
-            screen_geometry: Screen dimensions
-            spacing: Spacing between windows in pixels
-        """
-        self.scene.clear()
+    def auto_arrange_grid(self, pattern: str):
+        """Auto-arrange tiles based on pattern"""
+        chars = list(self.tiles.keys())
+        if not chars:
+            return
 
         # Calculate positions based on pattern
-        positions = self._calculate_pattern_positions(
-            pattern, window_count, screen_geometry, spacing
-        )
-
-        if not positions:
-            return
-
-        # Create geometry dict
-        geometry_dict = {}
-        for idx, (x, y, w, h) in enumerate(positions):
-            geometry_dict[f"window_{idx}"] = {
-                "x": x, "y": y, "width": w, "height": h
-            }
-
-        self.preview_layout(geometry_dict)
-
-    def _calculate_pattern_positions(self, pattern: str, window_count: int,
-                                    screen: ScreenGeometry, spacing: int) -> List[Tuple[int, int, int, int]]:
-        """Calculate window positions for a pattern"""
-        positions = []
-
         if pattern == "2x2 Grid":
-            # 2x2 grid
-            cols, rows = 2, 2
-            w = (screen.width - spacing * 3) // cols
-            h = (screen.height - spacing * 3) // rows
-
-            for i in range(min(window_count, 4)):
-                row = i // cols
-                col = i % cols
-                x = screen.x + spacing + col * (w + spacing)
-                y = screen.y + spacing + row * (h + spacing)
-                positions.append((x, y, w, h))
-
+            positions = [(0, 0), (0, 1), (1, 0), (1, 1)]
         elif pattern == "3x1 Row":
-            # 3 windows in a row
-            cols = 3
-            w = (screen.width - spacing * 4) // cols
-            h = screen.height - spacing * 2
-
-            for i in range(min(window_count, 3)):
-                x = screen.x + spacing + i * (w + spacing)
-                y = screen.y + spacing
-                positions.append((x, y, w, h))
-
+            positions = [(0, 0), (0, 1), (0, 2)]
         elif pattern == "1x3 Column":
-            # 3 windows in a column
-            rows = 3
-            w = screen.width - spacing * 2
-            h = (screen.height - spacing * 4) // rows
-
-            for i in range(min(window_count, 3)):
-                x = screen.x + spacing
-                y = screen.y + spacing + i * (h + spacing)
-                positions.append((x, y, w, h))
-
+            positions = [(0, 0), (1, 0), (2, 0)]
         elif pattern == "4x1 Row":
-            # 4 windows in a row
-            cols = 4
-            w = (screen.width - spacing * 5) // cols
-            h = screen.height - spacing * 2
-
-            for i in range(min(window_count, 4)):
-                x = screen.x + spacing + i * (w + spacing)
-                y = screen.y + spacing
-                positions.append((x, y, w, h))
-
+            positions = [(0, 0), (0, 1), (0, 2), (0, 3)]
+        elif pattern == "2x3 Grid":
+            positions = [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2)]
+        elif pattern == "3x2 Grid":
+            positions = [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1)]
         elif pattern == "Main + Sides":
-            # Large main window + smaller side windows
-            if window_count >= 1:
-                # Main window (70% width)
-                main_w = int((screen.width - spacing * 3) * 0.7)
-                main_h = screen.height - spacing * 2
-                positions.append((screen.x + spacing, screen.y + spacing, main_w, main_h))
-
-            if window_count >= 2:
-                # Side windows (30% width, split vertically)
-                side_w = screen.width - main_w - spacing * 3
-                side_h = (screen.height - spacing * 3) // (window_count - 1)
-
-                for i in range(1, window_count):
-                    x = screen.x + main_w + spacing * 2
-                    y = screen.y + spacing + (i - 1) * (side_h + spacing)
-                    positions.append((x, y, side_w, side_h))
-
+            # First window is main (full height), rest are stacked on right
+            positions = [(0, 0)]
+            for i in range(1, len(chars)):
+                positions.append((i - 1, 1))
         elif pattern == "Cascade":
-            # Cascading windows with offset
-            offset = 40
-            w = screen.width - spacing * 2 - offset * (window_count - 1)
-            h = screen.height - spacing * 2 - offset * (window_count - 1)
+            positions = [(i, i) for i in range(len(chars))]
+        elif pattern == "Stacked (All Same Position)":
+            positions = [(0, 0)] * len(chars)
+            for tile in self.tiles.values():
+                tile.set_stacked(True)
+        else:
+            # Default: sequential grid fill
+            positions = []
+            for i in range(len(chars)):
+                row = i // self.grid_cols
+                col = i % self.grid_cols
+                positions.append((row, col))
 
-            for i in range(window_count):
-                x = screen.x + spacing + i * offset
-                y = screen.y + spacing + i * offset
-                positions.append((x, y, w, h))
+        # Apply positions
+        for idx, char_name in enumerate(chars):
+            if idx < len(positions):
+                row, col = positions[idx]
+                tile = self.tiles[char_name]
 
-        return positions
+                # Remove from old position
+                self.grid_layout.removeWidget(tile)
+
+                # Add to new position
+                tile.set_position(row, col)
+                self.grid_layout.addWidget(tile, row, col)
+
+        self.arrangement_changed.emit(self.get_arrangement())
 
 
 class GridApplier:
@@ -454,8 +306,6 @@ class GridApplier:
                 self.logger.error("xrandr failed")
                 return None
 
-            # Parse xrandr output
-            # Looking for lines like: "HDMI-1 connected primary 1920x1080+0+0"
             monitors = []
             for line in result.stdout.split('\n'):
                 if ' connected' in line:
@@ -468,9 +318,8 @@ class GridApplier:
             if monitor < len(monitors):
                 return monitors[monitor]
             elif monitors:
-                return monitors[0]  # Default to first monitor
+                return monitors[0]
 
-            # Fallback: assume 1920x1080 at 0,0
             self.logger.warning("Could not parse xrandr output, using default geometry")
             return ScreenGeometry(0, 0, 1920, 1080, True)
 
@@ -478,429 +327,404 @@ class GridApplier:
             self.logger.error(f"Failed to get screen geometry: {e}")
             return ScreenGeometry(0, 0, 1920, 1080, True)
 
-    def apply_grid(self, pattern: str, window_ids: List[str],
-                   monitor: int = 0, spacing: int = 10) -> bool:
+    def apply_arrangement(self, arrangement: Dict[str, Tuple[int, int]],
+                         window_map: Dict[str, str],
+                         screen: ScreenGeometry,
+                         grid_rows: int, grid_cols: int,
+                         spacing: int = 10,
+                         stacked: bool = False) -> bool:
         """
-        Apply grid pattern to windows
+        Apply arrangement to windows
 
         Args:
-            pattern: Grid pattern display name
-            window_ids: List of X11 window IDs
-            monitor: Monitor index
+            arrangement: {char_name: (row, col)}
+            window_map: {char_name: window_id}
+            screen: Screen geometry
+            grid_rows, grid_cols: Grid dimensions
             spacing: Spacing between windows
-
-        Returns:
-            bool: Success
-        """
-        screen = self.get_screen_geometry(monitor)
-        if not screen:
-            return False
-
-        # Convert display name to enum
-        pattern_enum = pattern_display_to_enum(pattern)
-
-        # Calculate layout
-        try:
-            geometry_dict = self.layout_manager.calculate_grid_layout(
-                pattern_enum, window_ids, screen.__dict__, spacing
-            )
-
-            # Apply to windows
-            return self.move_windows(geometry_dict)
-
-        except Exception as e:
-            self.logger.error(f"Failed to apply grid: {e}")
-            return False
-
-    def move_windows(self, geometry_dict: Dict[str, Dict]) -> bool:
-        """
-        Move windows to specified positions using xdotool
-
-        Args:
-            geometry_dict: {window_id: {"x": x, "y": y, "width": w, "height": h}}
-
-        Returns:
-            bool: Success
+            stacked: If True, all windows at same position
         """
         try:
-            for window_id, geom in geometry_dict.items():
-                # Move window
-                subprocess.run(
-                    ['xdotool', 'windowmove', '--sync', window_id,
-                     str(geom["x"]), str(geom["y"])],
-                    capture_output=True,
-                    timeout=2
-                )
+            if stacked:
+                # All windows same size and position
+                for char_name, window_id in window_map.items():
+                    x = screen.x + spacing
+                    y = screen.y + spacing
+                    w = screen.width - spacing * 2
+                    h = screen.height - spacing * 2
 
-                # Resize window
-                subprocess.run(
-                    ['xdotool', 'windowsize', '--sync', window_id,
-                     str(geom["width"]), str(geom["height"])],
-                    capture_output=True,
-                    timeout=2
-                )
+                    self._move_window(window_id, x, y, w, h)
+            else:
+                # Grid-based arrangement
+                cell_width = (screen.width - spacing * (grid_cols + 1)) // grid_cols
+                cell_height = (screen.height - spacing * (grid_rows + 1)) // grid_rows
 
-            self.logger.info(f"Applied layout to {len(geometry_dict)} windows")
+                for char_name, (row, col) in arrangement.items():
+                    if char_name not in window_map:
+                        continue
+
+                    window_id = window_map[char_name]
+
+                    x = screen.x + spacing + col * (cell_width + spacing)
+                    y = screen.y + spacing + row * (cell_height + spacing)
+
+                    self._move_window(window_id, x, y, cell_width, cell_height)
+
+            self.logger.info(f"Applied arrangement to {len(window_map)} windows")
             return True
 
         except Exception as e:
-            self.logger.error(f"Failed to move windows: {e}")
+            self.logger.error(f"Failed to apply arrangement: {e}")
             return False
+
+    def _move_window(self, window_id: str, x: int, y: int, w: int, h: int):
+        """Move and resize a single window"""
+        subprocess.run(
+            ['xdotool', 'windowmove', '--sync', window_id, str(x), str(y)],
+            capture_output=True, timeout=2
+        )
+        subprocess.run(
+            ['xdotool', 'windowsize', '--sync', window_id, str(w), str(h)],
+            capture_output=True, timeout=2
+        )
 
 
 class LayoutsTab(QWidget):
-    """Main Layouts Tab widget"""
-    layout_applied = Signal(str)  # preset name
+    """Main Layouts Tab with group-based arrangement"""
 
-    def __init__(self, layout_manager, main_tab):
+    layout_applied = Signal(str)
+
+    def __init__(self, layout_manager, main_tab, settings_manager=None, character_manager=None):
         super().__init__()
         self.layout_manager = layout_manager
         self.main_tab = main_tab
+        self.settings_manager = settings_manager
+        self.character_manager = character_manager
         self.logger = logging.getLogger(__name__)
 
         self.grid_applier = GridApplier(layout_manager)
+        self.cycling_groups: Dict[str, List[str]] = {}
 
+        self._load_groups()
         self._setup_ui()
-        self._populate_layouts()
+
+    def _load_groups(self):
+        """Load cycling groups from settings"""
+        if self.settings_manager:
+            groups = self.settings_manager.get("cycling_groups", {})
+            if isinstance(groups, dict):
+                self.cycling_groups = groups
+
+        # Ensure default group exists
+        if "Default" not in self.cycling_groups:
+            self.cycling_groups["Default"] = []
 
     def _setup_ui(self):
-        layout = QHBoxLayout()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
 
-        # Splitter
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        # Top section: Group selector and pattern
+        top_section = self._create_top_section()
+        layout.addWidget(top_section)
 
-        # Left panel: Layout list
-        left_panel = self._create_left_panel()
-        splitter.addWidget(left_panel)
+        # Middle section: Arrangement grid
+        grid_section = self._create_grid_section()
+        layout.addWidget(grid_section, stretch=1)
 
-        # Right panel: Grid options and visualizer
-        right_panel = self._create_right_panel()
-        splitter.addWidget(right_panel)
-
-        splitter.setSizes([400, 600])
-        layout.addWidget(splitter)
+        # Bottom section: Apply buttons
+        bottom_section = self._create_bottom_section()
+        layout.addWidget(bottom_section)
 
         self.setLayout(layout)
 
-    def _create_left_panel(self) -> QWidget:
-        """Create layout list panel"""
-        panel = QWidget()
-        layout = QVBoxLayout()
+        # Initial update
+        self._on_group_selected()
 
-        # Title
-        title = QLabel("Saved Layouts")
-        font = QFont()
-        font.setPointSize(12)
-        font.setBold(True)
-        title.setFont(font)
-        layout.addWidget(title)
+    def _create_top_section(self) -> QWidget:
+        """Create group selector and pattern options"""
+        section = QGroupBox("Layout Configuration")
+        layout = QHBoxLayout()
 
-        # Toolbar
-        toolbar = QHBoxLayout()
+        # Group selector
+        group_layout = QVBoxLayout()
+        group_layout.addWidget(QLabel("Select Group:"))
 
-        self.refresh_btn = QPushButton("Refresh")
-        self.refresh_btn.clicked.connect(self._populate_layouts)
-        toolbar.addWidget(self.refresh_btn)
+        self.group_combo = QComboBox()
+        self._refresh_groups()
+        self.group_combo.currentTextChanged.connect(self._on_group_selected)
+        group_layout.addWidget(self.group_combo)
 
-        self.save_btn = QPushButton("Save Current")
-        self.save_btn.setToolTip("Save current window positions as new layout")
-        self.save_btn.clicked.connect(self._save_current_layout)
-        toolbar.addWidget(self.save_btn)
+        self.refresh_groups_btn = QPushButton("Refresh Groups")
+        self.refresh_groups_btn.clicked.connect(self._refresh_groups)
+        group_layout.addWidget(self.refresh_groups_btn)
 
-        toolbar.addStretch()
-        layout.addLayout(toolbar)
-
-        # Layout list
-        self.layout_list = QListWidget()
-        self.layout_list.itemSelectionChanged.connect(self._on_layout_selected)
-        self.layout_list.itemDoubleClicked.connect(self._load_selected_layout)
-        layout.addWidget(self.layout_list)
-
-        # Action buttons
-        action_layout = QHBoxLayout()
-
-        self.load_btn = QPushButton("Load Layout")
-        self.load_btn.clicked.connect(self._load_selected_layout)
-        self.load_btn.setEnabled(False)
-        action_layout.addWidget(self.load_btn)
-
-        self.delete_btn = QPushButton("Delete")
-        self.delete_btn.clicked.connect(self._delete_selected_layout)
-        self.delete_btn.setEnabled(False)
-        action_layout.addWidget(self.delete_btn)
-
-        layout.addLayout(action_layout)
-
-        panel.setLayout(layout)
-        return panel
-
-    def _create_right_panel(self) -> QWidget:
-        """Create grid options and visualizer panel"""
-        panel = QWidget()
-        layout = QVBoxLayout()
-
-        # Grid pattern options
-        options_group = QGroupBox("Grid Pattern Options")
-        options_layout = QVBoxLayout()
+        layout.addLayout(group_layout)
 
         # Pattern selector
-        pattern_layout = QFormLayout()
+        pattern_layout = QVBoxLayout()
+        pattern_layout.addWidget(QLabel("Grid Pattern:"))
 
         self.pattern_combo = QComboBox()
         self.pattern_combo.addItems(get_all_patterns())
-        self.pattern_combo.currentTextChanged.connect(self._update_pattern_preview)
-        pattern_layout.addRow("Pattern:", self.pattern_combo)
+        self.pattern_combo.currentTextChanged.connect(self._on_pattern_changed)
+        pattern_layout.addWidget(self.pattern_combo)
 
-        self.window_count_spin = QSpinBox()
-        self.window_count_spin.setRange(1, 16)
-        self.window_count_spin.setValue(4)
-        self.window_count_spin.valueChanged.connect(self._update_pattern_preview)
-        pattern_layout.addRow("Windows:", self.window_count_spin)
+        self.auto_arrange_btn = QPushButton("Auto-Arrange")
+        self.auto_arrange_btn.clicked.connect(self._auto_arrange)
+        pattern_layout.addWidget(self.auto_arrange_btn)
 
+        layout.addLayout(pattern_layout)
+
+        # Grid size options
+        size_layout = QVBoxLayout()
+        size_layout.addWidget(QLabel("Grid Size:"))
+
+        size_row = QHBoxLayout()
+        self.rows_spin = QSpinBox()
+        self.rows_spin.setRange(1, 6)
+        self.rows_spin.setValue(3)
+        self.rows_spin.setPrefix("Rows: ")
+        self.rows_spin.valueChanged.connect(self._update_grid_size)
+        size_row.addWidget(self.rows_spin)
+
+        self.cols_spin = QSpinBox()
+        self.cols_spin.setRange(1, 6)
+        self.cols_spin.setValue(4)
+        self.cols_spin.setPrefix("Cols: ")
+        self.cols_spin.valueChanged.connect(self._update_grid_size)
+        size_row.addWidget(self.cols_spin)
+
+        size_layout.addLayout(size_row)
+
+        # Spacing
+        spacing_row = QHBoxLayout()
+        spacing_row.addWidget(QLabel("Spacing:"))
         self.spacing_spin = QSpinBox()
         self.spacing_spin.setRange(0, 50)
         self.spacing_spin.setValue(10)
         self.spacing_spin.setSuffix(" px")
-        self.spacing_spin.valueChanged.connect(self._update_pattern_preview)
-        pattern_layout.addRow("Spacing:", self.spacing_spin)
+        spacing_row.addWidget(self.spacing_spin)
+        size_layout.addLayout(spacing_row)
+
+        layout.addLayout(size_layout)
+
+        # Monitor selector
+        monitor_layout = QVBoxLayout()
+        monitor_layout.addWidget(QLabel("Monitor:"))
 
         self.monitor_spin = QSpinBox()
         self.monitor_spin.setRange(0, 3)
         self.monitor_spin.setValue(0)
-        pattern_layout.addRow("Monitor:", self.monitor_spin)
+        monitor_layout.addWidget(self.monitor_spin)
 
-        options_layout.addLayout(pattern_layout)
+        # Stacking checkbox
+        self.stack_checkbox = QCheckBox("Stack Windows")
+        self.stack_checkbox.setToolTip("Place all windows at the same position (overlapping)")
+        monitor_layout.addWidget(self.stack_checkbox)
 
-        # Apply button
-        self.apply_pattern_btn = QPushButton("Apply Pattern to Active Windows")
-        self.apply_pattern_btn.clicked.connect(self._apply_pattern_to_active)
-        options_layout.addWidget(self.apply_pattern_btn)
+        layout.addLayout(monitor_layout)
 
-        options_group.setLayout(options_layout)
-        layout.addWidget(options_group)
+        section.setLayout(layout)
+        return section
 
-        # Visualizer
-        visualizer_group = QGroupBox("Layout Preview")
-        visualizer_layout = QVBoxLayout()
+    def _create_grid_section(self) -> QWidget:
+        """Create arrangement grid"""
+        section = QGroupBox("Window Arrangement")
+        layout = QVBoxLayout()
 
-        self.visualizer = GridPatternVisualizer()
-        visualizer_layout.addWidget(self.visualizer)
+        # Instructions
+        instructions = QLabel(
+            "Characters from the selected group are shown below. "
+            "Click 'Auto-Arrange' to position them based on the selected pattern, "
+            "or drag tiles to customize positions."
+        )
+        instructions.setWordWrap(True)
+        instructions.setStyleSheet("color: #888; font-style: italic; padding: 5px;")
+        layout.addWidget(instructions)
 
-        visualizer_group.setLayout(visualizer_layout)
-        layout.addWidget(visualizer_group)
+        # Scroll area for grid
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setMinimumHeight(300)
 
-        panel.setLayout(layout)
-        return panel
+        self.arrangement_grid = ArrangementGrid()
+        scroll.setWidget(self.arrangement_grid)
 
-    def _populate_layouts(self):
-        """Populate layout list from LayoutManager"""
-        self.layout_list.clear()
+        layout.addWidget(scroll)
 
-        presets = self.layout_manager.get_all_presets()
+        section.setLayout(layout)
+        return section
 
-        for preset in presets:
-            item = QListWidgetItem()
-            widget = LayoutListItem(preset)
-            item.setSizeHint(widget.sizeHint())
-            item.setData(Qt.ItemDataRole.UserRole, preset)
+    def _create_bottom_section(self) -> QWidget:
+        """Create apply buttons section"""
+        section = QWidget()
+        layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
 
-            self.layout_list.addItem(item)
-            self.layout_list.setItemWidget(item, widget)
+        # Info label
+        self.info_label = QLabel("Select a group to begin")
+        self.info_label.setStyleSheet("color: #888;")
+        layout.addWidget(self.info_label)
 
-        if not presets:
-            placeholder = QListWidgetItem("No saved layouts")
-            placeholder.setFlags(Qt.ItemFlag.NoItemFlags)
-            self.layout_list.addItem(placeholder)
+        layout.addStretch()
 
-        self.logger.info(f"Loaded {len(presets)} layout presets")
+        # Apply to active windows button
+        self.apply_active_btn = QPushButton("Apply to Active Windows")
+        self.apply_active_btn.setToolTip("Apply layout to currently detected EVE windows")
+        self.apply_active_btn.clicked.connect(self._apply_to_active_windows)
+        self.apply_active_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #ff8c00;
+                color: black;
+                font-weight: bold;
+                padding: 10px 20px;
+            }
+            QPushButton:hover {
+                background-color: #ffa500;
+            }
+        """)
+        layout.addWidget(self.apply_active_btn)
 
-    def _on_layout_selected(self):
-        """Handle layout selection"""
-        selected = self.layout_list.selectedItems()
-        has_selection = len(selected) > 0 and selected[0].data(Qt.ItemDataRole.UserRole) is not None
+        section.setLayout(layout)
+        return section
 
-        self.load_btn.setEnabled(has_selection)
-        self.delete_btn.setEnabled(has_selection)
+    def _refresh_groups(self):
+        """Refresh group list from settings"""
+        self._load_groups()
 
-        if has_selection:
-            preset = selected[0].data(Qt.ItemDataRole.UserRole)
-            # Preview the layout
-            self.visualizer.preview_layout(preset.windows)
+        current = self.group_combo.currentText() if self.group_combo.count() > 0 else None
 
-    def _load_selected_layout(self):
-        """Load selected layout and apply to windows"""
-        selected = self.layout_list.selectedItems()
-        if not selected:
-            return
+        self.group_combo.blockSignals(True)
+        self.group_combo.clear()
 
-        preset = selected[0].data(Qt.ItemDataRole.UserRole)
-        if not preset:
-            return
+        # Add "All Active Windows" option
+        self.group_combo.addItem("All Active Windows")
 
-        try:
-            # Apply layout using GridApplier
-            success = self.grid_applier.move_windows(preset.windows)
+        for group_name in sorted(self.cycling_groups.keys()):
+            self.group_combo.addItem(group_name)
 
-            if success:
-                QMessageBox.information(
-                    self,
-                    "Success",
-                    f"Layout '{preset.name}' applied successfully!"
-                )
-                self.layout_applied.emit(preset.name)
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Error",
-                    "Failed to apply layout. Check logs for details."
-                )
+        # Restore selection
+        if current:
+            idx = self.group_combo.findText(current)
+            if idx >= 0:
+                self.group_combo.setCurrentIndex(idx)
 
-        except Exception as e:
-            self.logger.error(f"Failed to load layout: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to load layout: {e}")
+        self.group_combo.blockSignals(False)
 
-    def _save_current_layout(self):
-        """Save current window positions as new layout"""
-        # Get current windows from main tab
+        self.logger.info(f"Loaded {len(self.cycling_groups)} groups")
+
+    def _on_group_selected(self):
+        """Handle group selection"""
+        group_name = self.group_combo.currentText()
+
+        # Clear current tiles
+        self.arrangement_grid.clear_tiles()
+
+        if group_name == "All Active Windows":
+            # Get all active windows from main_tab
+            if hasattr(self.main_tab, 'window_manager'):
+                for window_id, frame in self.main_tab.window_manager.preview_frames.items():
+                    self.arrangement_grid.add_character(frame.character_name)
+
+            self.info_label.setText(f"Showing all active windows")
+        else:
+            # Get characters from group
+            members = self.cycling_groups.get(group_name, [])
+            for idx, char_name in enumerate(members):
+                row = idx // self.arrangement_grid.grid_cols
+                col = idx % self.arrangement_grid.grid_cols
+                self.arrangement_grid.add_character(char_name, row, col)
+
+            self.info_label.setText(f"Group '{group_name}': {len(members)} characters")
+
+        # Auto-arrange if pattern is selected
+        if self.pattern_combo.currentText() != "Custom":
+            self._auto_arrange()
+
+    def _on_pattern_changed(self):
+        """Handle pattern change"""
+        pattern = self.pattern_combo.currentText()
+
+        # Update stacking checkbox
+        if pattern == "Stacked (All Same Position)":
+            self.stack_checkbox.setChecked(True)
+        else:
+            self.stack_checkbox.setChecked(False)
+
+        # Auto-arrange with new pattern
+        self._auto_arrange()
+
+    def _update_grid_size(self):
+        """Update grid dimensions"""
+        rows = self.rows_spin.value()
+        cols = self.cols_spin.value()
+        self.arrangement_grid.set_grid_size(rows, cols)
+
+    def _auto_arrange(self):
+        """Auto-arrange tiles based on pattern"""
+        pattern = self.pattern_combo.currentText()
+        self.arrangement_grid.auto_arrange_grid(pattern)
+
+    def _apply_to_active_windows(self):
+        """Apply layout to active windows"""
         if not hasattr(self.main_tab, 'window_manager'):
             QMessageBox.warning(self, "Error", "Main tab not initialized")
             return
 
-        current_windows = {}
-        for window_id, preview_widget in self.main_tab.window_manager.preview_frames.items():
-            # Get window geometry using xdotool
-            try:
-                result = subprocess.run(
-                    ['xdotool', 'getwindowgeometry', '--shell', window_id],
-                    capture_output=True,
-                    text=True,
-                    timeout=2
-                )
+        # Get arrangement
+        arrangement = self.arrangement_grid.get_arrangement()
+        if not arrangement:
+            QMessageBox.warning(self, "No Windows", "No windows in arrangement")
+            return
 
-                if result.returncode == 0:
-                    geom = {}
-                    for line in result.stdout.split('\n'):
-                        if '=' in line:
-                            key, value = line.split('=', 1)
-                            if key in ['X', 'Y', 'WIDTH', 'HEIGHT']:
-                                geom[key.lower()] = int(value)
+        # Build window map (char_name -> window_id)
+        window_map = {}
+        wm = self.main_tab.window_manager
 
-                    if len(geom) == 4:
-                        current_windows[window_id] = {
-                            "x": geom["x"],
-                            "y": geom["y"],
-                            "width": geom["width"],
-                            "height": geom["height"]
-                        }
+        for window_id, frame in wm.preview_frames.items():
+            if frame.character_name in arrangement:
+                window_map[frame.character_name] = window_id
 
-            except Exception as e:
-                self.logger.warning(f"Failed to get geometry for window {window_id}: {e}")
-
-        if not current_windows:
+        if not window_map:
             QMessageBox.warning(
-                self,
-                "No Windows",
-                "No active windows to save. Add windows in the Main tab first."
+                self, "No Matching Windows",
+                "None of the characters in the arrangement have active windows.\n\n"
+                "Make sure the EVE clients are running and detected."
             )
             return
 
-        # Show save dialog
-        dialog = SaveLayoutDialog(self.layout_manager, current_windows, self)
-        if dialog.exec():
-            self._populate_layouts()
+        # Get screen geometry
+        monitor = self.monitor_spin.value()
+        screen = self.grid_applier.get_screen_geometry(monitor)
 
-    def _delete_selected_layout(self):
-        """Delete selected layout"""
-        selected = self.layout_list.selectedItems()
-        if not selected:
+        if not screen:
+            QMessageBox.warning(self, "Error", "Could not get screen geometry")
             return
 
-        preset = selected[0].data(Qt.ItemDataRole.UserRole)
-        if not preset:
-            return
-
-        reply = QMessageBox.question(
-            self,
-            "Confirm Delete",
-            f"Delete layout '{preset.name}'?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        # Apply arrangement
+        success = self.grid_applier.apply_arrangement(
+            arrangement=arrangement,
+            window_map=window_map,
+            screen=screen,
+            grid_rows=self.rows_spin.value(),
+            grid_cols=self.cols_spin.value(),
+            spacing=self.spacing_spin.value(),
+            stacked=self.stack_checkbox.isChecked()
         )
 
-        if reply == QMessageBox.StandardButton.Yes:
-            try:
-                self.layout_manager.delete_preset(preset.name)
-                self._populate_layouts()
-                self.logger.info(f"Deleted layout: {preset.name}")
-            except Exception as e:
-                self.logger.error(f"Failed to delete layout: {e}")
-                QMessageBox.critical(self, "Error", f"Failed to delete layout: {e}")
-
-    def _update_pattern_preview(self):
-        """Update pattern preview based on current settings"""
-        pattern = self.pattern_combo.currentText()
-        window_count = self.window_count_spin.value()
-        spacing = self.spacing_spin.value()
-        monitor = self.monitor_spin.value()
-
-        screen = self.grid_applier.get_screen_geometry(monitor)
-        if screen:
-            self.visualizer.set_pattern_preview(pattern, window_count, screen, spacing)
-
-    def _apply_pattern_to_active(self):
-        """Apply selected grid pattern to active windows"""
-        # Get active windows from main tab
-        if not hasattr(self.main_tab, 'window_manager'):
-            QMessageBox.warning(self, "Error", "Main tab not initialized")
-            return
-
-        window_ids = list(self.main_tab.window_manager.preview_frames.keys())
-
-        if not window_ids:
-            QMessageBox.warning(
-                self,
-                "No Windows",
-                "No active windows to apply pattern to. Add windows in the Main tab first."
+        if success:
+            QMessageBox.information(
+                self, "Success",
+                f"Applied layout to {len(window_map)} windows!"
             )
-            return
-
-        pattern = self.pattern_combo.currentText()
-        monitor = self.monitor_spin.value()
-        spacing = self.spacing_spin.value()
-
-        try:
-            success = self.grid_applier.apply_grid(pattern, window_ids, monitor, spacing)
-
-            if success:
-                QMessageBox.information(
-                    self,
-                    "Success",
-                    f"Applied {pattern} pattern to {len(window_ids)} windows!"
-                )
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Error",
-                    "Failed to apply pattern. Check logs for details."
-                )
-
-        except Exception as e:
-            self.logger.error(f"Failed to apply pattern: {e}")
-            QMessageBox.critical(self, "Error", f"Failed to apply pattern: {e}")
-
-    def load_layout(self, preset_name: str):
-        """
-        Load layout by name (called from other tabs)
-
-        Args:
-            preset_name: Name of preset to load
-        """
-        presets = self.layout_manager.get_all_presets()
-        preset = next((p for p in presets if p.name == preset_name), None)
-
-        if preset:
-            success = self.grid_applier.move_windows(preset.windows)
-            if success:
-                self.layout_applied.emit(preset.name)
-                self.logger.info(f"Loaded layout: {preset_name}")
+            self.layout_applied.emit(self.pattern_combo.currentText())
         else:
-            self.logger.warning(f"Layout not found: {preset_name}")
+            QMessageBox.warning(
+                self, "Error",
+                "Failed to apply layout. Check logs for details."
+            )
+
+    def refresh_groups_from_settings(self):
+        """Called when groups change in hotkeys tab"""
+        self._refresh_groups()
+        self._on_group_selected()

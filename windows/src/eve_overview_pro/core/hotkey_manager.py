@@ -1,268 +1,246 @@
-"""
-Windows-specific Hotkey Manager
-Uses Windows API RegisterHotKey instead of Linux hotkey libraries
-"""
+"""Global hotkey management - supports both modifier combos and single keys"""
+from typing import Callable, Dict, Optional, Set
+from pynput import keyboard
+from PySide6.QtCore import QObject, Signal
 import logging
-from typing import Dict, Callable, Optional
-from PySide6.QtCore import QObject, Signal, QTimer
-import win32con
-import win32api
-import win32gui
 
 
 class HotkeyManager(QObject):
-    """
-    Global hotkey manager for Windows
-    Uses Windows RegisterHotKey API
-    """
-    hotkey_triggered = Signal(str)  # hotkey_name
+    """Manages global hotkeys - supports single keys and modifier combinations"""
 
-    # Modifier mapping
-    MOD_MAP = {
-        'ctrl': win32con.MOD_CONTROL,
-        'alt': win32con.MOD_ALT,
-        'shift': win32con.MOD_SHIFT,
-        'win': win32con.MOD_WIN
-    }
+    hotkey_triggered = Signal(str)
 
     def __init__(self):
         super().__init__()
+        self.hotkeys: Dict[str, Dict] = {}
+        self.combo_listener: Optional[keyboard.GlobalHotKeys] = None
+        self.key_listener: Optional[keyboard.Listener] = None
         self.logger = logging.getLogger(__name__)
-        self.hotkeys: Dict[int, str] = {}  # hotkey_id -> name
-        self.next_id = 1
-        self.running = False
-        self.hwnd = None
 
-        # Timer to check for hotkey messages
-        self.timer = QTimer()
-        self.timer.timeout.connect(self._check_messages)
+        # Track single-key hotkeys separately
+        self.single_key_hotkeys: Dict[str, Dict] = {}  # key_char -> {name, callback}
+        self.combo_hotkeys: Dict[str, Dict] = {}  # combo_string -> {name, callback}
 
-    def start(self):
-        """Start hotkey manager"""
-        if self.running:
-            return
+        # Track currently pressed modifiers
+        self.pressed_modifiers: Set[str] = set()
 
+    def register_hotkey(self, name: str, key_combo: str, callback: Callable) -> bool:
+        """Register a global hotkey"""
         try:
-            # Create invisible window for receiving hotkey messages
-            wc = win32gui.WNDCLASS()
-            wc.lpfnWndProc = self._wnd_proc
-            wc.lpszClassName = "EVEOverviewProHotkeys"
-            wc.hInstance = win32api.GetModuleHandle(None)
+            self.hotkeys[name] = {'combo': key_combo, 'callback': callback}
 
-            class_atom = win32gui.RegisterClass(wc)
-            self.hwnd = win32gui.CreateWindow(
-                class_atom, "EVE Overview Pro Hotkeys",
-                0, 0, 0, 0, 0, 0, 0, wc.hInstance, None
-            )
-
-            self.running = True
-            self.timer.start(50)  # Check every 50ms
-            self.logger.info("Hotkey manager started")
-
-        except Exception as e:
-            self.logger.error(f"Failed to start hotkey manager: {e}")
-
-    def stop(self):
-        """Stop hotkey manager and unregister all hotkeys"""
-        if not self.running:
-            return
-
-        self.running = False
-        self.timer.stop()
-
-        # Unregister all hotkeys
-        for hotkey_id in list(self.hotkeys.keys()):
-            try:
-                win32gui.UnregisterHotKey(self.hwnd, hotkey_id)
-            except:
-                pass
-
-        if self.hwnd:
-            try:
-                win32gui.DestroyWindow(self.hwnd)
-            except:
-                pass
-            self.hwnd = None
-
-        self.hotkeys.clear()
-        self.logger.info("Hotkey manager stopped")
-
-    def _wnd_proc(self, hwnd, msg, wparam, lparam):
-        """Window procedure to handle hotkey messages"""
-        if msg == win32con.WM_HOTKEY:
-            hotkey_id = wparam
-            if hotkey_id in self.hotkeys:
-                hotkey_name = self.hotkeys[hotkey_id]
-                self.hotkey_triggered.emit(hotkey_name)
-                self.logger.debug(f"Hotkey triggered: {hotkey_name}")
-
-        return win32gui.DefWindowProc(hwnd, msg, wparam, lparam)
-
-    def _check_messages(self):
-        """Check for Windows messages (hotkey events)"""
-        if not self.hwnd:
-            return
-
-        try:
-            # Process pending messages
-            if win32gui.PeekMessage(self.hwnd, 0, 0, win32con.PM_REMOVE):
-                win32gui.TranslateMessage(msg)
-                win32gui.DispatchMessage(msg)
-        except:
-            pass
-
-    def register_hotkey(self, name: str, combo: str, callback: Optional[Callable] = None) -> bool:
-        """
-        Register a global hotkey
-
-        Args:
-            name: Hotkey name
-            combo: Key combination (e.g., "<ctrl>+<alt>+1")
-            callback: Optional callback function
-
-        Returns:
-            bool: Success
-        """
-        if not self.running or not self.hwnd:
-            self.logger.warning("Hotkey manager not started")
-            return False
-
-        try:
-            # Parse combo string
-            modifiers, vk_code = self._parse_combo(combo)
-
-            # Register hotkey
-            hotkey_id = self.next_id
-            self.next_id += 1
-
-            success = win32gui.RegisterHotKey(self.hwnd, hotkey_id, modifiers, vk_code)
-
-            if success:
-                self.hotkeys[hotkey_id] = name
-                if callback:
-                    self.hotkey_triggered.connect(
-                        lambda n: callback() if n == name else None
-                    )
-                self.logger.info(f"Registered hotkey: {name} = {combo}")
-                return True
+            # Determine if single key or combo
+            if self._is_single_key(key_combo):
+                key_char = key_combo.strip('<>').lower()
+                self.single_key_hotkeys[key_char] = {'name': name, 'callback': callback}
             else:
-                self.logger.error(f"Failed to register hotkey: {name}")
-                return False
+                self.combo_hotkeys[key_combo] = {'name': name, 'callback': callback}
 
+            self._restart_listeners()
+            self.logger.info(f"Registered hotkey '{name}': {key_combo}")
+            return True
         except Exception as e:
-            self.logger.error(f"Failed to register hotkey {name}: {e}")
+            self.logger.error(f"Failed to register hotkey: {e}")
             return False
+
+    def _is_single_key(self, key_combo: str) -> bool:
+        """Check if hotkey is a single key (no modifiers)"""
+        # Single key format: <x> or just x
+        combo = key_combo.strip()
+
+        # Check if contains + (modifier separator)
+        if '+' in combo:
+            return False
+
+        # Check if it's a modifier key itself
+        modifiers = ['ctrl', 'alt', 'shift', 'cmd', 'super', 'win']
+        key = combo.strip('<>').lower()
+        if key in modifiers:
+            return False
+
+        return True
 
     def unregister_hotkey(self, name: str) -> bool:
-        """
-        Unregister a hotkey
+        """Unregister a hotkey"""
+        if name in self.hotkeys:
+            combo = self.hotkeys[name]['combo']
 
-        Args:
-            name: Hotkey name
+            # Remove from appropriate dict
+            if self._is_single_key(combo):
+                key_char = combo.strip('<>').lower()
+                if key_char in self.single_key_hotkeys:
+                    del self.single_key_hotkeys[key_char]
+            else:
+                if combo in self.combo_hotkeys:
+                    del self.combo_hotkeys[combo]
 
-        Returns:
-            bool: Success
-        """
+            del self.hotkeys[name]
+            self._restart_listeners()
+            return True
+        return False
+
+    def _restart_listeners(self):
+        """Restart all hotkey listeners"""
+        # Stop existing listeners
+        if self.combo_listener:
+            try:
+                self.combo_listener.stop()
+            except Exception:
+                pass
+            self.combo_listener = None
+
+        if self.key_listener:
+            try:
+                self.key_listener.stop()
+            except Exception:
+                pass
+            self.key_listener = None
+
+        # Start combo listener if we have combo hotkeys
+        if self.combo_hotkeys:
+            self._start_combo_listener()
+
+        # Start key listener if we have single-key hotkeys
+        if self.single_key_hotkeys:
+            self._start_key_listener()
+
+    def _start_combo_listener(self):
+        """Start the GlobalHotKeys listener for modifier combinations"""
+        hotkey_map = {}
+        for combo, info in self.combo_hotkeys.items():
+            callback = info['callback']
+            name = info['name']
+
+            def make_callback(cb=callback, hk_name=name):
+                def wrapper():
+                    cb()
+                    self.hotkey_triggered.emit(hk_name)
+                return wrapper
+
+            hotkey_map[combo] = make_callback()
+
         try:
-            # Find hotkey ID by name
-            hotkey_id = next((hid for hid, n in self.hotkeys.items() if n == name), None)
+            self.combo_listener = keyboard.GlobalHotKeys(hotkey_map)
+            self.combo_listener.start()
+        except Exception as e:
+            self.logger.error(f"Failed to start combo listener: {e}")
 
-            if hotkey_id:
-                win32gui.UnregisterHotKey(self.hwnd, hotkey_id)
-                del self.hotkeys[hotkey_id]
-                self.logger.info(f"Unregistered hotkey: {name}")
-                return True
+    def _start_key_listener(self):
+        """Start the Listener for single-key hotkeys"""
+        try:
+            self.key_listener = keyboard.Listener(
+                on_press=self._on_key_press,
+                on_release=self._on_key_release
+            )
+            self.key_listener.start()
+        except Exception as e:
+            self.logger.error(f"Failed to start key listener: {e}")
 
-            return False
+    def _on_key_press(self, key):
+        """Handle key press for single-key hotkeys"""
+        try:
+            # Track modifiers
+            if hasattr(key, 'name'):
+                if key.name in ('ctrl', 'ctrl_l', 'ctrl_r'):
+                    self.pressed_modifiers.add('ctrl')
+                    return
+                elif key.name in ('alt', 'alt_l', 'alt_r', 'alt_gr'):
+                    self.pressed_modifiers.add('alt')
+                    return
+                elif key.name in ('shift', 'shift_l', 'shift_r'):
+                    self.pressed_modifiers.add('shift')
+                    return
+
+            # Only trigger single-key hotkeys when NO modifiers are pressed
+            if self.pressed_modifiers:
+                return
+
+            # Get the key character
+            if hasattr(key, 'char') and key.char:
+                key_char = key.char.lower()
+            elif hasattr(key, 'name') and key.name:
+                key_char = key.name.lower()
+            else:
+                return
+
+            # Check if this key has a hotkey registered
+            if key_char in self.single_key_hotkeys:
+                info = self.single_key_hotkeys[key_char]
+                try:
+                    info['callback']()
+                    self.hotkey_triggered.emit(info['name'])
+                except Exception as e:
+                    self.logger.error(f"Error in hotkey callback: {e}")
 
         except Exception as e:
-            self.logger.error(f"Failed to unregister hotkey {name}: {e}")
-            return False
+            self.logger.debug(f"Key press handling error: {e}")
 
-    def _parse_combo(self, combo: str) -> tuple:
-        """
-        Parse key combination string
+    def _on_key_release(self, key):
+        """Handle key release to track modifiers"""
+        try:
+            if hasattr(key, 'name'):
+                if key.name in ('ctrl', 'ctrl_l', 'ctrl_r'):
+                    self.pressed_modifiers.discard('ctrl')
+                elif key.name in ('alt', 'alt_l', 'alt_r', 'alt_gr'):
+                    self.pressed_modifiers.discard('alt')
+                elif key.name in ('shift', 'shift_l', 'shift_r'):
+                    self.pressed_modifiers.discard('shift')
+        except Exception:
+            pass
 
-        Args:
-            combo: String like "<ctrl>+<alt>+1"
+    def start(self):
+        """Start listening"""
+        self._restart_listeners()
 
-        Returns:
-            Tuple of (modifiers, vk_code)
-        """
-        parts = combo.lower().replace('<', '').replace('>', '').split('+')
+    def stop(self):
+        """Stop listening"""
+        if self.combo_listener:
+            try:
+                self.combo_listener.stop()
+                self.combo_listener = None
+            except Exception:
+                pass
 
-        modifiers = 0
-        key = None
+        if self.key_listener:
+            try:
+                self.key_listener.stop()
+                self.key_listener = None
+            except Exception:
+                pass
+
+    def parse_key_combo(self, combo_string: str) -> str:
+        """Parse human-readable key combo"""
+        key_map = {
+            'ctrl': '<ctrl>', 'control': '<ctrl>',
+            'alt': '<alt>', 'shift': '<shift>',
+            'super': '<cmd>', 'win': '<cmd>', 'cmd': '<cmd>',
+        }
+
+        parts = combo_string.lower().split('+')
+        formatted_parts = []
 
         for part in parts:
             part = part.strip()
-            if part in self.MOD_MAP:
-                modifiers |= self.MOD_MAP[part]
+            if part in key_map:
+                formatted_parts.append(key_map[part])
+            elif len(part) == 1:
+                formatted_parts.append(part)
+            elif part.startswith('f') and part[1:].isdigit():
+                formatted_parts.append(f'<{part}>')
             else:
-                key = part
+                formatted_parts.append(f'<{part}>')
 
-        if not key:
-            raise ValueError(f"No key specified in combo: {combo}")
+        return '+'.join(formatted_parts)
 
-        # Convert key to virtual key code
-        vk_code = self._get_vk_code(key)
+    def format_key_combo(self, pynput_combo: str) -> str:
+        """Format pynput combo to human-readable"""
+        parts = pynput_combo.split('+')
+        formatted_parts = []
 
-        return modifiers, vk_code
+        for part in parts:
+            part = part.strip('<>').capitalize()
+            if part == 'Cmd':
+                part = 'Super'
+            formatted_parts.append(part)
 
-    def _get_vk_code(self, key: str) -> int:
-        """
-        Get Windows virtual key code for a key
-
-        Args:
-            key: Key string (e.g., "1", "f5", "a")
-
-        Returns:
-            Virtual key code
-        """
-        # Number keys
-        if key.isdigit():
-            return ord(key)
-
-        # Letter keys
-        if len(key) == 1 and key.isalpha():
-            return ord(key.upper())
-
-        # Function keys
-        if key.startswith('f') and key[1:].isdigit():
-            fn = int(key[1:])
-            if 1 <= fn <= 24:
-                return win32con.VK_F1 + fn - 1
-
-        # Special keys
-        special_keys = {
-            'space': win32con.VK_SPACE,
-            'enter': win32con.VK_RETURN,
-            'tab': win32con.VK_TAB,
-            'esc': win32con.VK_ESCAPE,
-            'backspace': win32con.VK_BACK,
-            'delete': win32con.VK_DELETE,
-            'insert': win32con.VK_INSERT,
-            'home': win32con.VK_HOME,
-            'end': win32con.VK_END,
-            'pageup': win32con.VK_PRIOR,
-            'pagedown': win32con.VK_NEXT,
-            'up': win32con.VK_UP,
-            'down': win32con.VK_DOWN,
-            'left': win32con.VK_LEFT,
-            'right': win32con.VK_RIGHT,
-        }
-
-        if key in special_keys:
-            return special_keys[key]
-
-        raise ValueError(f"Unknown key: {key}")
-
-    def get_registered_hotkeys(self) -> Dict[str, str]:
-        """
-        Get all registered hotkeys
-
-        Returns:
-            Dict mapping name to combo string
-        """
-        # This is a simplified version - we'd need to store combos
-        return {name: "registered" for name in self.hotkeys.values()}
+        return '+'.join(formatted_parts)

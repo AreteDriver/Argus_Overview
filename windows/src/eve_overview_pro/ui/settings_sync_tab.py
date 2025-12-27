@@ -35,10 +35,10 @@ class ScanWorker(QThread):
             characters = self.settings_sync.scan_for_characters()
 
             # Emit progress updates
-            total = len(characters)
+            total = len(characters) if characters else 1
             for idx, char in enumerate(characters):
                 progress = int((idx + 1) / total * 100)
-                self.scan_progress.emit(progress, f"Scanning {char.name}...")
+                self.scan_progress.emit(progress, f"Scanning {char.character_name}...")
 
             self.scan_progress.emit(100, "Scan complete")
             self.scan_complete.emit(characters)
@@ -70,22 +70,22 @@ class SyncWorker(QThread):
             total = len(self.target_chars)
 
             for idx, target_char in enumerate(self.target_chars):
-                self.sync_progress.emit(target_char.name, int(idx / total * 100))
+                self.sync_progress.emit(target_char.character_name, int(idx / total * 100))
 
                 try:
                     success = self.settings_sync.sync_settings(
-                        self.source_char,
-                        [target_char],
+                        self.source_char.character_name,
+                        [target_char.character_name],
                         backup=self.backup
                     )
-                    results[target_char.name] = success
+                    results[target_char.character_name] = success.get(target_char.character_name, False)
 
                     progress = int((idx + 1) / total * 100)
-                    self.sync_progress.emit(target_char.name, progress)
+                    self.sync_progress.emit(target_char.character_name, progress)
 
                 except Exception as e:
-                    self.logger.error(f"Failed to sync {target_char.name}: {e}")
-                    results[target_char.name] = False
+                    self.logger.error(f"Failed to sync {target_char.character_name}: {e}")
+                    results[target_char.character_name] = False
 
             self.sync_complete.emit(results)
 
@@ -114,7 +114,7 @@ class SyncPreviewDialog(QDialog):
 
         # Info header
         info_label = QLabel(
-            f"Syncing settings from <b>{self.source_char.name}</b> "
+            f"Syncing settings from <b>{self.source_char.character_name}</b> "
             f"to {len(self.target_chars)} character(s)"
         )
         info_label.setStyleSheet("font-size: 11pt; padding: 10px;")
@@ -157,7 +157,7 @@ class SyncPreviewDialog(QDialog):
         self.preview_table.setRowCount(0)
 
         # Get source files
-        source_dir = Path(self.source_char.settings_path)
+        source_dir = Path(self.source_char.settings_dir)
         if not source_dir.exists():
             QMessageBox.warning(self, "Error", f"Source directory not found: {source_dir}")
             return
@@ -166,7 +166,7 @@ class SyncPreviewDialog(QDialog):
 
         # For each target character
         for target_char in self.target_chars:
-            target_dir = Path(target_char.settings_path)
+            target_dir = Path(target_char.settings_dir)
 
             for source_file in source_files:
                 target_file = target_dir / source_file.name
@@ -418,12 +418,12 @@ class SettingsSyncTab(QWidget):
         # Populate source combo
         self.source_combo.clear()
         for char in characters:
-            self.source_combo.addItem(char.name, char)
+            self.source_combo.addItem(char.character_name, char)
 
         # Populate target list
         self.target_list.clear()
         for char in characters:
-            self.target_list.addItem(char.name)
+            self.target_list.addItem(char.character_name)
 
         if characters:
             self._log("Select source character and target character(s), then click 'Sync Settings'.")
@@ -439,7 +439,7 @@ class SettingsSyncTab(QWidget):
         """Handle source character selection"""
         source_char = self.source_combo.currentData()
         if source_char:
-            path = Path(source_char.settings_path)
+            path = Path(source_char.settings_dir)
             file_count = len(list(path.glob("*.dat"))) + len(list(path.glob("*.yaml")))
             self.source_info_label.setText(
                 f"Path: {path}\n"
@@ -466,7 +466,8 @@ class SettingsSyncTab(QWidget):
             from datetime import datetime
             dt = datetime.fromtimestamp(latest)
             return dt.strftime("%Y-%m-%d %H:%M")
-        except:
+        except (OSError, ValueError) as e:
+            self.logger.debug(f"Could not get last sync time: {e}")
             return "N/A"
 
     def _select_team(self):
@@ -513,7 +514,7 @@ class SettingsSyncTab(QWidget):
         # Get selected targets
         target_chars = []
         for item in self.target_list.selectedItems():
-            char = next((c for c in self.scanned_characters if c.name == item.text()), None)
+            char = next((c for c in self.scanned_characters if c.character_name == item.text()), None)
             if char:
                 target_chars.append(char)
 
@@ -535,7 +536,7 @@ class SettingsSyncTab(QWidget):
         # Get selected targets
         target_chars = []
         for item in self.target_list.selectedItems():
-            char = next((c for c in self.scanned_characters if c.name == item.text()), None)
+            char = next((c for c in self.scanned_characters if c.character_name == item.text()), None)
             if char:
                 target_chars.append(char)
 
@@ -547,7 +548,7 @@ class SettingsSyncTab(QWidget):
         reply = QMessageBox.question(
             self,
             "Confirm Sync",
-            f"Sync settings from '{source_char.name}' to {len(target_chars)} character(s)?\n\n"
+            f"Sync settings from '{source_char.character_name}' to {len(target_chars)} character(s)?\n\n"
             f"Backup: {'Yes' if self.backup_checkbox.isChecked() else 'No'}",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
@@ -561,7 +562,7 @@ class SettingsSyncTab(QWidget):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
 
-        self._log(f"Starting sync from '{source_char.name}' to {len(target_chars)} character(s)...")
+        self._log(f"Starting sync from '{source_char.character_name}' to {len(target_chars)} character(s)...")
 
         # Create and start worker
         self.sync_worker = SyncWorker(

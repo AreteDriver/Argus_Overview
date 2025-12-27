@@ -45,6 +45,10 @@ class MainWindowV21(QMainWindow):
             interval_seconds=self.settings_manager.get("general.auto_discovery_interval", 5)
         )
 
+        # v2.2: Window cycling state
+        self.cycling_index = 0  # Current position in cycling group
+        self.current_cycling_group = "Default"  # Active cycling group name
+
         # v2.2: Theme manager
         self.theme_manager = get_theme_manager()
 
@@ -73,7 +77,7 @@ class MainWindowV21(QMainWindow):
         # Create tabs
         self._create_main_tab()
         self._create_characters_tab()
-        self._create_layouts_tab()
+        self._create_hotkeys_tab()
         self._create_settings_sync_tab()
         self._create_settings_tab()
 
@@ -146,6 +150,17 @@ class MainWindowV21(QMainWindow):
 
         self.logger.info(f"Registered {len(char_hotkeys)} per-character hotkeys")
 
+        # v2.2: Cycling hotkeys
+        cycle_next_combo = self.settings_manager.get("hotkeys.cycle_next", "<ctrl>+<tab>")
+        cycle_prev_combo = self.settings_manager.get("hotkeys.cycle_prev", "<ctrl>+<shift>+<tab>")
+
+        if cycle_next_combo:
+            self.hotkey_manager.register_hotkey("cycle_next", cycle_next_combo, self._cycle_next)
+        if cycle_prev_combo:
+            self.hotkey_manager.register_hotkey("cycle_prev", cycle_prev_combo, self._cycle_prev)
+
+        self.logger.info(f"Registered cycling hotkeys: next={cycle_next_combo}, prev={cycle_prev_combo}")
+
     @Slot()
     def _toggle_visibility(self):
         """Toggle main window visibility"""
@@ -168,6 +183,88 @@ class MainWindowV21(QMainWindow):
         if hasattr(self, 'main_tab') and hasattr(self.main_tab, 'lock_btn'):
             self.main_tab.lock_btn.click()
 
+    def _get_cycling_group_members(self) -> list:
+        """Get members of the current cycling group"""
+        groups = self.settings_manager.get("cycling_groups", {})
+
+        # Use current cycling group, fall back to Default
+        if self.current_cycling_group in groups:
+            members = groups[self.current_cycling_group]
+        elif "Default" in groups:
+            members = groups["Default"]
+        else:
+            # If no groups, use all active windows
+            members = []
+            if hasattr(self, 'main_tab') and hasattr(self.main_tab, 'window_manager'):
+                for frame in self.main_tab.window_manager.preview_frames.values():
+                    members.append(frame.character_name)
+
+        return members
+
+    def _get_window_id_for_character(self, char_name: str) -> str:
+        """Get window ID for a character name"""
+        if hasattr(self, 'main_tab') and hasattr(self.main_tab, 'window_manager'):
+            for window_id, frame in self.main_tab.window_manager.preview_frames.items():
+                if frame.character_name == char_name:
+                    return window_id
+        return None
+
+    @Slot()
+    def _cycle_next(self):
+        """Cycle to next window in group"""
+        members = self._get_cycling_group_members()
+        if not members:
+            self.logger.warning("No members in cycling group")
+            return
+
+        # Advance index
+        self.cycling_index = (self.cycling_index + 1) % len(members)
+        char_name = members[self.cycling_index]
+
+        # Activate the window
+        window_id = self._get_window_id_for_character(char_name)
+        if window_id:
+            self._activate_window(window_id)
+            self.logger.info(f"Cycled to: {char_name} ({self.cycling_index + 1}/{len(members)})")
+        else:
+            self.logger.warning(f"Character '{char_name}' not found in active windows")
+            # Try next one
+            self._cycle_next()
+
+    @Slot()
+    def _cycle_prev(self):
+        """Cycle to previous window in group"""
+        members = self._get_cycling_group_members()
+        if not members:
+            self.logger.warning("No members in cycling group")
+            return
+
+        # Go back in index
+        self.cycling_index = (self.cycling_index - 1) % len(members)
+        char_name = members[self.cycling_index]
+
+        # Activate the window
+        window_id = self._get_window_id_for_character(char_name)
+        if window_id:
+            self._activate_window(window_id)
+            self.logger.info(f"Cycled to: {char_name} ({self.cycling_index + 1}/{len(members)})")
+        else:
+            self.logger.warning(f"Character '{char_name}' not found in active windows")
+            # Try previous one
+            self._cycle_prev()
+
+    def _activate_window(self, window_id: str):
+        """Activate a window by ID using xdotool"""
+        import subprocess
+        try:
+            subprocess.run(
+                ['xdotool', 'windowactivate', '--sync', window_id],
+                capture_output=True,
+                timeout=2
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to activate window {window_id}: {e}")
+
     @Slot(str)
     def _on_profile_selected(self, profile_name: str):
         """Handle profile selection from tray"""
@@ -182,7 +279,7 @@ class MainWindowV21(QMainWindow):
         """Show settings tab"""
         self.show()
         self.raise_()
-        self.tabs.setCurrentIndex(4)  # Settings tab
+        self.tabs.setCurrentIndex(4)  # Settings tab (Main=0, Characters=1, Hotkeys=2, SettingsSync=3, Settings=4)
 
     @Slot()
     def _reload_config(self):
@@ -347,6 +444,7 @@ class MainWindowV21(QMainWindow):
 
         # Connect signals
         self.main_tab.character_detected.connect(self._on_character_detected)
+        self.main_tab.layout_applied.connect(self._on_layout_applied)
 
     def _create_characters_tab(self):
         """Create character & team management tab"""
@@ -362,18 +460,21 @@ class MainWindowV21(QMainWindow):
         # Connect signals
         self.characters_tab.team_selected.connect(self._on_team_selected)
 
-    def _create_layouts_tab(self):
-        """Create layout presets tab"""
-        from eve_overview_pro.ui.layouts_tab import LayoutsTab
+    def _create_hotkeys_tab(self):
+        """Create hotkeys & cycling tab"""
+        from eve_overview_pro.ui.hotkeys_tab import HotkeysTab
 
-        self.layouts_tab = LayoutsTab(
-            self.layout_manager,
-            self.main_tab
+        self.hotkeys_tab = HotkeysTab(
+            self.character_manager,
+            self.settings_manager,
+            main_tab=self.main_tab
         )
-        self.tabs.addTab(self.layouts_tab, "Layouts")
+        self.tabs.addTab(self.hotkeys_tab, "Hotkeys & Cycling")
 
-        # Connect signals
-        self.layouts_tab.layout_applied.connect(self._on_layout_applied)
+        # Connect group changes to refresh layout sources in main tab
+        self.hotkeys_tab.group_changed.connect(
+            lambda: self.main_tab.refresh_layout_groups()
+        )
 
     def _create_settings_sync_tab(self):
         """Create EVE settings sync tab"""

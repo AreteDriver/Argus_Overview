@@ -15,12 +15,15 @@ v2.2 Features:
 - Themes (Dark, Light, EVE)
 - Hot reload configuration
 - Position lock for thumbnails
+- Single instance enforcement
 """
 import sys
 import logging
+import fcntl
+import os
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPalette, QColor
 
@@ -28,6 +31,56 @@ from PySide6.QtGui import QPalette, QColor
 sys.path.insert(0, str(Path(__file__).parent))
 
 from eve_overview_pro.ui.main_window_v21 import MainWindowV21
+
+
+class SingleInstance:
+    """
+    Ensures only one instance of the application can run at a time.
+    Uses a lock file with fcntl for reliable locking on Linux.
+    """
+
+    def __init__(self, app_name: str = "eve-veles-eyes"):
+        self.app_name = app_name
+        self.lock_file = None
+        self.lock_path = Path.home() / '.config' / 'eve-overview-pro' / f'{app_name}.lock'
+
+        # Ensure directory exists
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def try_lock(self) -> bool:
+        """
+        Try to acquire the lock.
+        Returns True if successful (first instance), False if already running.
+        """
+        try:
+            self.lock_file = open(self.lock_path, 'w')
+            fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            # Write PID to lock file
+            self.lock_file.write(str(os.getpid()))
+            self.lock_file.flush()
+            return True
+        except (IOError, OSError):
+            # Lock is held by another instance
+            if self.lock_file:
+                self.lock_file.close()
+                self.lock_file = None
+            return False
+
+    def release(self):
+        """Release the lock"""
+        if self.lock_file:
+            try:
+                fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
+                self.lock_file.close()
+            except:
+                pass
+            self.lock_file = None
+
+    def __enter__(self):
+        return self.try_lock()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.release()
 
 
 def setup_logging():
@@ -70,24 +123,43 @@ def main():
     """Main application entry point"""
     # Setup logging
     setup_logging()
-    
+
     logger = logging.getLogger(__name__)
     logger.info("Starting EVE Veles Eyes v2.2 Ultimate Edition")
-    
+
+    # Single instance check
+    single_instance = SingleInstance()
+    if not single_instance.try_lock():
+        logger.warning("Another instance is already running")
+        # Need QApplication to show message box
+        app = QApplication(sys.argv)
+        QMessageBox.warning(
+            None,
+            "Already Running",
+            "EVE Veles Eyes is already running.\n\n"
+            "Check your system tray for the existing instance."
+        )
+        sys.exit(1)
+
     # Create application
     app = QApplication(sys.argv)
-    app.setApplicationName("EVE Overview Pro")
-    app.setOrganizationName("EVE Overview Pro")
-    
+    app.setApplicationName("EVE Veles Eyes")
+    app.setOrganizationName("EVE Veles Eyes")
+
     # Setup theme
     setup_dark_theme(app)
-    
+
     # Create and show main window
     window = MainWindowV21()
     window.show()
-    
+
     # Run application
-    sys.exit(app.exec())
+    exit_code = app.exec()
+
+    # Release lock on exit
+    single_instance.release()
+
+    sys.exit(exit_code)
 
 
 if __name__ == '__main__':

@@ -189,81 +189,82 @@ class EVESettingsSync:
 
     def scan_for_characters(self) -> List[EVECharacterSettings]:
         """Scan for EVE character settings
-        
+
+        Scans settings directories for core_char_*.dat files and returns
+        one EVECharacterSettings per character found.
+
         Returns:
             List of found character settings
         """
         found_characters = []
         all_paths = self.eve_paths + self.custom_paths
-        
+
         for base_path in all_paths:
             if not base_path.exists():
                 continue
-            
+
             self.logger.info(f"Scanning EVE path: {base_path}")
-            
-            # Look for character directories
-            # EVE structure: /EVE/<tranquility|serenity>/settings_<CharacterName>_<ID>/
+
             try:
                 for server_dir in base_path.iterdir():
                     if not server_dir.is_dir():
                         continue
-                    
+
                     for settings_dir in server_dir.iterdir():
-                        if settings_dir.is_dir() and settings_dir.name.startswith('settings_'):
-                            char_settings = self._parse_character_settings(settings_dir)
+                        if not settings_dir.is_dir():
+                            continue
+                        if not settings_dir.name.startswith('settings'):
+                            continue
+
+                        # Scan for core_char_*.dat files inside settings directory
+                        for char_file in settings_dir.glob('core_char_*.dat'):
+                            char_settings = self._parse_char_file(char_file, settings_dir)
                             if char_settings:
                                 found_characters.append(char_settings)
                                 self.character_settings[char_settings.character_name] = char_settings
+
             except Exception as e:
                 self.logger.error(f"Error scanning {base_path}: {e}")
-        
+
         self.logger.info(f"Found {len(found_characters)} character settings")
         return found_characters
-    
-    def _parse_character_settings(self, settings_dir: Path) -> Optional[EVECharacterSettings]:
-        """Parse character settings directory
-        
+
+    def _parse_char_file(self, char_file: Path, settings_dir: Path) -> Optional[EVECharacterSettings]:
+        """Parse a core_char_*.dat file to extract character settings
+
         Args:
-            settings_dir: Settings directory path
-            
+            char_file: Path to core_char_*.dat file
+            settings_dir: Parent settings directory
+
         Returns:
             EVECharacterSettings if valid, None otherwise
         """
         try:
-            # Extract character name from directory
-            # Format: settings_CharacterName_12345678
-            dir_name = settings_dir.name
-            if '_' in dir_name:
-                parts = dir_name.split('_')
-                if len(parts) >= 2:
-                    char_name = parts[1]
-                else:
-                    char_name = "Unknown"
-            else:
-                char_name = dir_name
-            
-            # Look for core files
-            core_char = settings_dir / 'core_char_12345.dat'  # Placeholder
-            core_user = settings_dir / 'core_user_12345.dat'
-            
-            # Find actual core files
-            core_files = list(settings_dir.glob('core_*.dat'))
-            
-            has_settings = len(core_files) > 0
-            
+            # Extract character ID from filename (core_char_12345678.dat)
+            match = re.search(r'core_char_(\d+)\.dat$', char_file.name)
+            if not match:
+                return None
+
+            char_id = match.group(1)
+            char_name = self.get_character_name(char_id)
+
+            # Find corresponding user file if exists
+            user_files = list(settings_dir.glob('core_user_*.dat'))
+            core_user_file = user_files[0] if user_files else None
+
             char_settings = EVECharacterSettings(
                 character_name=char_name,
+                character_id=char_id,
                 settings_dir=settings_dir,
-                core_char_file=core_files[0] if core_files else core_char,
-                core_user_file=core_files[1] if len(core_files) > 1 else core_user,
-                has_settings=has_settings
+                core_char_file=char_file,
+                core_user_file=core_user_file,
+                has_settings=True
             )
-            
+
             return char_settings
-            
+
         except Exception as e:
-            self.logger.error(f"Error parsing settings dir {settings_dir}: {e}")
+            self.logger.error(f"Error parsing char file {char_file}: {e}")
             return None
     
     def sync_settings(self, source_char: str, target_chars: List[str],
