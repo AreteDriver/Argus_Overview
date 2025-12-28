@@ -13,7 +13,7 @@ class AboutDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("About EVE Overview Pro")
+        self.setWindowTitle("About EVE Veles Eyes")
         self.setMinimumWidth(500)
         self.setMinimumHeight(400)
         self._setup_ui()
@@ -23,7 +23,7 @@ class AboutDialog(QDialog):
         layout.setSpacing(15)
 
         # Title
-        title = QLabel("EVE Overview Pro")
+        title = QLabel("EVE Veles Eyes")
         title_font = QFont()
         title_font.setPointSize(20)
         title_font.setBold(True)
@@ -32,7 +32,7 @@ class AboutDialog(QDialog):
         layout.addWidget(title)
 
         # Version
-        version = QLabel("Version 2.1 Ultimate Edition")
+        version = QLabel("Version 2.2 Ultimate Edition")
         version_font = QFont()
         version_font.setPointSize(12)
         version.setFont(version_font)
@@ -84,7 +84,7 @@ class AboutDialog(QDialog):
         layout.addWidget(donation_label)
 
         donation_text = QLabel(
-            "If you find EVE Overview Pro useful,\n"
+            "If you find EVE Veles Eyes useful,\n"
             "consider supporting its development:"
         )
         donation_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -124,12 +124,12 @@ class AboutDialog(QDialog):
         # Links
         links_layout = QVBoxLayout()
 
-        github_link = QLabel('<a href="https://github.com/AreteDriver/eve-overview-pro">GitHub Repository</a>')
+        github_link = QLabel('<a href="https://github.com/AreteDriver/EVE_VelesEyes">GitHub Repository</a>')
         github_link.setOpenExternalLinks(True)
         github_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
         links_layout.addWidget(github_link)
 
-        issues_link = QLabel('<a href="https://github.com/AreteDriver/eve-overview-pro/issues">Report Issues</a>')
+        issues_link = QLabel('<a href="https://github.com/AreteDriver/EVE_VelesEyes/issues">Report Issues</a>')
         issues_link.setOpenExternalLinks(True)
         issues_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
         links_layout.addWidget(issues_link)

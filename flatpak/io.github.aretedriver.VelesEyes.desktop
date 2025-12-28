@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=EVE Veles Eyes
+Comment=Multi-window preview and management tool for EVE Online
+Exec=veles-eyes
+Icon=io.github.aretedriver.VelesEyes
+Terminal=false
+Type=Application
+Categories=Game;Utility;
+Keywords=EVE;Online;Multibox;Preview;Veles;
+StartupNotify=true

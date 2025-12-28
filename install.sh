@@ -1,10 +1,10 @@
 #!/bin/bash
-# EVE Overview Pro v2.1 Ultimate Edition - Installation Script
+# EVE Veles Eyes v2.2 Ultimate Edition - Installation Script
 
 set -e
 
 echo "================================================================"
-echo "EVE Overview Pro v2.1 Ultimate Edition"
+echo "EVE Veles Eyes v2.2 Ultimate Edition"
 echo "Installation Script"
 echo "================================================================"
 echo ""
@@ -47,7 +47,7 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     echo ""
     echo "Please install them using your package manager:"
     echo ""
-    
+
     if [ -f /etc/debian_version ]; then
         echo "  sudo apt-get install wmctrl xdotool imagemagick x11-apps"
     elif [ -f /etc/redhat-release ]; then
@@ -58,7 +58,7 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
         echo "  Install: wmctrl, xdotool, ImageMagick, x11-apps"
     fi
     echo ""
-    
+
     read -p "Continue anyway? (y/N) " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -67,7 +67,7 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
 fi
 
 # Create installation directory
-INSTALL_DIR="$HOME/eve-overview-pro"
+INSTALL_DIR="$HOME/eve-veles-eyes"
 echo ""
 echo "Creating installation directory: $INSTALL_DIR"
 
@@ -89,6 +89,7 @@ echo "✓ Installation directory created"
 # Copy files
 echo "Copying files..."
 cp -r src "$INSTALL_DIR/"
+cp -r assets "$INSTALL_DIR/" 2>/dev/null || true
 cp requirements.txt "$INSTALL_DIR/"
 cp README.md "$INSTALL_DIR/"
 echo "✓ Files copied"
@@ -121,47 +122,63 @@ RUNNER
 chmod +x "$INSTALL_DIR/run.sh"
 echo "✓ Launcher script created"
 
+# Copy and set up icon
+echo "Setting up application icon..."
+mkdir -p ~/.local/share/eve-veles-eyes/
+if [ -f "$INSTALL_DIR/assets/icon.png" ]; then
+    cp "$INSTALL_DIR/assets/icon.png" ~/.local/share/eve-veles-eyes/icon.png
+    ICON_PATH="$HOME/.local/share/eve-veles-eyes/icon.png"
+else
+    ICON_PATH="utilities-system-monitor"
+fi
+echo "✓ Icon set up"
+
 # Create desktop entry
 echo "Creating desktop entry..."
 mkdir -p ~/.local/share/applications
 
-cat > ~/.local/share/applications/eve-overview-pro.desktop << DESKTOP
+cat > ~/.local/share/applications/eve-veles-eyes.desktop << DESKTOP
 [Desktop Entry]
-Version=2.1
+Version=2.2
 Type=Application
-Name=EVE Overview Pro
-Comment=Multi-window preview tool for EVE Online
+Name=EVE Veles Eyes
+Comment=Multi-window preview and management tool for EVE Online
 Exec=$INSTALL_DIR/run.sh
-Icon=utilities-system-monitor
+Icon=$ICON_PATH
 Terminal=false
 Categories=Utility;Game;
-Keywords=eve;online;multibox;preview;
+Keywords=eve;online;multibox;preview;veles;
 DESKTOP
 
 echo "✓ Desktop entry created"
 
 # Create config directory
 echo "Creating configuration directory..."
-mkdir -p ~/.config/eve-overview-pro/profiles
-mkdir -p ~/.config/eve-overview-pro/layouts
+mkdir -p ~/.config/eve-veles-eyes/profiles
+mkdir -p ~/.config/eve-veles-eyes/layouts
 echo "✓ Configuration directory created"
+
+# Update desktop database
+if command -v update-desktop-database &> /dev/null; then
+    update-desktop-database ~/.local/share/applications 2>/dev/null || true
+fi
 
 echo ""
 echo "================================================================"
 echo "Installation Complete!"
 echo "================================================================"
 echo ""
-echo "EVE Overview Pro v2.1 has been installed to:"
+echo "EVE Veles Eyes v2.2 has been installed to:"
 echo "  $INSTALL_DIR"
 echo ""
-echo "To run EVE Overview Pro:"
+echo "To run EVE Veles Eyes:"
 echo "  $INSTALL_DIR/run.sh"
 echo ""
 echo "Or find it in your applications menu!"
 echo ""
 echo "Quick Start:"
 echo "  1. Launch EVE clients"
-echo "  2. Run EVE Overview Pro"
+echo "  2. Run EVE Veles Eyes"
 echo "  3. Go to Characters & Teams tab"
 echo "  4. Add your characters and create teams"
 echo "  5. Use Layouts tab to save window arrangements"

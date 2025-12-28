@@ -2,15 +2,43 @@
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
-![Version](https://img.shields.io/badge/version-2.2.0-blue)
-![Python](https://img.shields.io/badge/python-3.8+-green)
-![License](https://img.shields.io/badge/license-MIT-orange)
-![Platform](https://img.shields.io/badge/platform-Linux%20|%20Windows-lightgrey)
+[![CI](https://github.com/AreteDriver/EVE_VelesEyes/actions/workflows/ci.yml/badge.svg)](https://github.com/AreteDriver/EVE_VelesEyes/actions)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue)](https://github.com/AreteDriver/EVE_VelesEyes/releases)
+[![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
+[![Python](https://img.shields.io/badge/python-3.8+-green)](https://python.org)
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)]()
+[![Downloads](https://img.shields.io/github/downloads/AreteDriver/EVE_VelesEyes/total)](https://github.com/AreteDriver/EVE_VelesEyes/releases)
 
-## 💻 Platform Support
+## Screenshots
 
-- **🐧 Linux Version**: Full-featured native Linux application (this README)
-- **🪟 Windows Version**: See [windows/README_WINDOWS.md](windows/README_WINDOWS.md) for Windows .exe
+<p align="center">
+  <img src="docs/screenshots/main-window.png" alt="Main Window" width="800"/>
+</p>
+
+<details>
+<summary>More Screenshots</summary>
+
+### Team Management
+![Team Management](docs/screenshots/team-management.png)
+
+### Layout Presets
+![Layouts](docs/screenshots/layout-presets.png)
+
+### Visual Alerts
+![Alerts](docs/screenshots/visual-alerts.png)
+
+</details>
+
+## Demo
+
+![Demo GIF](docs/screenshots/demo.gif)
+
+---
+
+## Platform Support
+
+- **Linux Version**: Full-featured native Linux application (this README)
+- **Windows Version**: See [windows/README_WINDOWS.md](windows/README_WINDOWS.md) for Windows .exe
 
 ## ☕ Support Development
 
@@ -146,13 +174,16 @@ This release focuses on **usability, automation, and polish** with 14 new featur
 ### Installation
 
 ```bash
-# Extract and install
-tar -xzf eve-overview-pro-v2.1-ultimate.tar.gz
-cd eve-overview-pro-v2.1-complete
+# One-liner install
+curl -sSL https://raw.githubusercontent.com/AreteDriver/EVE_VelesEyes/main/install.sh | bash
+
+# Or manual installation
+git clone https://github.com/AreteDriver/EVE_VelesEyes
+cd EVE_VelesEyes
 ./install.sh
 
 # Run
-~/eve-overview-pro/run.sh
+~/eve-veles-eyes/run.sh
 ```
 
 ### First-Time Setup

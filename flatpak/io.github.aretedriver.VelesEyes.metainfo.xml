@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.aretedriver.VelesEyes</id>
+  <name>EVE Veles Eyes</name>
+  <summary>Multi-window preview and management for EVE Online</summary>
+  <metadata_license>MIT</metadata_license>
+  <project_license>MIT</project_license>
+
+  <description>
+    <p>
+      EVE Veles Eyes is a professional multi-boxing tool for EVE Online that provides
+      live window previews, team management, layout presets, and EVE settings synchronization.
+    </p>
+    <p>Features include:</p>
+    <ul>
+      <li>Live window previews at up to 30 FPS</li>
+      <li>System tray integration with minimize-to-tray</li>
+      <li>One-click import of all EVE windows</li>
+      <li>Auto-discovery of new EVE clients</li>
+      <li>Per-character global hotkeys</li>
+      <li>Character and team management</li>
+      <li>Layout presets with auto-tiling</li>
+      <li>Visual activity alerts (red flash detection)</li>
+      <li>EVE settings synchronization between characters</li>
+      <li>Multi-monitor support</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.aretedriver.VelesEyes.desktop</launchable>
+
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main window with EVE previews</caption>
+      <image>https://raw.githubusercontent.com/AreteDriver/EVE_VelesEyes/main/docs/screenshots/main-window.png</image>
+    </screenshot>
+  </screenshots>
+
+  <url type="homepage">https://github.com/AreteDriver/EVE_VelesEyes</url>
+  <url type="bugtracker">https://github.com/AreteDriver/EVE_VelesEyes/issues</url>
+  <url type="donation">https://buymeacoffee.com/aretedriver</url>
+
+  <developer_name>AreteDriver</developer_name>
+
+  <releases>
+    <release version="2.2.0" date="2024-12-27">
+      <description>
+        <p>Ultimate Edition with 14 new features including system tray, one-click import, auto-discovery, and per-character hotkeys.</p>
+      </description>
+    </release>
+  </releases>
+
+  <content_rating type="oars-1.1" />
+
+  <requires>
+    <display_length compare="ge">1024</display_length>
+  </requires>
+
+  <recommends>
+    <control>keyboard</control>
+    <control>pointing</control>
+  </recommends>
+</component>

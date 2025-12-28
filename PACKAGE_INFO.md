@@ -1,10 +1,10 @@
-# EVE Overview Pro v2.1 Ultimate Edition - Package Information
+# EVE Veles Eyes v2.2 Ultimate Edition - Package Information
 
-## 📦 What's Included in This Package
+## What's Included in This Package
 
-This is the **complete core architecture** for EVE Overview Pro v2.1 Ultimate Edition with all 6 major features!
+This is the **complete core architecture** for EVE Veles Eyes v2.2 Ultimate Edition with all features!
 
-### ✅ Core Modules (100% Complete):
+### Core Modules (100% Complete):
 
 1. **character_manager.py** - Full character & team management system
 2. **layout_manager.py** - Complete layout presets & grid patterns
@@ -12,8 +12,24 @@ This is the **complete core architecture** for EVE Overview Pro v2.1 Ultimate Ed
 4. **eve_settings_sync.py** - EVE settings synchronization
 5. **window_capture_threaded.py** - High-performance threaded capture
 6. **hotkey_manager.py** - Global hotkey system
+7. **discovery.py** - Auto-discovery of EVE windows
+8. **config_watcher.py** - Hot-reload configuration
 
-### ✅ Infrastructure:
+### UI Modules (100% Complete):
+
+1. **main_window_v21.py** - Main window with tabbed interface
+2. **main_tab.py** - Window preview & management
+3. **characters_teams_tab.py** - Character roster & teams
+4. **layouts_tab.py** - Layout presets & grid patterns
+5. **settings_sync_tab.py** - EVE settings synchronization
+6. **settings_tab.py** - Application settings
+7. **hotkeys_tab.py** - Hotkey configuration
+8. **about_dialog.py** - About dialog
+9. **tray.py** - System tray integration
+10. **themes.py** - Theme management
+11. **settings_manager.py** - Settings persistence
+
+### Infrastructure:
 
 - Complete installation system (install.sh)
 - Python package structure
@@ -21,119 +37,104 @@ This is the **complete core architecture** for EVE Overview Pro v2.1 Ultimate Ed
 - Launcher scripts
 - Desktop integration
 - Configuration management
+- CI/CD workflows
 
-### ✅ Documentation:
+### Documentation:
 
 - README.md - Complete user guide
+- QUICKSTART.md - Quick start guide
 - WHATS_NEW.md - Feature changelog
 - PACKAGE_INFO.md - This file
 - LICENSE - MIT License
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ```bash
 # Extract
-tar -xzf eve-overview-pro-v2.1-ultimate.tar.gz
-cd eve-overview-pro-v2.1-complete
+tar -xzf eve-veles-eyes-v2.2.tar.gz
+cd eve-veles-eyes
 
 # Install
 ./install.sh
 
 # Run
-~/eve-overview-pro/run.sh
+~/eve-veles-eyes/run.sh
 ```
 
 ---
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ```
-eve-overview-pro-v2.1-complete/
+eve-veles-eyes/
 ├── src/
 │   ├── main.py                          # Application entry point
 │   └── eve_overview_pro/
 │       ├── __init__.py
-│       ├── core/                        # Core modules (100% complete)
-│       │   ├── character_manager.py     # ✅ Character & team system
-│       │   ├── layout_manager.py        # ✅ Layout presets & grids
-│       │   ├── alert_detector.py        # ✅ Visual alerts
-│       │   ├── eve_settings_sync.py     # ✅ Settings synchronization
-│       │   ├── window_capture_threaded.py # ✅ Threaded capture
-│       │   └── hotkey_manager.py        # ✅ Global hotkeys
+│       ├── core/                        # Core modules
+│       │   ├── character_manager.py     # Character & team system
+│       │   ├── layout_manager.py        # Layout presets & grids
+│       │   ├── alert_detector.py        # Visual alerts
+│       │   ├── eve_settings_sync.py     # Settings synchronization
+│       │   ├── window_capture_threaded.py # Threaded capture
+│       │   ├── hotkey_manager.py        # Global hotkeys
+│       │   ├── discovery.py             # Auto-discovery
+│       │   ├── config_watcher.py        # Hot reload
+│       │   └── position.py              # Window positioning
 │       ├── ui/                          # UI modules
-│       │   └── main_window_v21.py       # Main window (stub with tabs)
+│       │   ├── main_window_v21.py       # Main window
+│       │   ├── main_tab.py              # Preview tab
+│       │   ├── characters_teams_tab.py  # Characters tab
+│       │   ├── layouts_tab.py           # Layouts tab
+│       │   ├── settings_sync_tab.py     # Sync tab
+│       │   ├── settings_tab.py          # Settings tab
+│       │   ├── hotkeys_tab.py           # Hotkeys tab
+│       │   ├── about_dialog.py          # About dialog
+│       │   ├── tray.py                  # System tray
+│       │   ├── themes.py                # Theme management
+│       │   └── settings_manager.py      # Settings persistence
 │       └── utils/                       # Utilities
+├── assets/                              # Application assets
+│   └── icon.png                         # Application icon
+├── windows/                             # Windows version
+│   └── src/                             # Windows source
 ├── requirements.txt                     # Python dependencies
 ├── install.sh                           # Installation script
 ├── README.md                            # User documentation
+├── QUICKSTART.md                        # Quick start guide
 ├── WHATS_NEW.md                         # Feature changelog
 └── LICENSE                              # MIT License
 ```
 
 ---
 
-## 🛠️ Implementation Status
+## Configuration Paths
 
-### ✅ **100% Complete:**
-- Character & Team Management
-- Layout Presets & Grid Patterns
-- Visual Activity Alerts
-- EVE Settings Synchronization
-- Threaded Window Capture
-- Global Hotkey System
-- Installation & Package System
-- Documentation
-
-### 🚧 **UI Implementation:**
-The main window (main_window_v21.py) contains a tabbed interface stub showing the 5 tabs:
-- Main (window management)
-- Characters & Teams
-- Layouts
-- Settings Sync
-- Settings
-
-Full UI implementation requires wiring these tabs to the core modules. All core functionality is ready to use!
+- **Config Directory**: `~/.config/eve-veles-eyes/`
+- **Data Directory**: `~/.local/share/eve-veles-eyes/`
+- **Log File**: `~/.config/eve-veles-eyes/eve-veles-eyes.log`
+- **Lock File**: `~/.config/eve-veles-eyes/eve-veles-eyes.lock`
 
 ---
 
-## 🎯 How to Use This Package
+## Key Dependencies
 
-### For End Users:
-
-1. Run the installer: `./install.sh`
-2. Launch: `~/eve-overview-pro/run.sh`
-3. The core modules are fully functional
-4. UI tabs show placeholders but core features work
-
-### For Developers:
-
-**All core modules are production-ready!** You can:
-
-1. **Import and use modules directly:**
-   ```python
-   from eve_overview_pro.core.character_manager import CharacterManager
-   from eve_overview_pro.core.layout_manager import LayoutManager
-   from eve_overview_pro.core.alert_detector import AlertDetector
-   from eve_overview_pro.core.eve_settings_sync import EVESettingsSync
-   ```
-
-2. **Build your own UI:**
-   - Connect tabs to core modules
-   - Use existing v1.0 UI as reference
-   - Customize to your needs
-
-3. **Extend functionality:**
-   - Add new features to core modules
-   - Create custom layouts
-   - Build plugins
+```
+PySide6>=6.6.0        # Qt GUI framework
+python-xlib>=0.33     # X11 window management
+Pillow>=10.4.0        # Image processing
+pynput>=1.7.7         # Keyboard/mouse input
+numpy>=1.26.4         # Numerical computations
+watchdog>=4.0.0       # File system monitoring
+```
 
 ---
 
-## 💡 Key Features Ready to Use
+## API Examples
 
-### 1. Character Management
+### Character Management
 ```python
 from eve_overview_pro.core.character_manager import CharacterManager, Character, Team
 
@@ -149,7 +150,7 @@ manager.create_team(team)
 manager.add_character_to_team("Mining Fleet", "Drunk'n Sailor")
 ```
 
-### 2. Layout Management
+### Layout Management
 ```python
 from eve_overview_pro.core.layout_manager import LayoutManager, GridPattern
 
@@ -161,7 +162,7 @@ windows = ['0x123', '0x124', '0x125', '0x126']
 layout = manager.calculate_grid_layout(GridPattern.GRID_2X2, windows, screen)
 ```
 
-### 3. Alert Detection
+### Alert Detection
 ```python
 from eve_overview_pro.core.alert_detector import AlertDetector, AlertLevel
 
@@ -174,7 +175,7 @@ detector.register_callback('0x123', on_alert)
 alert_level = detector.analyze_frame('0x123', image)
 ```
 
-### 4. Settings Sync
+### Settings Sync
 ```python
 from eve_overview_pro.core.eve_settings_sync import EVESettingsSync
 
@@ -185,34 +186,25 @@ results = sync.sync_settings("Main Character", ["Alt 1", "Alt 2"])
 
 ---
 
-## 📚 Additional Resources
+## Contributing
 
-- Check README.md for user guide
-- See WHATS_NEW.md for feature details
-- Review module docstrings for API documentation
-- All modules have comprehensive inline documentation
-
----
-
-## 🤝 Contributing
-
-This package contains the complete core architecture. To contribute:
+To contribute:
 
 1. Fork the repository
-2. Add UI implementation
-3. Extend core features
-4. Submit pull requests
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
-All core modules are designed to be extended!
+See CONTRIBUTING.md for detailed guidelines.
 
 ---
 
-## ⚖️ License
+## License
 
 MIT License - See LICENSE file
 
 ---
 
-**Built with ❤️ for the EVE Online community**
+**Built for the EVE Online community**
 
 Fly safe, capsuleers! o7

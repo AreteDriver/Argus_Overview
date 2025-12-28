@@ -43,26 +43,29 @@ jobs:
 
     - name: Create package
       run: |
-        mkdir -p eve-overview-pro-linux
-        cp -r src eve-overview-pro-linux/
-        cp requirements.txt eve-overview-pro-linux/
-        cp install.sh eve-overview-pro-linux/
-        cp uninstall.sh eve-overview-pro-linux/
-        cp README.md eve-overview-pro-linux/
-        cp -r assets eve-overview-pro-linux/ || mkdir eve-overview-pro-linux/assets
-        tar -czf EVE-Overview-Pro-${{ steps.version.outputs.version }}-Linux.tar.gz eve-overview-pro-linux
+        mkdir -p eve-veles-eyes-linux
+        cp -r src eve-veles-eyes-linux/
+        cp requirements.txt eve-veles-eyes-linux/
+        cp install.sh eve-veles-eyes-linux/
+        cp uninstall.sh eve-veles-eyes-linux/
+        cp README.md eve-veles-eyes-linux/
+        cp QUICKSTART.md eve-veles-eyes-linux/
+        cp WHATS_NEW.md eve-veles-eyes-linux/
+        cp LICENSE eve-veles-eyes-linux/
+        cp -r assets eve-veles-eyes-linux/ || mkdir eve-veles-eyes-linux/assets
+        tar -czf EVE-Veles-Eyes-${{ steps.version.outputs.version }}-Linux.tar.gz eve-veles-eyes-linux
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: EVE-Overview-Pro-Linux
-        path: EVE-Overview-Pro-*.tar.gz
+        name: EVE-Veles-Eyes-Linux
+        path: EVE-Veles-Eyes-*.tar.gz
         retention-days: 30
 
     - name: Upload to release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
-        files: EVE-Overview-Pro-*.tar.gz
+        files: EVE-Veles-Eyes-*.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,8 +1,131 @@
-# 🚀 EVE Overview Pro v2.1 - Ultimate Edition
+# EVE Veles Eyes - What's New
 
-## What's New - 6 Major Features Added!
+## v2.2 Ultimate Edition - Major UX Overhaul!
 
-### 1. ⭐ Layout Presets - Save Your Perfect Setups!
+This release focuses on **usability, automation, and polish** with 14 new features!
+
+### 1. System Tray Integration
+
+**Never lose track of Veles Eyes!**
+
+- Orange "V" icon in system tray
+- Minimize to tray instead of closing
+- Quick access menu (Show/Hide, Profiles, Settings)
+- Double-click to show/hide main window
+- Notifications for new characters
+
+### 2. One-Click Import
+
+**Import all EVE windows instantly!**
+
+- Scan and import ALL EVE windows with one button
+- Automatically detects character names from window titles
+- Skip duplicates automatically
+- Shows count of imported characters
+
+### 3. Auto-Discovery
+
+**Characters appear automatically!**
+
+- Background process scans every 5 seconds (configurable)
+- Automatically adds new EVE windows when they launch
+- Shows notification for each new character
+- No more manual adding required!
+
+### 4. Per-Character Hotkeys
+
+**Direct access to any character!**
+
+- Bind Ctrl+1 to "Main Character", Ctrl+2 to "Scout Alt"
+- Global hotkeys work even when EVE has focus
+- Configure in settings.json
+
+### 5. Position Lock
+
+**Prevent accidental moves!**
+
+- Lock thumbnail positions
+- Lock button in toolbar + Ctrl+Shift+L hotkey
+- Visual lock icon on thumbnails when locked
+
+### 6. Custom Labels
+
+**Identify by role, not name!**
+
+- Right-click thumbnail → "Set Label..."
+- Display "Scout", "Logi", "DPS" instead of character names
+- Persists across sessions
+
+### 7. Hover Effects
+
+**See through thumbnails!**
+
+- Opacity fade on hover (30% default, configurable)
+- See through thumbnails to underlying windows
+- Smooth transitions
+
+### 8. Activity Indicators
+
+**Know what's happening at a glance!**
+
+- Small colored dot on each thumbnail
+- Green = focused, Yellow = recent activity, Gray = idle
+- Quickly identify active windows
+
+### 9. Session Timers
+
+**Track your play time!**
+
+- Optional "2h 15m" display on thumbnails
+- Shows how long each character has been logged in
+- Enable in settings
+
+### 10. Themes
+
+**Choose your look!**
+
+- Dark (default), Light, EVE (orange accents)
+- Configure in settings.json
+- Affects all UI elements
+
+### 11. Quick Minimize/Restore All
+
+**Manage all windows at once!**
+
+- Ctrl+Shift+M: Minimize all EVE windows
+- Ctrl+Shift+R: Restore all EVE windows
+- Tray notifications show count
+
+### 12. Hot Reload Config
+
+**No restart needed!**
+
+- Edit settings.json while running
+- Click "Reload Config" in tray menu
+- Changes apply without restart
+
+### 13. Enhanced Context Menu
+
+**More control per thumbnail!**
+
+- Focus Window, Minimize, Close (with confirmation)
+- Set Label, Zoom Level
+- Remove from Preview
+
+### 14. Smart Position Inheritance
+
+**New thumbnails go where they should!**
+
+- New thumbnails position relative to existing ones
+- Fills right-to-left, then starts new row
+- Respects screen boundaries
+- Grid snapping (10px)
+
+---
+
+## v2.1 - Ultimate Edition
+
+### Layout Presets
 
 **Never arrange windows again!**
 
@@ -17,17 +140,9 @@
 - **"Market Layout"**: One large trader, others minimized
 - **"AFK Ratting"**: Single main window, minimal monitoring
 
-**How to Use:**
-1. Arrange your windows perfectly
-2. Click "Save Layout" in Layouts tab
-3. Name it (e.g., "Mining Fleet")
-4. Select from dropdown anytime to instantly restore!
+### Auto-Tiling & Grid Layouts
 
----
-
-### 2. 🎯 Auto-Tiling & Grid Layouts - Professional Organization!
-
-**One-click window organization with professional patterns!**
+**One-click window organization!**
 
 **Available Patterns:**
 - **2x2 Grid** - Perfect for 4 clients
@@ -45,15 +160,7 @@
 - Auto-arrange on window add
 - Different patterns per monitor
 
-**How to Use:**
-1. Select your windows
-2. Choose grid pattern from dropdown
-3. Click "Apply Grid"
-4. Windows auto-arrange instantly!
-
----
-
-### 3. 👥 Team & Character Management - Game Changer!
+### Team & Character Management
 
 **Manage your entire EVE roster - even offline characters!**
 
@@ -71,46 +178,13 @@
 - Auto-assign windows when chars log in
 - Link teams to layout presets
 
-**Real-World Example:**
-```
-Account 1: Main/Miner, Alt-1/Ratter, Alt-2/Booster
-Account 2: Alt-3/FC, Alt-4/Logi, Alt-5/Scout
-Account 3: Alt-6/Hauler, Alt-7/Trader, Alt-8/Backup
+### Visual Activity Alerts
 
-Mining Team:
-  Main/Miner (Orca)
-  Alt-1/Ratter (Protection)
-  Alt-2/Booster (Links)
-  → Loads "Mining Layout" automatically
-
-PvP Team:
-  Alt-3/FC (Fleet Commander)
-  Alt-4/Logi (Logistics)
-  Alt-5/Scout (Intel)
-  → Loads "PvP Layout" automatically
-
-Market Team:
-  Alt-7/Trader (Jita)
-  Alt-8/Backup (Amarr)
-  → Loads "Market Layout" automatically
-```
-
-**Workflow:**
-1. Set up all characters once (even those offline)
-2. Create teams for each activity
-3. Select "Mining Team" → Log in those 3 chars
-4. EVE Overview Pro auto-detects and organizes them!
-5. Switch to "PvP Team" → Different layout loads!
-
----
-
-### 4. 🔔 Visual Activity Alerts - Safety First!
-
-**Get notified of important events in inactive windows!**
+**Get notified of important events!**
 
 **Alert Types:**
-- **Red Flash** (🔴 High Priority) - Damage detected! Combat!
-- **Screen Change** (🟡 Medium Priority) - Significant activity
+- **Red Flash** (High Priority) - Damage detected! Combat!
+- **Screen Change** (Medium Priority) - Significant activity
 - **Custom Patterns** - Define your own alerts
 
 **Alert Actions:**
@@ -119,31 +193,10 @@ Market Team:
 - Auto-focus affected window
 - Log alert events
 
-**Configuration:**
-- Adjustable sensitivity thresholds
-- Per-window alert settings
-- Cooldown periods to prevent spam
-- Enable/disable per alert type
-
-**Use Cases:**
-- Mining: Get alerted when rats appear
-- Ratting: Know when you're taking damage
-- Market: See when orders change
-- AFK: Monitor for gankers
-
-**How to Use:**
-1. Enable alert detector in Settings
-2. Adjust sensitivity for your needs
-3. Watch for colored borders on previews
-4. React to threats immediately!
-
----
-
-### 5. 🖥️ Multi-Monitor Support - Use All Your Screens!
+### Multi-Monitor Support
 
 **Professional multi-monitor management!**
 
-**Features:**
 - Auto-detect all connected monitors
 - Per-monitor layout presets
 - "Send to Monitor X" commands
@@ -151,29 +204,7 @@ Market Team:
 - Remember monitor assignments
 - Different grid patterns per monitor
 
-**Example Setups:**
-```
-Monitor 1 (Main):
-  - EVE main gameplay window (fullscreen)
-  
-Monitor 2 (Secondary):
-  - 2x2 grid of mining alt previews
-  - Market window preview
-  
-Monitor 3 (Portrait):
-  - 1x3 vertical stack of scouts
-  - Intel channels
-```
-
-**How to Use:**
-1. Click "Detect Monitors"
-2. Assign windows to monitors
-3. Save layout with monitor info
-4. Layouts remember monitor positions!
-
----
-
-### 6. ⚙️ EVE Settings Sync - Hours Saved!
+### EVE Settings Sync
 
 **Copy all EVE settings between characters in seconds!**
 
@@ -185,73 +216,46 @@ Monitor 3 (Portrait):
 - All in-game preferences
 - Custom filters
 
-**Features:**
-- Select one character as template (MAIN)
-- Sync to specific characters or entire team
-- Automatic backups before sync
-- Preview what will be synced
-- Batch operations
-- Verification after sync
-
 **Time Savings:**
 ```
-Manual Method:
-  - Log in char 1, configure settings: 30 min
-  - Log out, log in char 2, configure: 30 min
-  - Repeat for 12 characters: 6 HOURS! 😱
-
-EVE Overview Pro:
-  - Configure MAIN once: 30 min
-  - Click "Scan Characters": 5 sec
-  - Select MAIN as source: 2 sec
-  - Select all targets: 3 sec
-  - Click "Sync Settings": 6 sec
-  - TOTAL: 30 minutes 16 seconds! 🚀
+Manual Method: 6 HOURS for 12 characters
+EVE Veles Eyes: 30 minutes 16 seconds!
 ```
 
-**How to Use:**
-1. Configure your MAIN character perfectly in EVE
-2. Log out, go to "Settings Sync" tab
-3. Click "Scan EVE Settings"
-4. Select MAIN as source character
-5. Select target characters (or entire team)
-6. Click "Sync Settings"
-7. Done! All chars now have same settings!
+---
+
+## v2.0 Features (Still Included)
+
+- Low-latency multi-window previews
+- Draggable, resizable preview frames
+- Global hotkeys (Ctrl+Alt+1-9)
+- Profile management
+- Adjustable refresh rates (1-60 FPS)
+- Always-on-top mode
+- Click-to-activate windows
+- Minimize inactive (50-80% GPU savings!)
+- Threaded capture (no UI lag!)
+- Smart caching
 
 ---
 
-## From v2.0 (Still Included):
+## Technical Improvements
 
-- ✅ Low-latency multi-window previews
-- ✅ Drag gable, resizable preview frames
-- ✅ Global hotkeys (Ctrl+Alt+1-9)
-- ✅ Profile management
-- ✅ Adjustable refresh rates (1-60 FPS)
-- ✅ Always-on-top mode
-- ✅ Click-to-activate windows
-- ✅ Minimize inactive (50-80% GPU savings!)
-- ✅ Threaded capture (no UI lag!)
-- ✅ Smart caching
-
----
-
-## Technical Improvements:
-
-### Performance:
+### Performance
 - Threaded window capture system
 - Smart frame caching
 - Adaptive refresh rates
 - Minimal CPU overhead
 - GPU-friendly operation
 
-### Reliability:
+### Reliability
 - Better error handling
 - Automatic recovery
 - Backup systems
 - Data validation
 - Crash protection
 
-### User Experience:
+### User Experience
 - Professional tabbed interface
 - Intuitive workflows
 - Comprehensive documentation
@@ -260,58 +264,6 @@ EVE Overview Pro:
 
 ---
 
-## Installation & Upgrade:
-
-**New Installation:**
-```bash
-tar -xzf eve-overview-pro-v2.1-ultimate.tar.gz
-cd eve-overview-pro-v2.1-complete
-./install.sh
-```
-
-**Upgrading from v2.0:**
-- Profiles and settings automatically migrate
-- Character data preserved
-- Backup created automatically
-
----
-
-## Quick Reference:
-
-**Main Tab:**
-- Add/remove windows
-- Minimize inactive
-- Quick actions
-
-**Characters & Teams Tab:**
-- Manage roster
-- Create teams
-- Link to layouts
-
-**Layouts Tab:**
-- Save arrangements
-- Grid patterns
-- Quick-switch
-
-**Settings Sync Tab:**
-- Scan characters
-- Select source
-- Sync settings
-
----
-
-## What's Next? (Roadmap for v2.2)
-
-- Visual layout editor (drag-drop in app)
-- Fleet composition templates
-- Advanced alert rules
-- Launch integration
-- Cloud profile sync
-- Session replay
-- More grid patterns
-
----
-
-**Enjoy EVE Overview Pro v2.1!**
+**Enjoy EVE Veles Eyes!**
 
 **Fly safe, capsuleers! o7**

@@ -42,7 +42,7 @@ class SingleInstance:
     def __init__(self, app_name: str = "eve-veles-eyes"):
         self.app_name = app_name
         self.lock_file = None
-        self.lock_path = Path.home() / '.config' / 'eve-overview-pro' / f'{app_name}.lock'
+        self.lock_path = Path.home() / '.config' / 'eve-veles-eyes' / f'{app_name}.lock'
 
         # Ensure directory exists
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -85,7 +85,7 @@ class SingleInstance:
 
 def setup_logging():
     """Setup logging configuration"""
-    log_dir = Path.home() / '.config' / 'eve-overview-pro'
+    log_dir = Path.home() / '.config' / 'eve-veles-eyes'
     log_dir.mkdir(parents=True, exist_ok=True)
     
     logging.basicConfig(
@@ -93,7 +93,7 @@ def setup_logging():
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.StreamHandler(),
-            logging.FileHandler(log_dir / 'eve-overview-pro.log')
+            logging.FileHandler(log_dir / 'eve-veles-eyes.log')
         ]
     )
 

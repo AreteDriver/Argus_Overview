@@ -1,5 +1,5 @@
 #!/bin/bash
-# EVE Overview Pro Launcher Script
+# EVE Veles Eyes Launcher Script
 
 # Get script directory
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

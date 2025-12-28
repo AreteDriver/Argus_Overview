@@ -47,19 +47,19 @@ jobs:
     - name: Create artifact
       run: |
         cd windows/dist
-        7z a EVE-Overview-Pro-${{ steps.version.outputs.version }}-Windows.zip EVE-Overview-Pro.exe
+        7z a EVE-Veles-Eyes-${{ steps.version.outputs.version }}-Windows.zip EVE-Veles-Eyes.exe
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        name: EVE-Overview-Pro-Windows
-        path: windows/dist/EVE-Overview-Pro-*.zip
+        name: EVE-Veles-Eyes-Windows
+        path: windows/dist/EVE-Veles-Eyes-*.zip
         retention-days: 30
 
     - name: Upload to release
       if: startsWith(github.ref, 'refs/tags/v')
       uses: softprops/action-gh-release@v1
       with:
-        files: windows/dist/EVE-Overview-Pro-*.zip
+        files: windows/dist/EVE-Veles-Eyes-*.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
