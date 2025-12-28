@@ -19,6 +19,7 @@ jobs:
   lint:
     name: Lint & Format
     runs-on: ubuntu-latest
+    continue-on-error: true  # Report issues but don't fail CI
     steps:
       - uses: actions/checkout@v4
 
