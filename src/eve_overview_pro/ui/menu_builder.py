@@ -277,6 +277,82 @@ def build_toolbar_actions(
     ]
 
 
+class ContextMenuBuilder:
+    """
+    Builds context menus from the ActionRegistry.
+
+    Context menus are for object-level actions (right-click on items).
+    """
+
+    def __init__(self, registry: Optional[ActionRegistry] = None):
+        self.logger = logging.getLogger(__name__)
+        self.registry = registry or ActionRegistry.get_instance()
+
+    def build_window_context_menu(
+        self,
+        handlers: Dict[str, Callable],
+        zoom_handler: Optional[Callable] = None,
+        current_zoom: float = 0.3,
+        parent=None,
+    ) -> QMenu:
+        """
+        Build context menu for window preview frames.
+
+        Args:
+            handlers: Dict mapping action_id -> handler callable
+            zoom_handler: Callback for zoom level changes (zoom_value)
+            current_zoom: Current zoom level for checkmark
+            parent: Parent widget
+
+        Returns:
+            QMenu for window context
+        """
+        menu = QMenu(parent)
+
+        # Window actions from registry
+        action_order = [
+            "focus_window",
+            "minimize_window",
+            "close_window",
+            None,  # separator
+            "set_label",
+            None,  # separator
+            "zoom",  # special: submenu
+            None,  # separator
+            "remove_from_preview",
+        ]
+
+        for item in action_order:
+            if item is None:
+                menu.addSeparator()
+            elif item == "zoom":
+                # Zoom submenu (not from registry - dynamic state)
+                zoom_menu = menu.addMenu("Zoom Level")
+                for zoom in [0.2, 0.3, 0.4, 0.5]:
+                    zoom_action = QAction(f"{int(zoom*100)}%", menu)
+                    if zoom == current_zoom:
+                        zoom_action.setCheckable(True)
+                        zoom_action.setChecked(True)
+                    if zoom_handler:
+                        # Create closure to capture zoom value
+                        def make_zoom_callback(z=zoom):
+                            return lambda: zoom_handler(z)
+                        zoom_action.triggered.connect(make_zoom_callback())
+                    zoom_menu.addAction(zoom_action)
+            else:
+                spec = self.registry.get(item)
+                if spec:
+                    action = QAction(spec.label, menu)
+                    if spec.tooltip:
+                        action.setToolTip(spec.tooltip)
+                    handler = handlers.get(item)
+                    if handler:
+                        action.triggered.connect(handler)
+                    menu.addAction(action)
+
+        return menu
+
+
 class ToolbarBuilder:
     """
     Builds Qt toolbar widgets from the ActionRegistry.

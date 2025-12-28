@@ -46,7 +46,7 @@ from PySide6.QtWidgets import (
 )
 
 from eve_overview_pro.ui.action_registry import ActionRegistry, PrimaryHome
-from eve_overview_pro.ui.menu_builder import ToolbarBuilder
+from eve_overview_pro.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
 
 
 @dataclass
@@ -806,49 +806,25 @@ class WindowPreviewWidget(QWidget):
             self.logger.info(f"Activating window: {self.window_id}")
 
     def contextMenuEvent(self, event):
-        """Handle right-click context menu (v2.2 enhanced)"""
-        menu = QMenu(self)
+        """Handle right-click context menu (v2.3 - uses ActionRegistry)"""
+        # Build context menu from ActionRegistry
+        context_builder = ContextMenuBuilder()
 
-        # Focus Window
-        activate_action = QAction("Focus Window", self)
-        activate_action.triggered.connect(lambda: self.window_activated.emit(self.window_id))
-        menu.addAction(activate_action)
+        # Handler map for context actions
+        handlers = {
+            "focus_window": lambda: self.window_activated.emit(self.window_id),
+            "minimize_window": self._minimize_window,
+            "close_window": self._close_window,
+            "set_label": self._show_label_dialog,
+            "remove_from_preview": lambda: self.window_removed.emit(self.window_id),
+        }
 
-        # Minimize
-        minimize_action = QAction("Minimize", self)
-        minimize_action.triggered.connect(self._minimize_window)
-        menu.addAction(minimize_action)
-
-        # Close (with confirmation)
-        close_action = QAction("Close", self)
-        close_action.triggered.connect(self._close_window)
-        menu.addAction(close_action)
-
-        menu.addSeparator()
-
-        # Set Label (v2.2)
-        label_action = QAction("Set Label...", self)
-        label_action.triggered.connect(self._show_label_dialog)
-        menu.addAction(label_action)
-
-        menu.addSeparator()
-
-        # Zoom submenu
-        zoom_menu = menu.addMenu("Zoom Level")
-        for zoom in [0.2, 0.3, 0.4, 0.5]:
-            zoom_action = QAction(f"{int(zoom*100)}%", self)
-            zoom_action.triggered.connect(lambda checked, z=zoom: self._set_zoom(z))
-            if zoom == self.zoom_factor:
-                zoom_action.setCheckable(True)
-                zoom_action.setChecked(True)
-            zoom_menu.addAction(zoom_action)
-
-        menu.addSeparator()
-
-        # Remove from Group
-        remove_action = QAction("Remove from Preview", self)
-        remove_action.triggered.connect(lambda: self.window_removed.emit(self.window_id))
-        menu.addAction(remove_action)
+        menu = context_builder.build_window_context_menu(
+            handlers=handlers,
+            zoom_handler=self._set_zoom,
+            current_zoom=self.zoom_factor,
+            parent=self,
+        )
 
         menu.exec(event.globalPos())
 
