@@ -75,7 +75,7 @@ class SingleInstance:
         """Fallback file-based locking if win32 not available"""
         try:
             import msvcrt
-            lock_path = Path(os.environ.get('LOCALAPPDATA', '.')) / 'eve-overview-pro' / 'app.lock'
+            lock_path = Path(os.environ.get('LOCALAPPDATA', '.')) / 'eve-veles-eyes' / 'app.lock'
             lock_path.parent.mkdir(parents=True, exist_ok=True)
 
             self.lock_file = open(lock_path, 'w')
@@ -104,7 +104,7 @@ class SingleInstance:
 def setup_logging():
     """Setup logging configuration"""
     # Use LOCALAPPDATA on Windows
-    log_dir = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'eve-overview-pro'
+    log_dir = Path(os.environ.get('LOCALAPPDATA', Path.home())) / 'eve-veles-eyes'
     log_dir.mkdir(parents=True, exist_ok=True)
 
     logging.basicConfig(

@@ -89,7 +89,7 @@ class SettingsManager:
         },
         "advanced": {
             "log_level": "INFO",
-            "config_directory": "~/.config/eve-overview-pro",
+            "config_directory": "~/.config/eve-veles-eyes",
             "enable_debug": False
         }
     }
@@ -99,12 +99,12 @@ class SettingsManager:
         Initialize SettingsManager
 
         Args:
-            config_dir: Configuration directory path (default: ~/.config/eve-overview-pro)
+            config_dir: Configuration directory path (default: ~/.config/eve-veles-eyes)
         """
         self.logger = logging.getLogger(__name__)
 
         if config_dir is None:
-            config_dir = Path.home() / '.config' / 'eve-overview-pro'
+            config_dir = Path.home() / '.config' / 'eve-veles-eyes'
 
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)

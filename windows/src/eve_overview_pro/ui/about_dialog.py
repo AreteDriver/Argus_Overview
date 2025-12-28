@@ -124,12 +124,12 @@ class AboutDialog(QDialog):
         # Links
         links_layout = QVBoxLayout()
 
-        github_link = QLabel('<a href="https://github.com/AreteDriver/eve-overview-pro">GitHub Repository</a>')
+        github_link = QLabel('<a href="https://github.com/AreteDriver/EVE_VelesEyes">GitHub Repository</a>')
         github_link.setOpenExternalLinks(True)
         github_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
         links_layout.addWidget(github_link)
 
-        issues_link = QLabel('<a href="https://github.com/AreteDriver/eve-overview-pro/issues">Report Issues</a>')
+        issues_link = QLabel('<a href="https://github.com/AreteDriver/EVE_VelesEyes/issues">Report Issues</a>')
         issues_link.setOpenExternalLinks(True)
         issues_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
         links_layout.addWidget(issues_link)

@@ -550,7 +550,7 @@ class AdvancedPanel(QWidget):
 
         # Config directory
         self.config_dir_label = QLabel(
-            self.settings_manager.get("advanced.config_directory", "~/.config/eve-overview-pro")
+            self.settings_manager.get("advanced.config_directory", "~/.config/eve-veles-eyes")
         )
         self.config_dir_label.setStyleSheet("color: #888;")
         form.addRow("Config directory:", self.config_dir_label)
