@@ -108,12 +108,13 @@ class SystemTray(QObject):
         - [separator]
         - Profiles (submenu)
         - [separator]
+        - Settings
         - Reload Config
         - [separator]
         - Quit
-        """
-        self.menu.clear()
 
+        This method rebuilds the entire menu. Call it when profiles change.
+        """
         # Build handlers map - connects action IDs to signal emitters
         handlers = {
             "show_hide": self.show_hide_requested.emit,
@@ -125,7 +126,7 @@ class SystemTray(QObject):
             "quit": self.quit_requested.emit,
         }
 
-        # Build menu using MenuBuilder
+        # Build menu using MenuBuilder (creates new QMenu instance)
         self.menu = self.menu_builder.build_tray_menu(
             parent=None,
             handlers=handlers,
@@ -134,40 +135,12 @@ class SystemTray(QObject):
             current_profile=self._current_profile,
         )
 
-        # Store reference to profiles submenu for updates
-        for action in self.menu.actions():
-            if action.menu() and action.text() == "Profiles":
-                self.profiles_menu = action.menu()
-                break
-
         # Update the tray icon's context menu
         self.tray_icon.setContextMenu(self.menu)
 
     def _on_profile_selected(self, profile_name: str):
         """Handle profile selection from menu"""
         self.profile_selected.emit(profile_name)
-
-    def _update_profiles_menu(self):
-        """Update the profiles submenu"""
-        self.profiles_menu.clear()
-
-        if not self._profiles:
-            no_profiles = QAction("(No profiles saved)", self.profiles_menu)
-            no_profiles.setEnabled(False)
-            self.profiles_menu.addAction(no_profiles)
-            return
-
-        for profile in self._profiles:
-            action = QAction(profile, self.profiles_menu)
-            action.setCheckable(True)
-            action.setChecked(profile == self._current_profile)
-
-            # Create closure to capture profile name
-            def make_callback(p=profile):
-                return lambda: self.profile_selected.emit(p)
-
-            action.triggered.connect(make_callback())
-            self.profiles_menu.addAction(action)
 
     def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason):
         """
@@ -202,7 +175,7 @@ class SystemTray(QObject):
         """
         self._profiles = profiles
         self._current_profile = current
-        self._update_profiles_menu()
+        self._setup_menu()  # Rebuild menu with new profiles
 
     def set_current_profile(self, profile: str):
         """
@@ -212,7 +185,7 @@ class SystemTray(QObject):
             profile: Profile name
         """
         self._current_profile = profile
-        self._update_profiles_menu()
+        self._setup_menu()  # Rebuild menu with updated current profile
 
     def show_notification(self, title: str, message: str,
                           icon: QSystemTrayIcon.MessageIcon = QSystemTrayIcon.MessageIcon.Information,
