@@ -438,8 +438,10 @@ def pil_to_qimage(pil_image: Image.Image) -> QImage:
         pil_image: PIL Image object
 
     Returns:
-        QImage: Converted image
+        QImage: Converted image, or None if input is None
     """
+    if pil_image is None:
+        return None
     if pil_image.mode == "RGB":
         bytes_per_line = 3 * pil_image.width
         return QImage(
@@ -604,6 +606,8 @@ class WindowPreviewWidget(QWidget):
         try:
             # Convert PIL to QImage
             qimage = pil_to_qimage(image)
+            if qimage is None:
+                return  # Skip frame if capture failed
 
             # Convert to pixmap
             self.current_pixmap = QPixmap.fromImage(qimage)
