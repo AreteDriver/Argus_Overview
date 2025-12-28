@@ -4,4 +4,4 @@ python-xlib==0.33
 Pillow==10.4.0
 pynput==1.7.7
 numpy==1.26.4
-watchdog==4.0.0  # v2.2: Hot reload config file watching
+watchdog==6.0.0  # v2.2: Hot reload config file watching
