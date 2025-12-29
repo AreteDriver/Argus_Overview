@@ -42,7 +42,7 @@
   <developer_name>AreteDriver</developer_name>
 
   <releases>
-    <release version="2.4.1" date="2025-12-29">
+    <release version="2.4.2" date="2025-12-29">
       <description>
         <p>Complete rebrand to Argus Overview with updated CI/CD and documentation.</p>
       </description>
