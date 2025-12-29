@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <defs>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="500" height="500" fill="#1a0a0a"/>
+
+  <!-- Outer hexagon (flat-top) - dark red -->
+  <polygon
+    points="250,30 432,135 432,365 250,470 68,365 68,135"
+    fill="none"
+    stroke="#8b0000"
+    stroke-width="10"
+    filter="url(#glow)"/>
+
+  <!-- Middle hexagon (pointy-top, rotated 90deg from outer) - veles red -->
+  <polygon
+    points="250,70 405,160 405,340 250,430 95,340 95,160"
+    fill="none"
+    stroke="#ff4444"
+    stroke-width="8"
+    transform="rotate(30, 250, 250)"
+    filter="url(#glow)"/>
+
+  <!-- Inner hexagon (flat-top, same orientation as outer) - bright red -->
+  <polygon
+    points="250,130 362,195 362,305 250,370 138,305 138,195"
+    fill="none"
+    stroke="#ff6b6b"
+    stroke-width="7"
+    filter="url(#glow)"/>
+
+  <!-- Inner cube structure - creates 3D hexagonal cube -->
+  <!-- Top diamond of cube -->
+  <polygon
+    points="250,170 310,205 250,240 190,205"
+    fill="none"
+    stroke="#ff6b6b"
+    stroke-width="5"
+    filter="url(#glow)"/>
+
+  <!-- Left face of cube -->
+  <polygon
+    points="190,205 250,240 250,310 190,275"
+    fill="none"
+    stroke="#ff4444"
+    stroke-width="5"
+    filter="url(#glow)"/>
+
+  <!-- Right face of cube -->
+  <polygon
+    points="310,205 250,240 250,310 310,275"
+    fill="none"
+    stroke="#cc2222"
+    stroke-width="5"
+    filter="url(#glow)"/>
+
+  <!-- Center vertical line -->
+  <line x1="250" y1="240" x2="250" y2="310" stroke="#ff6b6b" stroke-width="5" filter="url(#glow)"/>
+</svg>
