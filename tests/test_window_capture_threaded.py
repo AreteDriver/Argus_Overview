@@ -725,6 +725,27 @@ class TestWorkerThread:
 
         assert not worker_thread.is_alive()
 
+    def test_worker_handles_capture_exception(self):
+        """Test worker handles exception from _capture_window_sync"""
+        from eve_overview_pro.core.window_capture_threaded import WindowCaptureThreaded
+
+        capture = WindowCaptureThreaded(max_workers=1)
+        capture.running = True
+
+        # Mock _capture_window_sync to raise an exception
+        with patch.object(capture, '_capture_window_sync', side_effect=Exception("Test error")):
+            # Queue a task then None to stop
+            capture.capture_queue.put(("0x12345", 1.0, "request_123"))
+            capture.capture_queue.put(None)
+
+            # Run worker
+            worker_thread = threading.Thread(target=capture._worker)
+            worker_thread.start()
+            worker_thread.join(timeout=2.0)
+
+            # Worker should have handled exception and exited cleanly
+            assert not worker_thread.is_alive()
+
 
 class TestIntegration:
     """Integration tests for the capture system"""
