@@ -642,3 +642,235 @@ class TestNewCharacterDiscovered:
 
         window.main_tab.window_manager.add_window.assert_called_with("0x99999", "NewPilot")
         window.system_tray.show_notification.assert_called()
+
+
+# Test toggle lock
+class TestToggleLock:
+    """Tests for _toggle_lock method"""
+
+    def test_toggle_lock_clicks_lock_button(self):
+        """Test that toggle_lock clicks the lock button"""
+        from eve_overview_pro.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.main_tab = MagicMock()
+        window.main_tab.lock_btn = MagicMock()
+
+        MainWindowV21._toggle_lock(window)
+
+        window.main_tab.lock_btn.click.assert_called_once()
+
+    def test_toggle_lock_no_main_tab(self):
+        """Test toggle_lock handles missing main_tab gracefully"""
+        from eve_overview_pro.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        # No main_tab attribute
+        del window.main_tab
+
+        # Should not raise
+        MainWindowV21._toggle_lock(window)
+
+
+# Test get cycling group members edge cases
+class TestGetCyclingGroupMembersEdgeCases:
+    """Edge case tests for _get_cycling_group_members"""
+
+    def test_fallback_to_default_group(self):
+        """Test fallback to Default group when current not found"""
+        window = create_mock_window()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = {
+            "Default": ["Char1", "Char2"]
+        }
+        window.current_cycling_group = "NonExistent"
+
+        members = window._get_cycling_group_members()
+
+        assert members == ["Char1", "Char2"]
+
+    def test_fallback_to_active_windows(self):
+        """Test fallback to active windows when no groups defined"""
+        window = create_mock_window()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = {}
+        window.current_cycling_group = "Default"
+
+        mock_frame1 = MagicMock()
+        mock_frame1.character_name = "ActiveChar1"
+        mock_frame2 = MagicMock()
+        mock_frame2.character_name = "ActiveChar2"
+
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.window_manager.preview_frames = {
+            "0x111": mock_frame1,
+            "0x222": mock_frame2
+        }
+
+        members = window._get_cycling_group_members()
+
+        assert "ActiveChar1" in members
+        assert "ActiveChar2" in members
+
+
+# Test cycle when character not found
+class TestCycleEdgeCases:
+    """Edge case tests for cycling methods"""
+
+    def test_cycle_next_empty_group(self):
+        """Test cycle_next with empty group"""
+        window = create_mock_window()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = {}
+        window.current_cycling_group = "Empty"
+
+        # No main_tab to fall back to
+        del window.main_tab
+
+        window._cycle_next()
+
+        window.logger.warning.assert_called()
+
+    def test_cycle_prev_empty_group(self):
+        """Test cycle_prev with empty group"""
+        window = create_mock_window()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = {}
+        window.current_cycling_group = "Empty"
+
+        # No main_tab to fall back to
+        del window.main_tab
+
+        window._cycle_prev()
+
+        window.logger.warning.assert_called()
+
+
+# Test handle hotkey
+class TestHandleHotkey:
+    """Tests for _handle_hotkey method"""
+
+    def test_handle_hotkey_logs_message(self):
+        """Test that _handle_hotkey logs the hotkey name"""
+        from eve_overview_pro.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+
+        MainWindowV21._handle_hotkey(window, "test_hotkey")
+
+        window.logger.info.assert_called()
+
+
+# Test reload config edge cases
+class TestReloadConfigEdgeCases:
+    """Edge case tests for _reload_config"""
+
+    def test_reload_config_stops_auto_discovery_when_disabled(self):
+        """Test that reload_config stops auto-discovery when disabled"""
+        window = create_mock_window()
+
+        window.settings_manager = MagicMock()
+        # First call returns theme, second call returns False for auto_discovery
+        window.settings_manager.get.side_effect = [
+            "dark",  # appearance.theme
+            False,   # general.auto_discovery
+        ]
+
+        window.theme_manager = MagicMock()
+        window.auto_discovery = MagicMock()
+        window.system_tray = MagicMock()
+        window._apply_initial_settings = MagicMock()
+
+        window._reload_config()
+
+        window.auto_discovery.stop.assert_called_once()
+
+    def test_reload_config_updates_running_auto_discovery(self):
+        """Test reload_config updates interval when auto-discovery running"""
+        window = create_mock_window()
+
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.side_effect = [
+            "dark",  # appearance.theme
+            True,    # general.auto_discovery
+            10,      # general.auto_discovery_interval
+        ]
+
+        window.theme_manager = MagicMock()
+        window.auto_discovery = MagicMock()
+        window.auto_discovery.scan_timer = MagicMock()
+        window.auto_discovery.scan_timer.isActive.return_value = True  # Already running
+
+        window.system_tray = MagicMock()
+        window._apply_initial_settings = MagicMock()
+
+        window._reload_config()
+
+        window.auto_discovery.set_interval.assert_called_with(10)
+        window.auto_discovery.start.assert_not_called()  # Already running
+
+
+# Test apply setting edge cases
+class TestApplySettingEdgeCases:
+    """Edge case tests for _apply_setting"""
+
+    def test_apply_setting_hotkeys(self):
+        """Test applying hotkeys setting (currently a no-op)"""
+        window = create_mock_window()
+
+        # Should not raise
+        window._apply_setting("hotkeys.minimize_all", "<ctrl>+m")
+
+        window.logger.info.assert_called()
+
+    def test_apply_setting_performance_refresh_rate(self):
+        """Test applying refresh rate setting"""
+        window = create_mock_window()
+
+        # Should not raise
+        window._apply_setting("performance.default_refresh_rate", 60)
+
+        window.logger.info.assert_called()
+
+
+# Test on character detected with status update
+class TestOnCharacterDetectedEdgeCases:
+    """Edge case tests for _on_character_detected"""
+
+    def test_on_character_detected_updates_characters_tab(self):
+        """Test that character detection updates characters tab if available"""
+        window = create_mock_window()
+        window.character_manager = MagicMock()
+        window.characters_tab = MagicMock()
+
+        window._on_character_detected("0x12345", "TestPilot")
+
+        window.characters_tab.update_character_status.assert_called_with("TestPilot", "0x12345")
+
+
+# Test get window id for character
+class TestGetWindowIdForCharacter:
+    """Tests for _get_window_id_for_character method"""
+
+    def test_get_window_id_not_found(self):
+        """Test returns None when character not found"""
+        window = create_mock_window()
+
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.window_manager.preview_frames = {}
+
+        result = window._get_window_id_for_character("Unknown")
+
+        assert result is None
+
+    def test_get_window_id_no_main_tab(self):
+        """Test returns None when no main_tab"""
+        window = create_mock_window()
+        del window.main_tab
+
+        result = window._get_window_id_for_character("SomeChar")
+
+        assert result is None

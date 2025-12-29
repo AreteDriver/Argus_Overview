@@ -358,3 +358,301 @@ class TestStartStop:
 
         assert manager.combo_listener is None
         assert manager.key_listener is None
+
+    def test_stop_handles_listener_exception(self):
+        """Stop handles exception from listener.stop()"""
+        manager = HotkeyManager()
+        mock_combo = MagicMock()
+        mock_combo.stop.side_effect = RuntimeError("Stop failed")
+        manager.combo_listener = mock_combo
+
+        mock_key = MagicMock()
+        mock_key.stop.side_effect = RuntimeError("Stop failed")
+        manager.key_listener = mock_key
+
+        # Should not raise - just silently catch exception
+        manager.stop()
+
+        # stop() was called even though it raised
+        mock_combo.stop.assert_called_once()
+        mock_key.stop.assert_called_once()
+
+
+class TestRestartListeners:
+    """Tests for _restart_listeners method"""
+
+    def test_stops_existing_combo_listener(self):
+        """Stops existing combo listener before restart"""
+        manager = HotkeyManager()
+        mock_listener = MagicMock()
+        manager.combo_listener = mock_listener
+
+        with patch.object(manager, '_start_combo_listener'):
+            with patch.object(manager, '_start_key_listener'):
+                manager._restart_listeners()
+
+        mock_listener.stop.assert_called_once()
+        assert manager.combo_listener is None or manager.combo_listener != mock_listener
+
+    def test_stops_existing_key_listener(self):
+        """Stops existing key listener before restart"""
+        manager = HotkeyManager()
+        mock_listener = MagicMock()
+        manager.key_listener = mock_listener
+
+        with patch.object(manager, '_start_combo_listener'):
+            with patch.object(manager, '_start_key_listener'):
+                manager._restart_listeners()
+
+        mock_listener.stop.assert_called_once()
+
+    def test_handles_stop_exception(self):
+        """Handles exception when stopping listeners"""
+        manager = HotkeyManager()
+        mock_listener = MagicMock()
+        mock_listener.stop.side_effect = RuntimeError("Stop failed")
+        manager.combo_listener = mock_listener
+
+        with patch.object(manager, '_start_combo_listener'):
+            with patch.object(manager, '_start_key_listener'):
+                # Should not raise
+                manager._restart_listeners()
+
+    def test_starts_combo_listener_when_combos_exist(self):
+        """Starts combo listener when combo hotkeys registered"""
+        manager = HotkeyManager()
+        manager.combo_hotkeys = {"<ctrl>+a": {"name": "test", "callback": MagicMock()}}
+
+        with patch.object(manager, '_start_combo_listener') as mock_start:
+            with patch.object(manager, '_start_key_listener'):
+                manager._restart_listeners()
+
+        mock_start.assert_called_once()
+
+    def test_starts_key_listener_when_single_keys_exist(self):
+        """Starts key listener when single-key hotkeys registered"""
+        manager = HotkeyManager()
+        manager.single_key_hotkeys = {"a": {"name": "test", "callback": MagicMock()}}
+
+        with patch.object(manager, '_start_combo_listener'):
+            with patch.object(manager, '_start_key_listener') as mock_start:
+                manager._restart_listeners()
+
+        mock_start.assert_called_once()
+
+
+class TestStartComboListener:
+    """Tests for _start_combo_listener method"""
+
+    def test_creates_global_hotkeys(self):
+        """Creates GlobalHotKeys with registered combos"""
+        manager = HotkeyManager()
+        callback = MagicMock()
+        manager.combo_hotkeys = {"<ctrl>+a": {"name": "test", "callback": callback}}
+
+        with patch('eve_overview_pro.core.hotkey_manager.keyboard.GlobalHotKeys') as mock_ghk:
+            manager._start_combo_listener()
+
+        mock_ghk.assert_called_once()
+        # Verify the combo was passed
+        call_args = mock_ghk.call_args[0][0]
+        assert "<ctrl>+a" in call_args
+
+    def test_handles_exception(self):
+        """Handles exception when creating listener"""
+        manager = HotkeyManager()
+        manager.combo_hotkeys = {"<ctrl>+a": {"name": "test", "callback": MagicMock()}}
+
+        with patch('eve_overview_pro.core.hotkey_manager.keyboard.GlobalHotKeys') as mock_ghk:
+            mock_ghk.side_effect = RuntimeError("Failed")
+            # Should not raise
+            manager._start_combo_listener()
+
+
+class TestStartKeyListener:
+    """Tests for _start_key_listener method"""
+
+    def test_creates_listener(self):
+        """Creates keyboard Listener"""
+        manager = HotkeyManager()
+
+        with patch('eve_overview_pro.core.hotkey_manager.keyboard.Listener') as mock_listener:
+            manager._start_key_listener()
+
+        mock_listener.assert_called_once()
+
+    def test_handles_exception(self):
+        """Handles exception when creating listener"""
+        manager = HotkeyManager()
+
+        with patch('eve_overview_pro.core.hotkey_manager.keyboard.Listener') as mock_listener:
+            mock_listener.side_effect = RuntimeError("Failed")
+            # Should not raise
+            manager._start_key_listener()
+
+
+class TestOnKeyPressAdvanced:
+    """Advanced tests for key press handling"""
+
+    @pytest.fixture
+    def manager(self):
+        """Create manager with registered single-key hotkey"""
+        m = HotkeyManager()
+        m._restart_listeners = MagicMock()
+        m.callback = MagicMock()
+        m.register_hotkey("test", "x", m.callback)
+        return m
+
+    def test_tracks_alt_press(self, manager):
+        """Tracks alt key press"""
+        mock_key = MagicMock()
+        mock_key.name = 'alt_l'
+
+        manager._on_key_press(mock_key)
+
+        assert 'alt' in manager.pressed_modifiers
+
+    def test_tracks_alt_gr_press(self, manager):
+        """Tracks alt_gr key press"""
+        mock_key = MagicMock()
+        mock_key.name = 'alt_gr'
+
+        manager._on_key_press(mock_key)
+
+        assert 'alt' in manager.pressed_modifiers
+
+    def test_tracks_shift_press(self, manager):
+        """Tracks shift key press"""
+        mock_key = MagicMock()
+        mock_key.name = 'shift_r'
+
+        manager._on_key_press(mock_key)
+
+        assert 'shift' in manager.pressed_modifiers
+
+    def test_uses_key_name_when_no_char(self, manager):
+        """Uses key.name when key.char is None"""
+        manager.register_hotkey("enter", "enter", manager.callback)
+
+        mock_key = MagicMock()
+        mock_key.char = None
+        mock_key.name = 'enter'
+
+        manager._on_key_press(mock_key)
+
+        assert manager.callback.call_count == 1
+
+    def test_handles_key_without_char_or_name(self, manager):
+        """Handles key with neither char nor name"""
+        mock_key = MagicMock()
+        mock_key.char = None
+        mock_key.name = None
+
+        # Should not raise
+        manager._on_key_press(mock_key)
+        manager.callback.assert_not_called()
+
+    def test_handles_callback_exception(self, manager):
+        """Handles exception from callback"""
+        manager.callback.side_effect = RuntimeError("Callback failed")
+
+        mock_key = MagicMock()
+        mock_key.char = 'x'
+        del mock_key.name
+
+        # Should not raise
+        manager._on_key_press(mock_key)
+
+    def test_handles_key_processing_exception(self, manager):
+        """Handles exception during key processing"""
+        mock_key = MagicMock()
+        # Create a key that will cause issues
+        type(mock_key).char = property(lambda self: (_ for _ in ()).throw(RuntimeError()))
+
+        # Should not raise
+        manager._on_key_press(mock_key)
+
+
+class TestOnKeyReleaseAdvanced:
+    """Advanced tests for key release handling"""
+
+    @pytest.fixture
+    def manager(self):
+        """Create a fresh manager"""
+        return HotkeyManager()
+
+    def test_handles_key_without_name(self, manager):
+        """Handles key without name attribute"""
+        mock_key = MagicMock(spec=[])  # No attributes
+
+        # Should not raise
+        manager._on_key_release(mock_key)
+
+    def test_clears_ctrl_r(self, manager):
+        """Clears ctrl on ctrl_r release"""
+        manager.pressed_modifiers.add('ctrl')
+        mock_key = MagicMock()
+        mock_key.name = 'ctrl_r'
+
+        manager._on_key_release(mock_key)
+
+        assert 'ctrl' not in manager.pressed_modifiers
+
+    def test_clears_alt_r(self, manager):
+        """Clears alt on alt_r release"""
+        manager.pressed_modifiers.add('alt')
+        mock_key = MagicMock()
+        mock_key.name = 'alt_r'
+
+        manager._on_key_release(mock_key)
+
+        assert 'alt' not in manager.pressed_modifiers
+
+    def test_clears_alt_gr(self, manager):
+        """Clears alt on alt_gr release"""
+        manager.pressed_modifiers.add('alt')
+        mock_key = MagicMock()
+        mock_key.name = 'alt_gr'
+
+        manager._on_key_release(mock_key)
+
+        assert 'alt' not in manager.pressed_modifiers
+
+
+class TestRegisterHotkeyErrors:
+    """Tests for error handling in hotkey registration"""
+
+    def test_register_returns_false_on_exception(self):
+        """Returns False when registration fails"""
+        manager = HotkeyManager()
+
+        # Make _restart_listeners raise
+        manager._restart_listeners = MagicMock(side_effect=RuntimeError("Failed"))
+
+        result = manager.register_hotkey("test", "a", MagicMock())
+
+        assert result is False
+
+
+class TestParseKeyComboEdgeCases:
+    """Edge case tests for parse_key_combo"""
+
+    @pytest.fixture
+    def manager(self):
+        """Create a fresh manager"""
+        return HotkeyManager()
+
+    def test_parse_unknown_key(self, manager):
+        """Parses unknown keys by wrapping in brackets"""
+        result = manager.parse_key_combo("ctrl+escape")
+        assert result == "<ctrl>+<escape>"
+
+    def test_parse_special_key(self, manager):
+        """Parses special keys"""
+        result = manager.parse_key_combo("ctrl+space")
+        assert result == "<ctrl>+<space>"
+
+    def test_parse_cmd_key(self, manager):
+        """Parses cmd key"""
+        result = manager.parse_key_combo("cmd+a")
+        assert result == "<cmd>+a"
