@@ -418,6 +418,21 @@ class TestRestartListeners:
                 # Should not raise
                 manager._restart_listeners()
 
+    def test_handles_key_listener_stop_exception(self):
+        """Handles exception when stopping key_listener"""
+        manager = HotkeyManager()
+        mock_listener = MagicMock()
+        mock_listener.stop.side_effect = RuntimeError("Key listener stop failed")
+        manager.key_listener = mock_listener
+
+        with patch.object(manager, '_start_combo_listener'):
+            with patch.object(manager, '_start_key_listener'):
+                # Should not raise
+                manager._restart_listeners()
+
+        # key_listener should be set to None after stopping
+        assert manager.key_listener is None
+
     def test_starts_combo_listener_when_combos_exist(self):
         """Starts combo listener when combo hotkeys registered"""
         manager = HotkeyManager()
@@ -467,6 +482,37 @@ class TestStartComboListener:
             mock_ghk.side_effect = RuntimeError("Failed")
             # Should not raise
             manager._start_combo_listener()
+
+    def test_wrapper_calls_callback_and_emits_signal(self):
+        """Tests the wrapper callback calls the original callback and emits signal"""
+        manager = HotkeyManager()
+        callback = MagicMock()
+        manager.combo_hotkeys = {"<ctrl>+a": {"name": "test_hotkey", "callback": callback}}
+
+        # Capture the wrapper that gets created
+        captured_wrapper = None
+
+        def capture_hotkey_map(hotkey_map):
+            nonlocal captured_wrapper
+            captured_wrapper = hotkey_map.get("<ctrl>+a")
+            mock_listener = MagicMock()
+            return mock_listener
+
+        # Track signal emissions
+        signal_received = []
+        manager.hotkey_triggered.connect(lambda name: signal_received.append(name))
+
+        with patch('eve_overview_pro.core.hotkey_manager.keyboard.GlobalHotKeys', side_effect=capture_hotkey_map):
+            manager._start_combo_listener()
+
+            # Call the wrapper
+            assert captured_wrapper is not None
+            captured_wrapper()
+
+            # Verify callback was called
+            callback.assert_called_once()
+            # Verify signal was emitted with hotkey name
+            assert signal_received == ["test_hotkey"]
 
 
 class TestStartKeyListener:
@@ -584,6 +630,15 @@ class TestOnKeyReleaseAdvanced:
     def test_handles_key_without_name(self, manager):
         """Handles key without name attribute"""
         mock_key = MagicMock(spec=[])  # No attributes
+
+        # Should not raise
+        manager._on_key_release(mock_key)
+
+    def test_handles_exception_in_release(self, manager):
+        """Handles exception during key release processing"""
+        mock_key = MagicMock()
+        # Create a key that will cause issues when accessing .name
+        type(mock_key).name = property(lambda self: (_ for _ in ()).throw(RuntimeError()))
 
         # Should not raise
         manager._on_key_release(mock_key)
