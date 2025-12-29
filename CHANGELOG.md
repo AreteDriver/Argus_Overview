@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.2] - 2025-12-29
+
+### Changed
+- **Complete Rebrand Cleanup** - Finished rebranding from EVE Veles Eyes to Argus Overview
+  - Updated all Windows source files (9 files): app names, paths, URLs, window titles
+  - Renamed Flatpak files to `io.github.aretedriver.ArgusOverview.*`
+  - Updated all documentation with new branding
+  - Fixed GitHub URLs in Help menu links
+
+### Fixed
+- **GitHub Actions** - Updated `actions/checkout` and `actions/setup-python` from v4/v5 to v6
+- **Documentation** - Fixed remaining old branding in CONTRIBUTING.md, issue templates, QUICKSTART.md, PACKAGE_INFO.md, windows/README_WINDOWS.md
+
+### Removed
+- Old `veles-eyes.sh` launcher script
+- Obsolete build artifacts (`argus-overview.desktop`, `argus-overview.spec`)
+
 ## [2.4.0] - 2025-12-28
 
 ### Added
@@ -120,7 +137,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simple hotkey support
 - Single window capture
 
-[Unreleased]: https://github.com/AreteDriver/Argus_Overview/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/AreteDriver/Argus_Overview/compare/v2.4.2...HEAD
+[2.4.2]: https://github.com/AreteDriver/Argus_Overview/compare/v2.4.0...v2.4.2
 [2.4.0]: https://github.com/AreteDriver/Argus_Overview/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/AreteDriver/Argus_Overview/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/AreteDriver/Argus_Overview/compare/v2.1.0...v2.2.0
