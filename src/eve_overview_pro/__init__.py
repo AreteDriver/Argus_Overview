@@ -1,2 +1,2 @@
-"""EVE Veles Eyes v2.2 Ultimate Edition"""
-__version__ = "2.2.0"
+"""EVE Veles Eyes v2.3 - ActionRegistry Edition"""
+__version__ = "2.3.0"

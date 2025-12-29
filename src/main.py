@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-EVE Veles Eyes v2.2 Ultimate Edition
+EVE Veles Eyes v2.3 - ActionRegistry Edition
 Main entry point with professional UI and all features
+
+v2.3 Features:
+- ActionRegistry: Single source of truth for all UI actions
+- Centralized menu/toolbar building from registry
+- Tab renames: Overview, Roster, Automation, Sync
+- ToolbarBuilder and ContextMenuBuilder classes
+- CLI audit tool for redundancy checking
 
 v2.2 Features:
 - System tray with minimize-to-tray
@@ -125,7 +132,7 @@ def main():
     setup_logging()
 
     logger = logging.getLogger(__name__)
-    logger.info("Starting EVE Veles Eyes v2.2 Ultimate Edition")
+    logger.info("Starting EVE Veles Eyes v2.3")
 
     # Single instance check
     single_instance = SingleInstance()

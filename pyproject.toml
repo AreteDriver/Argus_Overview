@@ -1,6 +1,6 @@
 [project]
 name = "eve-veles-eyes"
-version = "2.2.0"
+version = "2.3.0"
 description = "Multi-window preview and management tool for EVE Online on Linux"
 readme = "README.md"
 license = {text = "MIT"}

@@ -31,7 +31,7 @@ class MainWindowV21(QMainWindow):
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger(__name__)
-        self.setWindowTitle("EVE Veles Eyes v2.2 Ultimate Edition")
+        self.setWindowTitle("EVE Veles Eyes v2.3")
         self.setMinimumSize(1000, 700)
 
         # Initialize core modules (singleton instances)
@@ -602,7 +602,7 @@ class MainWindowV21(QMainWindow):
                 return
 
         # Actually closing the application
-        self.logger.info("Shutting down EVE Veles Eyes v2.2...")
+        self.logger.info("Shutting down EVE Veles Eyes v2.3...")
 
         # Stop systems
         if hasattr(self, 'auto_discovery'):

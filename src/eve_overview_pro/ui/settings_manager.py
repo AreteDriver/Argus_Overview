@@ -16,7 +16,7 @@ class SettingsManager:
     """
 
     DEFAULT_SETTINGS = {
-        "version": "2.2",
+        "version": "2.3",
         "general": {
             "start_with_system": False,
             "minimize_to_tray": True,
