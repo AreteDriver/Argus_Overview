@@ -284,3 +284,17 @@ class TestActionRegistryIntegration:
         assert "focus_window" in action_ids
         assert "minimize_window" in action_ids
         assert "close_window" in action_ids
+
+    def test_toolbar_builder_finds_layouts_actions(self):
+        """ToolbarBuilder can find Layouts toolbar actions"""
+        builder = ToolbarBuilder()
+        registry = builder.registry
+
+        actions = registry.get_by_home(PrimaryHome.LAYOUTS_TOOLBAR)
+        assert len(actions) >= 4, "Should have at least 4 Layouts toolbar actions"
+
+        action_ids = [a.id for a in actions]
+        assert "apply_layout" in action_ids
+        assert "auto_arrange" in action_ids
+        assert "save_layout_preset" in action_ids
+        assert "refresh_layout_groups" in action_ids

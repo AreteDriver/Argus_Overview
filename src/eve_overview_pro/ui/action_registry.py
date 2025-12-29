@@ -333,11 +333,11 @@ class ActionRegistry:
         # --- Layouts Tab ---
         self.register(ActionSpec(
             id="apply_layout",
-            label="Apply Layout",
+            label="Apply to Windows",
             scope=ActionScope.TAB,
             primary_home=PrimaryHome.LAYOUTS_TOOLBAR,
-            tooltip="Arrange EVE windows on screen",
-            handler_name="_apply_layout_to_windows",
+            tooltip="Apply current arrangement to EVE windows",
+            handler_name="_apply_to_active_windows",
         ))
 
         self.register(ActionSpec(
@@ -346,7 +346,25 @@ class ActionRegistry:
             scope=ActionScope.TAB,
             primary_home=PrimaryHome.LAYOUTS_TOOLBAR,
             tooltip="Arrange tiles based on selected pattern",
-            handler_name="_auto_arrange_tiles",
+            handler_name="_auto_arrange",
+        ))
+
+        self.register(ActionSpec(
+            id="save_layout_preset",
+            label="Save Preset",
+            scope=ActionScope.TAB,
+            primary_home=PrimaryHome.LAYOUTS_TOOLBAR,
+            tooltip="Save current arrangement as a preset",
+            handler_name="_save_preset",
+        ))
+
+        self.register(ActionSpec(
+            id="refresh_layout_groups",
+            label="Refresh Groups",
+            scope=ActionScope.TAB,
+            primary_home=PrimaryHome.LAYOUTS_TOOLBAR,
+            tooltip="Reload cycling groups from Automation tab",
+            handler_name="_refresh_groups",
         ))
 
         # --- Automation Tab (Hotkeys + Alerts) ---
