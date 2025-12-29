@@ -3,13 +3,13 @@ Auto-Discovery - Background process to detect new EVE windows
 v2.2 Feature: Automatic detection of new EVE clients
 """
 import logging
-import subprocess
 import re
-from typing import Dict, List, Tuple, Optional, Callable, Set
-from datetime import datetime
+import subprocess
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
-from PySide6.QtCore import QObject, Signal, QTimer
+from PySide6.QtCore import QObject, QTimer, Signal
 
 
 @dataclass

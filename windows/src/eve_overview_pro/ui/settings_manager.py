@@ -4,9 +4,9 @@ Handles all application settings with nested key support and auto-save
 """
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional
-from datetime import datetime
 
 
 class SettingsManager:
@@ -124,7 +124,7 @@ class SettingsManager:
         """
         if self.settings_file.exists():
             try:
-                with open(self.settings_file, 'r') as f:
+                with open(self.settings_file) as f:
                     loaded = json.load(f)
 
                 # Merge with defaults (add any new keys from updates)
@@ -277,7 +277,7 @@ class SettingsManager:
         try:
             import_path = Path(import_path)
 
-            with open(import_path, 'r') as f:
+            with open(import_path) as f:
                 import_data = json.load(f)
 
             # Extract settings (handle both old and new format)

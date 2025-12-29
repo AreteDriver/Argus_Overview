@@ -2,17 +2,35 @@
 Settings Tab - Application settings configuration
 Configure all application settings with category-based panels
 """
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QSplitter, QTreeWidget,
-    QTreeWidgetItem, QStackedWidget, QGroupBox, QLabel, QPushButton,
-    QCheckBox, QSpinBox, QComboBox, QSlider, QLineEdit, QFormLayout,
-    QDialog, QDialogButtonBox, QMessageBox, QTableWidget, QTableWidgetItem,
-    QHeaderView, QColorDialog
-)
-from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QFont, QColor
 import logging
-from typing import Dict, Any
+from typing import Any
+
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSlider,
+    QSpinBox,
+    QSplitter,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class HotkeyEditDialog(QDialog):

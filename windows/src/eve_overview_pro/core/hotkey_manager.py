@@ -1,8 +1,9 @@
 """Global hotkey management - supports both modifier combos and single keys"""
+import logging
 from typing import Callable, Dict, Optional, Set
+
 from pynput import keyboard
 from PySide6.QtCore import QObject, Signal
-import logging
 
 
 class HotkeyManager(QObject):

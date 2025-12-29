@@ -2,15 +2,16 @@
 Windows-specific Layout Manager
 Uses Windows API for window positioning instead of xdotool
 """
-import logging
 import json
+import logging
+from dataclasses import asdict, dataclass
+from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
-from enum import Enum
-import win32gui
+
 import win32api
 import win32con
+import win32gui
 
 
 class GridPattern(Enum):
@@ -82,7 +83,7 @@ class LayoutManager:
         """Load layout presets from JSON file"""
         if self.presets_file.exists():
             try:
-                with open(self.presets_file, 'r') as f:
+                with open(self.presets_file) as f:
                     data = json.load(f)
                     self.presets = [LayoutPreset.from_dict(p) for p in data]
                 self.logger.info(f"Loaded {len(self.presets)} layout presets")

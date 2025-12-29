@@ -5,14 +5,31 @@ Implements character database, team building with drag-drop, and layout linking
 import logging
 from typing import List, Optional
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget,
-    QTableWidgetItem, QDialog, QLineEdit, QTextEdit, QComboBox, QCheckBox,
-    QDialogButtonBox, QFormLayout, QMessageBox, QSplitter, QListWidget,
-    QListWidgetItem, QGroupBox, QColorDialog, QHeaderView
-)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from eve_overview_pro.core.character_manager import Character, Team
 

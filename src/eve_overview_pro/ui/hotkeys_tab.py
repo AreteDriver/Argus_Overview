@@ -3,16 +3,30 @@ Hotkeys & Cycling Tab - Hotkey assignment and window cycling groups
 Drag-and-drop interface for creating cycling groups and assigning hotkeys
 """
 import logging
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QComboBox, QGroupBox,
-    QSplitter, QMessageBox, QInputDialog, QFormLayout,
-    QLineEdit, QSpinBox, QFrame, QAbstractItemView
-)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+)
+
+from eve_overview_pro.ui.action_registry import ActionRegistry, PrimaryHome
+from eve_overview_pro.ui.menu_builder import ToolbarBuilder
 
 
 class DraggableCharacterList(QListWidget):
@@ -186,10 +200,13 @@ class HotkeysTab(QWidget):
         return panel
 
     def _create_cycling_panel(self) -> QWidget:
-        """Create right panel with cycling group management"""
+        """Create right panel with cycling group management (v2.3 - uses ActionRegistry)"""
         panel = QWidget()
         layout = QVBoxLayout()
         panel.setLayout(layout)
+
+        # ToolbarBuilder for registry-based buttons
+        toolbar_builder = ToolbarBuilder()
 
         # Group selector section
         selector_group = QGroupBox("Cycling Group")
@@ -206,17 +223,17 @@ class HotkeysTab(QWidget):
 
         selector_layout.addStretch()
 
-        # New group button
-        new_btn = QPushButton("+ New Group")
-        new_btn.setStyleSheet("QPushButton { background-color: #2d5a27; color: white; }")
-        new_btn.clicked.connect(self._create_new_group)
-        selector_layout.addWidget(new_btn)
+        # New group button (from registry)
+        new_btn = toolbar_builder.create_button("new_group", self._create_new_group)
+        if new_btn:
+            new_btn.setText("+ New Group")  # Override label for this context
+            selector_layout.addWidget(new_btn)
 
-        # Delete group button
-        delete_btn = QPushButton("Delete")
-        delete_btn.setStyleSheet("QPushButton { background-color: #8b0000; color: white; }")
-        delete_btn.clicked.connect(self._delete_current_group)
-        selector_layout.addWidget(delete_btn)
+        # Delete group button (from registry)
+        delete_btn = toolbar_builder.create_button("delete_group", self._delete_current_group)
+        if delete_btn:
+            delete_btn.setText("Delete")  # Override label for this context
+            selector_layout.addWidget(delete_btn)
 
         layout.addWidget(selector_group)
 
@@ -239,23 +256,23 @@ class HotkeysTab(QWidget):
         # Member controls
         member_controls = QHBoxLayout()
 
-        remove_btn = QPushButton("Remove Selected")
-        remove_btn.clicked.connect(self._remove_selected_member)
-        member_controls.addWidget(remove_btn)
+        # Context actions from registry
+        remove_btn = toolbar_builder.create_button("remove_group_member", self._remove_selected_member)
+        if remove_btn:
+            member_controls.addWidget(remove_btn)
 
-        clear_btn = QPushButton("Clear All")
-        clear_btn.clicked.connect(self._clear_group_members)
-        member_controls.addWidget(clear_btn)
+        clear_btn = toolbar_builder.create_button("clear_group", self._clear_group_members)
+        if clear_btn:
+            member_controls.addWidget(clear_btn)
 
-        # Load active windows button
-        load_active_btn = QPushButton("Load Active Windows")
-        load_active_btn.setToolTip("Load all currently active EVE windows into this group")
-        load_active_btn.setStyleSheet("QPushButton { background-color: #2d5a27; color: white; }")
-        load_active_btn.clicked.connect(self._load_active_windows)
-        member_controls.addWidget(load_active_btn)
+        # Load active windows button (from registry)
+        load_active_btn = toolbar_builder.create_button("load_active_windows", self._load_active_windows)
+        if load_active_btn:
+            member_controls.addWidget(load_active_btn)
 
         member_controls.addStretch()
 
+        # Move Up/Down are list manipulation, not registry actions
         move_up_btn = QPushButton("Move Up")
         move_up_btn.clicked.connect(self._move_member_up)
         member_controls.addWidget(move_up_btn)
@@ -289,11 +306,10 @@ class HotkeysTab(QWidget):
         )
         hotkey_layout.addRow("Cycle Backward:", self.cycle_backward_edit)
 
-        # Save hotkeys button
-        save_hotkeys_btn = QPushButton("Save Hotkeys")
-        save_hotkeys_btn.setStyleSheet("QPushButton { background-color: #ff8c00; color: black; font-weight: bold; }")
-        save_hotkeys_btn.clicked.connect(self._save_hotkeys)
-        hotkey_layout.addRow("", save_hotkeys_btn)
+        # Save hotkeys button (from registry)
+        save_hotkeys_btn = toolbar_builder.create_button("save_hotkeys", self._save_hotkeys)
+        if save_hotkeys_btn:
+            hotkey_layout.addRow("", save_hotkeys_btn)
 
         layout.addWidget(hotkey_group)
 

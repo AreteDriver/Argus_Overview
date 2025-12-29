@@ -3,12 +3,11 @@ Themes - Customizable appearance themes for the application
 v2.2 Feature: Dark, Light, EVE, and Custom themes
 """
 import logging
-from typing import Dict, Optional
 from dataclasses import dataclass
+from typing import Dict, Optional
 
+from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QPalette, QColor
-from PySide6.QtCore import Qt
 
 
 @dataclass

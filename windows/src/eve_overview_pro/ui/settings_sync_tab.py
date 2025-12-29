@@ -2,17 +2,31 @@
 Settings Sync Tab - EVE Online settings synchronization
 Scan and sync EVE client settings between characters
 """
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QGroupBox,
-    QLabel, QComboBox, QListWidget, QTextEdit, QProgressBar,
-    QMessageBox, QDialog, QTableWidget, QTableWidgetItem,
-    QDialogButtonBox, QCheckBox, QFileDialog, QSplitter
-)
-from PySide6.QtCore import Qt, Signal, QThread
-from PySide6.QtGui import QFont, QColor
 import logging
-from typing import List, Dict, Optional
 from pathlib import Path
+
+from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QColor, QFont
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class ScanWorker(QThread):

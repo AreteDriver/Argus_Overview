@@ -1,11 +1,11 @@
 """
 About Dialog with donation link
 """
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QHBoxLayout
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QDesktopServices, QPixmap
-from PySide6.QtCore import QUrl
 import sys
+
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QFont
+from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 
 class AboutDialog(QDialog):

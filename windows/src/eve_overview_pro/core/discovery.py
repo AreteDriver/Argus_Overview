@@ -5,15 +5,15 @@ Windows Edition - Uses Win32 API
 """
 import logging
 import re
-from typing import Dict, List, Tuple, Optional, Callable, Set
-from datetime import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
-from PySide6.QtCore import QObject, Signal, QTimer
+from PySide6.QtCore import QObject, QTimer, Signal
 
 try:
-    import win32gui
     import win32con
+    import win32gui
     HAS_WIN32 = True
 except ImportError:
     HAS_WIN32 = False

@@ -1,10 +1,10 @@
 #!/bin/bash
-# EVE Veles Eyes v2.2 Ultimate Edition - Installation Script
+# EVE Veles Eyes v2.3 ActionRegistry Edition - Installation Script
 
 set -e
 
 echo "================================================================"
-echo "EVE Veles Eyes v2.2 Ultimate Edition"
+echo "EVE Veles Eyes v2.3 ActionRegistry Edition"
 echo "Installation Script"
 echo "================================================================"
 echo ""
@@ -139,7 +139,7 @@ mkdir -p ~/.local/share/applications
 
 cat > ~/.local/share/applications/eve-veles-eyes.desktop << DESKTOP
 [Desktop Entry]
-Version=2.2
+Version=2.3
 Type=Application
 Name=EVE Veles Eyes
 Comment=Multi-window preview and management tool for EVE Online
@@ -168,7 +168,7 @@ echo "================================================================"
 echo "Installation Complete!"
 echo "================================================================"
 echo ""
-echo "EVE Veles Eyes v2.2 has been installed to:"
+echo "EVE Veles Eyes v2.3 has been installed to:"
 echo "  $INSTALL_DIR"
 echo ""
 echo "To run EVE Veles Eyes:"

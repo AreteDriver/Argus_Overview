@@ -5,22 +5,45 @@ v2.2: Added one-click import, hover effects, activity indicators, session timers
 v2.3: Merged layouts functionality - group-based window arrangement
 """
 import logging
-import subprocess
 import re
-from typing import Dict, Optional, List, Tuple
-from datetime import datetime
+import subprocess
 from dataclasses import dataclass
-from PIL import Image
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QSpinBox, QCheckBox, QScrollArea, QDialog, QListWidget,
-    QListWidgetItem, QDialogButtonBox, QMenu, QMessageBox,
-    QInputDialog, QGraphicsOpacityEffect, QLayout, QSizePolicy,
-    QComboBox, QGroupBox, QFrame, QGridLayout, QSplitter
+from PIL import Image
+from PySide6.QtCore import (
+    QPoint,
+    QRect,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
 )
-from PySide6.QtCore import Qt, Signal, QTimer, QSize, QPropertyAnimation, QEasingCurve, QRect, QPoint
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QAction, QBrush
+from PySide6.QtGui import QAction, QBrush, QColor, QImage, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFrame,
+    QGraphicsOpacityEffect,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLayout,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 @dataclass

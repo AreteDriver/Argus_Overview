@@ -2,20 +2,29 @@
 Layouts Tab - Group-based window arrangement with drag-and-drop tiles
 Supports grid patterns, stacking, and custom positioning
 """
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QListWidget, QListWidgetItem,
-    QPushButton, QGroupBox, QLabel, QComboBox, QSpinBox, QDialog,
-    QLineEdit, QTextEdit, QMessageBox, QSplitter, QGraphicsView,
-    QGraphicsScene, QGraphicsRectItem, QDialogButtonBox, QFormLayout,
-    QCheckBox, QFrame, QScrollArea, QGridLayout
-)
-from PySide6.QtCore import Qt, Signal, QRectF, QPointF, QMimeData
-from PySide6.QtGui import QColor, QPen, QBrush, QFont, QDrag, QPainter
 import logging
-import subprocess
 import re
-from typing import Dict, List, Tuple, Optional
+import subprocess
 from dataclasses import dataclass
+from typing import Dict, List, Optional, Tuple
+
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
 
 from eve_overview_pro.core.layout_manager import GridPattern
 
@@ -626,7 +635,7 @@ class LayoutsTab(QWidget):
                 for window_id, frame in self.main_tab.window_manager.preview_frames.items():
                     self.arrangement_grid.add_character(frame.character_name)
 
-            self.info_label.setText(f"Showing all active windows")
+            self.info_label.setText("Showing all active windows")
         else:
             # Get characters from group
             members = self.cycling_groups.get(group_name, [])

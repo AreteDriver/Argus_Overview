@@ -5,16 +5,35 @@ Implements character database, team building with drag-drop, and layout linking
 import logging
 from typing import List, Optional
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTableWidget,
-    QTableWidgetItem, QDialog, QLineEdit, QTextEdit, QComboBox, QCheckBox,
-    QDialogButtonBox, QFormLayout, QMessageBox, QSplitter, QListWidget,
-    QListWidgetItem, QGroupBox, QColorDialog, QHeaderView
-)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QColorDialog,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from eve_overview_pro.core.character_manager import Character, Team
+from eve_overview_pro.ui.action_registry import ActionRegistry, PrimaryHome
+from eve_overview_pro.ui.menu_builder import ToolbarBuilder
 
 
 class CharacterTable(QTableWidget):
@@ -597,47 +616,45 @@ class CharactersTeamsTab(QWidget):
         splitter.setSizes([600, 400])
 
     def _create_left_panel(self) -> QWidget:
-        """Create left panel with character table"""
+        """Create left panel with character table (v2.3 - uses ActionRegistry)"""
         panel = QWidget()
         layout = QVBoxLayout()
         panel.setLayout(layout)
 
-        # Toolbar
-        toolbar = QHBoxLayout()
+        # Build toolbar from ActionRegistry
+        toolbar_layout = QHBoxLayout()
+        toolbar_builder = ToolbarBuilder()
 
-        add_btn = QPushButton("Add Character")
-        add_btn.clicked.connect(self._add_character)
-        toolbar.addWidget(add_btn)
+        # Roster toolbar actions
+        handlers = {
+            "add_character": self._add_character,
+            "scan_eve_folder": self._scan_eve_folder,
+            "new_team": self.team_builder._new_team if hasattr(self, 'team_builder') else None,
+        }
 
-        edit_btn = QPushButton("Edit")
-        edit_btn.clicked.connect(self._edit_character)
-        toolbar.addWidget(edit_btn)
+        # Add Character button from registry
+        add_btn = toolbar_builder.create_button("add_character", self._add_character)
+        if add_btn:
+            toolbar_layout.addWidget(add_btn)
 
-        delete_btn = QPushButton("Delete")
-        delete_btn.clicked.connect(self._delete_character)
-        toolbar.addWidget(delete_btn)
+        # Edit/Delete are context actions but keep in toolbar for convenience
+        edit_btn = toolbar_builder.create_button("edit_character", self._edit_character)
+        if edit_btn:
+            toolbar_layout.addWidget(edit_btn)
 
-        toolbar.addStretch()
+        delete_btn = toolbar_builder.create_button("delete_character", self._delete_character)
+        if delete_btn:
+            toolbar_layout.addWidget(delete_btn)
+
+        toolbar_layout.addStretch()
 
         # Scan EVE Folder button (if settings_sync available)
         if self.settings_sync is not None:
-            scan_btn = QPushButton("📁 Scan EVE Folder")
-            scan_btn.setToolTip("Import ALL characters from EVE installation (even logged off)")
-            scan_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #2d5a27;
-                    color: white;
-                    padding: 5px 10px;
-                    border-radius: 3px;
-                }
-                QPushButton:hover {
-                    background-color: #3d7a37;
-                }
-            """)
-            scan_btn.clicked.connect(self._scan_eve_folder)
-            toolbar.addWidget(scan_btn)
+            scan_btn = toolbar_builder.create_button("scan_eve_folder", self._scan_eve_folder)
+            if scan_btn:
+                toolbar_layout.addWidget(scan_btn)
 
-        layout.addLayout(toolbar)
+        layout.addLayout(toolbar_layout)
 
         # Character table
         self.character_table = CharacterTable(self.character_manager)

@@ -5,22 +5,48 @@ v2.2: Added one-click import, hover effects, activity indicators, session timers
 v2.3: Merged layouts functionality - group-based window arrangement
 """
 import logging
-import subprocess
 import re
-from typing import Dict, Optional, List, Tuple
-from datetime import datetime
+import subprocess
 from dataclasses import dataclass
-from PIL import Image
+from datetime import datetime
+from typing import Dict, List, Optional, Tuple
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QSpinBox, QCheckBox, QScrollArea, QDialog, QListWidget,
-    QListWidgetItem, QDialogButtonBox, QMenu, QMessageBox,
-    QInputDialog, QGraphicsOpacityEffect, QLayout, QSizePolicy,
-    QComboBox, QGroupBox, QFrame, QGridLayout, QSplitter
+from PIL import Image
+from PySide6.QtCore import (
+    QPoint,
+    QRect,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
 )
-from PySide6.QtCore import Qt, Signal, QTimer, QSize, QPropertyAnimation, QEasingCurve, QRect, QPoint
-from PySide6.QtGui import QImage, QPixmap, QPainter, QPen, QColor, QAction, QBrush
+from PySide6.QtGui import QAction, QBrush, QColor, QImage, QPainter, QPen, QPixmap
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QComboBox,
+    QDialog,
+    QDialogButtonBox,
+    QFrame,
+    QGraphicsOpacityEffect,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLayout,
+    QListWidget,
+    QListWidgetItem,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
+
+from eve_overview_pro.ui.action_registry import ActionRegistry, PrimaryHome
+from eve_overview_pro.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
 
 
 @dataclass
@@ -780,49 +806,25 @@ class WindowPreviewWidget(QWidget):
             self.logger.info(f"Activating window: {self.window_id}")
 
     def contextMenuEvent(self, event):
-        """Handle right-click context menu (v2.2 enhanced)"""
-        menu = QMenu(self)
+        """Handle right-click context menu (v2.3 - uses ActionRegistry)"""
+        # Build context menu from ActionRegistry
+        context_builder = ContextMenuBuilder()
 
-        # Focus Window
-        activate_action = QAction("Focus Window", self)
-        activate_action.triggered.connect(lambda: self.window_activated.emit(self.window_id))
-        menu.addAction(activate_action)
+        # Handler map for context actions
+        handlers = {
+            "focus_window": lambda: self.window_activated.emit(self.window_id),
+            "minimize_window": self._minimize_window,
+            "close_window": self._close_window,
+            "set_label": self._show_label_dialog,
+            "remove_from_preview": lambda: self.window_removed.emit(self.window_id),
+        }
 
-        # Minimize
-        minimize_action = QAction("Minimize", self)
-        minimize_action.triggered.connect(self._minimize_window)
-        menu.addAction(minimize_action)
-
-        # Close (with confirmation)
-        close_action = QAction("Close", self)
-        close_action.triggered.connect(self._close_window)
-        menu.addAction(close_action)
-
-        menu.addSeparator()
-
-        # Set Label (v2.2)
-        label_action = QAction("Set Label...", self)
-        label_action.triggered.connect(self._show_label_dialog)
-        menu.addAction(label_action)
-
-        menu.addSeparator()
-
-        # Zoom submenu
-        zoom_menu = menu.addMenu("Zoom Level")
-        for zoom in [0.2, 0.3, 0.4, 0.5]:
-            zoom_action = QAction(f"{int(zoom*100)}%", self)
-            zoom_action.triggered.connect(lambda checked, z=zoom: self._set_zoom(z))
-            if zoom == self.zoom_factor:
-                zoom_action.setCheckable(True)
-                zoom_action.setChecked(True)
-            zoom_menu.addAction(zoom_action)
-
-        menu.addSeparator()
-
-        # Remove from Group
-        remove_action = QAction("Remove from Preview", self)
-        remove_action.triggered.connect(lambda: self.window_removed.emit(self.window_id))
-        menu.addAction(remove_action)
+        menu = context_builder.build_window_context_menu(
+            handlers=handlers,
+            zoom_handler=self._set_zoom,
+            current_zoom=self.zoom_factor,
+            parent=self,
+        )
 
         menu.exec(event.globalPos())
 
@@ -1119,55 +1121,56 @@ class MainTab(QWidget):
         layout.addWidget(status_bar)
 
     def _create_toolbar(self) -> QWidget:
-        """Create toolbar with v2.2 One-Click Import"""
+        """Create toolbar using ActionRegistry (v2.3)"""
         toolbar = QWidget()
         toolbar_layout = QHBoxLayout()
         toolbar_layout.setContentsMargins(0, 0, 0, 5)
         toolbar.setLayout(toolbar_layout)
 
-        # One-Click Import button (v2.2 - prominent)
-        import_btn = QPushButton("Import All EVE Windows")
-        import_btn.setToolTip("Scan and import all EVE windows with one click")
-        import_btn.setStyleSheet("QPushButton { background-color: #ff8c00; color: black; font-weight: bold; padding: 5px 10px; }")
-        import_btn.clicked.connect(self.one_click_import)
-        toolbar_layout.addWidget(import_btn)
+        # Build toolbar buttons from ActionRegistry
+        toolbar_builder = ToolbarBuilder()
+        handlers = {
+            "import_windows": self.one_click_import,
+            "add_window": self.show_add_window_dialog,
+            "remove_all_windows": self._remove_all_windows,
+            "lock_positions": self._toggle_lock,
+            "minimize_inactive": self.minimize_inactive_windows,
+            "refresh_capture": self._refresh_all,
+        }
 
-        # Add Window button (manual)
-        add_btn = QPushButton("Add Window")
-        add_btn.setToolTip("Manually select EVE windows to add")
-        add_btn.clicked.connect(self.show_add_window_dialog)
-        toolbar_layout.addWidget(add_btn)
+        # Create buttons in specific order with layout control
+        action_order = [
+            "import_windows",
+            "add_window",
+            "remove_all_windows",
+        ]
 
-        # Remove All button
-        remove_btn = QPushButton("Remove All")
-        remove_btn.setToolTip("Remove all windows from preview")
-        remove_btn.clicked.connect(self._remove_all_windows)
-        toolbar_layout.addWidget(remove_btn)
+        buttons = toolbar_builder.build_toolbar_buttons(
+            PrimaryHome.OVERVIEW_TOOLBAR,
+            handlers,
+            action_order,
+        )
+
+        # Add first group of buttons
+        for action_id in action_order:
+            if action_id in buttons:
+                toolbar_layout.addWidget(buttons[action_id])
 
         toolbar_layout.addStretch()
 
-        # Lock Positions toggle (v2.2)
-        self.lock_btn = QPushButton("Lock")
-        self.lock_btn.setCheckable(True)
-        self.lock_btn.setToolTip("Lock thumbnail positions (Ctrl+Shift+L)")
-        self.lock_btn.clicked.connect(self._toggle_lock)
+        # Add lock button (store reference for state updates)
+        self.lock_btn = toolbar_builder.create_button("lock_positions", self._toggle_lock)
         toolbar_layout.addWidget(self.lock_btn)
 
-        # Minimize Inactive button
-        minimize_btn = QPushButton("Minimize Inactive")
-        minimize_btn.setToolTip("Minimize all windows except the currently focused one")
-        minimize_btn.clicked.connect(self.minimize_inactive_windows)
-        toolbar_layout.addWidget(minimize_btn)
-
-        # Refresh All button
-        refresh_btn = QPushButton("Refresh")
-        refresh_btn.setToolTip("Restart capture for all windows")
-        refresh_btn.clicked.connect(self._refresh_all)
-        toolbar_layout.addWidget(refresh_btn)
+        # Add remaining buttons
+        for action_id in ["minimize_inactive", "refresh_capture"]:
+            btn = toolbar_builder.create_button(action_id, handlers.get(action_id))
+            if btn:
+                toolbar_layout.addWidget(btn)
 
         toolbar_layout.addStretch()
 
-        # Refresh Rate
+        # Refresh Rate (not from registry - it's a widget, not an action)
         toolbar_layout.addWidget(QLabel("FPS:"))
         self.refresh_rate_spin = QSpinBox()
         self.refresh_rate_spin.setRange(1, 60)

@@ -3,16 +3,27 @@ Hotkeys & Cycling Tab - Hotkey assignment and window cycling groups
 Drag-and-drop interface for creating cycling groups and assigning hotkeys
 """
 import logging
-from typing import List, Optional, Dict
+from typing import Dict, List, Optional
 
-from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QComboBox, QGroupBox,
-    QSplitter, QMessageBox, QInputDialog, QFormLayout,
-    QLineEdit, QSpinBox, QFrame, QAbstractItemView
-)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QComboBox,
+    QFormLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QListWidget,
+    QListWidgetItem,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class DraggableCharacterList(QListWidget):

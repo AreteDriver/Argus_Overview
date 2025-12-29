@@ -4,14 +4,15 @@ Uses Windows API (pywin32) for screen capture instead of ImageMagick
 """
 import logging
 import uuid
-from queue import Queue, Empty
+from ctypes import windll
+from queue import Empty, Queue
 from threading import Thread
-from typing import Dict, Optional, Tuple
-from PIL import Image
+from typing import Optional, Tuple
+
+import win32con
 import win32gui
 import win32ui
-import win32con
-from ctypes import windll
+from PIL import Image
 
 
 class WindowCaptureThreaded:

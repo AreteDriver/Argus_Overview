@@ -3,10 +3,10 @@ Position Inheritance - Smart positioning for new thumbnail windows
 v2.2 Feature: Automatically position new thumbnails relative to existing ones
 """
 import logging
-from typing import Dict, List, Tuple, Optional
 from dataclasses import dataclass
+from typing import Dict, List, Optional
 
-from PySide6.QtCore import QRect, QPoint, QSize
+from PySide6.QtCore import QRect
 from PySide6.QtWidgets import QApplication
 
 

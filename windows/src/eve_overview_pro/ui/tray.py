@@ -3,12 +3,11 @@ System Tray - Provides system tray icon with quick actions menu
 v2.2 Feature: Minimize to tray, quick profile switching, toggle visibility
 """
 import logging
-from pathlib import Path
-from typing import Optional, Dict, List, Callable
+from typing import List, Optional
 
-from PySide6.QtWidgets import QSystemTrayIcon, QMenu, QApplication
-from PySide6.QtGui import QIcon, QPixmap, QPainter, QColor, QFont, QAction
-from PySide6.QtCore import Signal, QObject
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
 
 class SystemTray(QObject):

@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2025-12-28
+
+### Added
+- **ActionRegistry** - Single source of truth for all 42 UI actions
+- **ToolbarBuilder** - Centralized toolbar construction from registry
+- **ContextMenuBuilder** - Context menu construction from registry
+- **MenuBuilder** - Tray and app menu construction from registry
+- **CLI Audit Tool** - `python -m eve_overview_pro.ui.action_registry` for redundancy checks
+- **DEV_NOTES.md** - Developer documentation for action tier rules
+
+### Changed
+- **Tab Renames** - Main→Overview, Characters & Teams→Roster, Hotkeys & Cycling→Automation, Settings Sync→Sync
+- All menus now built from ActionRegistry (no hard-coded duplicates)
+- Tray menu includes Minimize All / Restore All actions
+- Consistent button styling via ToolbarBuilder (PRIMARY, SUCCESS, DANGER)
+
+### Technical
+- 42 registered actions across 3 tiers (Global, Tab, Object)
+- 0 duplicate actions across primary homes (enforced by audit)
+- All toolbars use registry-based button creation
+
 ## [2.2.0] - 2025-12-27
 
 ### Added
@@ -72,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simple hotkey support
 - Single window capture
 
-[Unreleased]: https://github.com/AreteDriver/EVE_VelesEyes/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/AreteDriver/EVE_VelesEyes/compare/v2.3.0...HEAD
+[2.3.0]: https://github.com/AreteDriver/EVE_VelesEyes/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/AreteDriver/EVE_VelesEyes/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/AreteDriver/EVE_VelesEyes/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/AreteDriver/EVE_VelesEyes/compare/v1.0.0...v2.0.0

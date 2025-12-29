@@ -1,7 +1,14 @@
 #!/usr/bin/env python3
 """
-EVE Veles Eyes v2.2 Ultimate Edition
+EVE Veles Eyes v2.3 - ActionRegistry Edition
 Main entry point with professional UI and all features
+
+v2.3 Features:
+- ActionRegistry: Single source of truth for all UI actions
+- Centralized menu/toolbar building from registry
+- Tab renames: Overview, Roster, Automation, Sync
+- ToolbarBuilder and ContextMenuBuilder classes
+- CLI audit tool for redundancy checking
 
 v2.2 Features:
 - System tray with minimize-to-tray
@@ -17,15 +24,15 @@ v2.2 Features:
 - Position lock for thumbnails
 - Single instance enforcement
 """
-import sys
-import logging
 import fcntl
+import logging
 import os
+import sys
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette, QColor
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -59,7 +66,7 @@ class SingleInstance:
             self.lock_file.write(str(os.getpid()))
             self.lock_file.flush()
             return True
-        except (IOError, OSError):
+        except OSError:
             # Lock is held by another instance
             if self.lock_file:
                 self.lock_file.close()
@@ -87,7 +94,7 @@ def setup_logging():
     """Setup logging configuration"""
     log_dir = Path.home() / '.config' / 'eve-veles-eyes'
     log_dir.mkdir(parents=True, exist_ok=True)
-    
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -101,7 +108,7 @@ def setup_logging():
 def setup_dark_theme(app):
     """Setup professional dark theme"""
     app.setStyle('Fusion')
-    
+
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(53, 53, 53))
     palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
@@ -125,7 +132,7 @@ def main():
     setup_logging()
 
     logger = logging.getLogger(__name__)
-    logger.info("Starting EVE Veles Eyes v2.2 Ultimate Edition")
+    logger.info("Starting EVE Veles Eyes v2.3")
 
     # Single instance check
     single_instance = SingleInstance()

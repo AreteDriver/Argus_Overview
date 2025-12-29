@@ -3,22 +3,24 @@ Main Window v2.2 with Tabbed Interface
 Production implementation with all core modules integrated
 v2.2: Added system tray, auto-discovery, themes, hotkey enhancements
 """
-from PySide6.QtWidgets import QMainWindow, QTabWidget, QWidget, QVBoxLayout, QLabel, QApplication
-from PySide6.QtCore import Slot, Qt
-from PySide6.QtGui import QCloseEvent
 import logging
+
+from PySide6.QtCore import Slot
+from PySide6.QtGui import QCloseEvent
+from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
+
+from eve_overview_pro.core.alert_detector import AlertDetector
 
 # Import core modules
 from eve_overview_pro.core.character_manager import CharacterManager
-from eve_overview_pro.core.layout_manager import LayoutManager
-from eve_overview_pro.core.alert_detector import AlertDetector
-from eve_overview_pro.core.window_capture_threaded import WindowCaptureThreaded
-from eve_overview_pro.core.hotkey_manager import HotkeyManager
-from eve_overview_pro.core.eve_settings_sync import EVESettingsSync
 from eve_overview_pro.core.discovery import AutoDiscovery
+from eve_overview_pro.core.eve_settings_sync import EVESettingsSync
+from eve_overview_pro.core.hotkey_manager import HotkeyManager
+from eve_overview_pro.core.layout_manager import LayoutManager
+from eve_overview_pro.core.window_capture_threaded import WindowCaptureThreaded
 from eve_overview_pro.ui.settings_manager import SettingsManager
-from eve_overview_pro.ui.tray import SystemTray
 from eve_overview_pro.ui.themes import get_theme_manager
+from eve_overview_pro.ui.tray import SystemTray
 
 
 class MainWindowV21(QMainWindow):
@@ -400,14 +402,14 @@ class MainWindowV21(QMainWindow):
 
     def _open_donation_link(self):
         """Open Buy Me a Coffee link"""
-        from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
         QDesktopServices.openUrl(QUrl("https://buymeacoffee.com/aretedriver"))
 
     def _open_url(self, url: str):
         """Open URL in browser"""
-        from PySide6.QtGui import QDesktopServices
         from PySide6.QtCore import QUrl
+        from PySide6.QtGui import QDesktopServices
         QDesktopServices.openUrl(QUrl(url))
 
     def _apply_initial_settings(self):

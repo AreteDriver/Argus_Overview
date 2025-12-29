@@ -1,10 +1,10 @@
 #!/bin/bash
-# EVE Veles Eyes v2.2 - Uninstallation Script
+# EVE Veles Eyes v2.3 - Uninstallation Script
 
 set -e
 
 echo "=========================================="
-echo "EVE Veles Eyes v2.2 - Uninstallation"
+echo "EVE Veles Eyes v2.3 - Uninstallation"
 echo "=========================================="
 echo ""
 
@@ -79,7 +79,7 @@ echo "=========================================="
 echo "Uninstallation Complete!"
 echo "=========================================="
 echo ""
-echo "EVE Veles Eyes v2.2 has been uninstalled."
+echo "EVE Veles Eyes v2.3 has been uninstalled."
 echo ""
 echo "Note: Virtual environment (.venv) and source code remain."
 echo "To completely remove, delete the project directory."

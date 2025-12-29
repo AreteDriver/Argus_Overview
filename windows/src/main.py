@@ -17,14 +17,14 @@ v2.2 Features:
 - Position lock for thumbnails
 - Single instance enforcement
 """
-import sys
 import logging
 import os
+import sys
 from pathlib import Path
 
-from PySide6.QtWidgets import QApplication, QMessageBox
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPalette, QColor
+from PySide6.QtGui import QColor, QPalette
+from PySide6.QtWidgets import QApplication, QMessageBox
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -49,8 +49,8 @@ class SingleInstance:
         Returns True if successful (first instance), False if already running.
         """
         try:
-            import win32event
             import win32api
+            import win32event
             import winerror
 
             self.mutex = win32event.CreateMutex(None, False, self.mutex_name)

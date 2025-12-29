@@ -1,9 +1,9 @@
-# EVE Veles Eyes v2.2 Ultimate Edition
+# EVE Veles Eyes v2.3 ActionRegistry Edition
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
 [![CI](https://github.com/AreteDriver/EVE_VelesEyes/actions/workflows/ci.yml/badge.svg)](https://github.com/AreteDriver/EVE_VelesEyes/actions)
-[![Version](https://img.shields.io/badge/version-2.2.0-blue)](https://github.com/AreteDriver/EVE_VelesEyes/releases)
+[![Version](https://img.shields.io/badge/version-2.3.0-blue)](https://github.com/AreteDriver/EVE_VelesEyes/releases)
 [![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-green)](https://python.org)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)]()
@@ -339,5 +339,5 @@ MIT License - See LICENSE file
 
 **Fly safe, capsuleers! o7**
 
-*EVE Veles Eyes v2.2 Ultimate Edition*
+*EVE Veles Eyes v2.3 ActionRegistry Edition*
 *The Complete Professional Solution for Linux Multi-Boxing*
