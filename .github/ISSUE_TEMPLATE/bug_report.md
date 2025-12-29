@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a bug in EVE Veles Eyes
+about: Report a bug in Argus Overview
 title: '[BUG] '
 labels: bug
 ---
@@ -31,12 +31,12 @@ If applicable, add screenshots to help explain your problem.
 - **Desktop**: [e.g., GNOME, KDE, i3]
 - **Display Server**: [X11 / Wayland+XWayland]
 - **Python version**: [e.g., 3.11]
-- **EVE Veles Eyes version**: [e.g., 2.2.0]
+- **Argus Overview version**: [e.g., 2.4.1]
 
 ## Logs
 
 ```
-Paste relevant logs from ~/.config/eve-veles-eyes/eve-veles-eyes.log
+Paste relevant logs from ~/.config/argus-overview/argus-overview.log
 ```
 
 ## Additional Context

@@ -1,6 +1,6 @@
 ---
 name: Feature Request
-about: Suggest a feature for EVE Veles Eyes
+about: Suggest a feature for Argus Overview
 title: '[FEATURE] '
 labels: enhancement
 ---

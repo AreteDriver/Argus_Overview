@@ -1,6 +1,6 @@
-# Contributing to EVE Veles Eyes
+# Contributing to Argus Overview
 
-Thank you for your interest in contributing to EVE Veles Eyes!
+Thank you for your interest in contributing to Argus Overview!
 
 ## Getting Started
 
@@ -9,12 +9,12 @@ Thank you for your interest in contributing to EVE Veles Eyes!
 1. Fork the repository on GitHub
 2. Clone your fork:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/EVE_VelesEyes
-   cd EVE_VelesEyes
+   git clone https://github.com/YOUR_USERNAME/Argus_Overview
+   cd Argus_Overview
    ```
 3. Add upstream remote:
    ```bash
-   git remote add upstream https://github.com/AreteDriver/EVE_VelesEyes
+   git remote add upstream https://github.com/AreteDriver/Argus_Overview
    ```
 
 ### Development Setup
@@ -40,7 +40,7 @@ python src/main.py --debug
 ### Project Structure
 
 ```
-EVE_VelesEyes/
+Argus_Overview/
 ├── src/
 │   ├── main.py                    # Entry point
 │   └── eve_overview_pro/
@@ -155,7 +155,7 @@ Use the bug report template and include:
 - Steps to reproduce
 - Expected behavior
 - Environment details (OS, Python version, etc.)
-- Relevant logs from `~/.config/eve-veles-eyes/eve-veles-eyes.log`
+- Relevant logs from `~/.config/argus-overview/argus-overview.log`
 
 ### Feature Requests
 
@@ -224,6 +224,6 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ---
 
-**Thank you for contributing to EVE Veles Eyes!**
+**Thank you for contributing to Argus Overview!**
 
 Fly safe, capsuleer! o7

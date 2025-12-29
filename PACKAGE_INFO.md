@@ -1,8 +1,8 @@
-# EVE Veles Eyes v2.2 Ultimate Edition - Package Information
+# Argus Overview v2.4 - Package Information
 
 ## What's Included in This Package
 
-This is the **complete core architecture** for EVE Veles Eyes v2.2 Ultimate Edition with all features!
+This is the **complete core architecture** for Argus Overview v2.4 with all features!
 
 ### Core Modules (100% Complete):
 
@@ -53,14 +53,14 @@ This is the **complete core architecture** for EVE Veles Eyes v2.2 Ultimate Edit
 
 ```bash
 # Extract
-tar -xzf eve-veles-eyes-v2.2.tar.gz
-cd eve-veles-eyes
+tar -xzf Argus-Overview-v2.4.1-Linux.tar.gz
+cd argus-overview-linux
 
 # Install
 ./install.sh
 
 # Run
-~/eve-veles-eyes/run.sh
+~/argus-overview/run.sh
 ```
 
 ---
@@ -68,7 +68,7 @@ cd eve-veles-eyes
 ## Architecture Overview
 
 ```
-eve-veles-eyes/
+argus-overview/
 ├── src/
 │   ├── main.py                          # Application entry point
 │   └── eve_overview_pro/
@@ -112,10 +112,10 @@ eve-veles-eyes/
 
 ## Configuration Paths
 
-- **Config Directory**: `~/.config/eve-veles-eyes/`
-- **Data Directory**: `~/.local/share/eve-veles-eyes/`
-- **Log File**: `~/.config/eve-veles-eyes/eve-veles-eyes.log`
-- **Lock File**: `~/.config/eve-veles-eyes/eve-veles-eyes.lock`
+- **Config Directory**: `~/.config/argus-overview/`
+- **Data Directory**: `~/.local/share/argus-overview/`
+- **Log File**: `~/.config/argus-overview/argus-overview.log`
+- **Lock File**: `~/.config/argus-overview/argus-overview.lock`
 
 ---
 

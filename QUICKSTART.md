@@ -1,17 +1,17 @@
-# EVE Veles Eyes v2.2 Ultimate Edition - Quick Start Guide
+# Argus Overview v2.4 - Quick Start Guide
 
 ## Installation (5 minutes)
 
 ```bash
 # 1. Extract the package
-tar -xzf eve-veles-eyes-v2.2.tar.gz
-cd eve-veles-eyes
+tar -xzf Argus-Overview-v2.4.1-Linux.tar.gz
+cd argus-overview-linux
 
 # 2. Run the installer
 ./install.sh
 
 # 3. Launch the application
-~/eve-veles-eyes/run.sh
+~/argus-overview/run.sh
 # OR find it in your applications menu!
 ```
 
@@ -22,8 +22,8 @@ cd eve-veles-eyes
 ### Step 1: Launch Your EVE Clients
 Log in to your EVE characters as normal.
 
-### Step 2: Start EVE Veles Eyes
-- Run: `~/eve-veles-eyes/run.sh`
+### Step 2: Start Argus Overview
+- Run: `~/argus-overview/run.sh`
 - Or click the desktop icon
 
 ### Step 3: Characters & Teams Tab
@@ -49,7 +49,7 @@ Log in to your EVE characters as normal.
 
 ---
 
-## Top Features (v2.2)
+## Top Features (v2.4)
 
 ### System Tray Integration
 - Orange "V" icon in system tray
@@ -187,7 +187,7 @@ Log in to your EVE characters as normal.
 
 **Check logs:**
 ```bash
-~/.config/eve-veles-eyes/eve-veles-eyes.log
+~/.config/argus-overview/argus-overview.log
 ```
 
 ---
@@ -212,4 +212,4 @@ Log in to your EVE characters as normal.
 
 **Fly safe, capsuleers! o7**
 
-*EVE Veles Eyes v2.2 Ultimate Edition*
+*Argus Overview v2.4*
