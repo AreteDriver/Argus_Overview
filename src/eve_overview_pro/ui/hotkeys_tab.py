@@ -25,7 +25,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from eve_overview_pro.ui.action_registry import ActionRegistry, PrimaryHome
 from eve_overview_pro.ui.menu_builder import ToolbarBuilder
 
 

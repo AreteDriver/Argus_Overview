@@ -20,7 +20,7 @@ from PySide6.QtCore import (
     QTimer,
     Signal,
 )
-from PySide6.QtGui import QAction, QBrush, QColor, QImage, QPainter, QPen, QPixmap
+from PySide6.QtGui import QBrush, QColor, QImage, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -36,7 +36,6 @@ from PySide6.QtWidgets import (
     QLayout,
     QListWidget,
     QListWidgetItem,
-    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -45,7 +44,9 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from eve_overview_pro.ui.action_registry import ActionRegistry, PrimaryHome
+from eve_overview_pro.core.alert_detector import AlertLevel
+from eve_overview_pro.core.discovery import scan_eve_windows
+from eve_overview_pro.ui.action_registry import PrimaryHome
 from eve_overview_pro.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
 
 
@@ -165,9 +166,6 @@ class FlowLayout(QLayout):
         for item, _, size in row_items:
             item.setGeometry(QRect(QPoint(x, y), size))
             x += size.width() + self._spacing
-
-from eve_overview_pro.core.alert_detector import AlertLevel
-from eve_overview_pro.core.discovery import scan_eve_windows
 
 
 def get_all_layout_patterns():
@@ -294,7 +292,7 @@ class ArrangementGrid(QWidget):
                 """)
                 self.grid_layout.addWidget(cell, row, col)
 
-        for char_name, tile in self.tiles.items():
+        for _char_name, tile in self.tiles.items():
             row = min(tile.grid_row, rows - 1)
             col = min(tile.grid_col, cols - 1)
             tile.set_position(row, col)
@@ -419,7 +417,7 @@ class GridApplier:
                          stacked: bool = False) -> bool:
         try:
             if stacked:
-                for char_name, window_id in window_map.items():
+                for _char_name, window_id in window_map.items():
                     x = screen.x + spacing
                     y = screen.y + spacing
                     w = screen.width - spacing * 2
@@ -1331,7 +1329,7 @@ class MainTab(QWidget):
         self.arrangement_grid.clear_tiles()
 
         if source == "All Active Windows":
-            for window_id, frame in self.window_manager.preview_frames.items():
+            for _window_id, frame in self.window_manager.preview_frames.items():
                 self.arrangement_grid.add_character(frame.character_name)
         else:
             members = self.cycling_groups.get(source, [])
@@ -1434,7 +1432,7 @@ class MainTab(QWidget):
         added_count = 0
         skipped_count = 0
 
-        for window_id, window_title, char_name in eve_windows:
+        for window_id, _window_title, char_name in eve_windows:
             # Skip if already in preview
             if window_id in self.window_manager.preview_frames:
                 skipped_count += 1

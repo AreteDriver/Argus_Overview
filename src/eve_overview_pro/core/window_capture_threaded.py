@@ -26,7 +26,7 @@ class WindowCaptureThreaded:
     def start(self):
         """Start capture worker threads"""
         self.running = True
-        for i in range(self.max_workers):
+        for _i in range(self.max_workers):
             worker = threading.Thread(target=self._worker, daemon=True)
             worker.start()
             self.workers.append(worker)
@@ -60,7 +60,7 @@ class WindowCaptureThreaded:
 
     def capture_window_async(self, window_id: str, scale: float = 1.0) -> str:
         """Request async window capture
-        
+
         Returns:
             request_id to retrieve result later
         """
@@ -71,7 +71,7 @@ class WindowCaptureThreaded:
 
     def get_result(self, timeout: float = 0.1) -> Optional[Tuple[str, str, Image.Image]]:
         """Get capture result if available
-        
+
         Returns:
             Tuple of (request_id, window_id, image) or None
         """

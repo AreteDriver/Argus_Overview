@@ -7,10 +7,10 @@ import logging
 from typing import List, Optional
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
-from eve_overview_pro.ui.action_registry import ActionRegistry, PrimaryHome
+from eve_overview_pro.ui.action_registry import ActionRegistry
 from eve_overview_pro.ui.menu_builder import MenuBuilder
 
 

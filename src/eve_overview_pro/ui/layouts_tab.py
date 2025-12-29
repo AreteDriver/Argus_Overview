@@ -196,7 +196,7 @@ class ArrangementGrid(QWidget):
                 self.grid_layout.addWidget(cell, row, col)
 
         # Re-add tiles
-        for char_name, tile in self.tiles.items():
+        for _char_name, tile in self.tiles.items():
             row = min(tile.grid_row, rows - 1)
             col = min(tile.grid_col, cols - 1)
             tile.set_position(row, col)
@@ -356,7 +356,7 @@ class GridApplier:
         try:
             if stacked:
                 # All windows same size and position
-                for char_name, window_id in window_map.items():
+                for _char_name, window_id in window_map.items():
                     x = screen.x + spacing
                     y = screen.y + spacing
                     w = screen.width - spacing * 2
@@ -651,7 +651,7 @@ class LayoutsTab(QWidget):
         if group_name == "All Active Windows":
             # Get all active windows from main_tab
             if hasattr(self.main_tab, 'window_manager'):
-                for window_id, frame in self.main_tab.window_manager.preview_frames.items():
+                for _window_id, frame in self.main_tab.window_manager.preview_frames.items():
                     self.arrangement_grid.add_character(frame.character_name)
 
             self.info_label.setText("Showing all active windows")

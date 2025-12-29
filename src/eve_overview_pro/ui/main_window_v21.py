@@ -4,7 +4,6 @@ Production implementation with all core modules integrated
 v2.2: Added system tray, auto-discovery, themes, hotkey enhancements
 """
 import logging
-
 from pathlib import Path
 
 from PySide6.QtCore import Slot

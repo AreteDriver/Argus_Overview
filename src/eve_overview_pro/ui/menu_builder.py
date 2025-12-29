@@ -9,7 +9,7 @@ import logging
 from typing import Callable, Dict, List, Optional
 
 from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QMenu
+from PySide6.QtWidgets import QMenu, QPushButton
 
 from eve_overview_pro.ui.action_registry import (
     ActionRegistry,
@@ -86,9 +86,6 @@ class MenuBuilder:
         menu = QMenu(parent)
         handlers = handlers or {}
         profiles = profiles or []
-
-        # Get tray actions in specific order
-        tray_actions = self.registry.get_by_home(PrimaryHome.TRAY_MENU)
 
         # Order: show_hide, toggle_thumbnails, separator, minimize_all, restore_all,
         #        separator, profiles, separator, settings, reload_config, separator, quit
@@ -404,7 +401,7 @@ class ToolbarBuilder:
         handlers: Dict[str, Callable],
         action_order: Optional[List[str]] = None,
         parent=None,
-    ) -> Dict[str, "QPushButton"]:
+    ) -> Dict[str, QPushButton]:
         """
         Build toolbar buttons from the registry.
 
@@ -417,8 +414,6 @@ class ToolbarBuilder:
         Returns:
             Dict mapping action_id -> QPushButton
         """
-        from PySide6.QtWidgets import QPushButton
-
         actions = self.registry.get_by_home(home)
         buttons = {}
 
@@ -462,7 +457,7 @@ class ToolbarBuilder:
         action_id: str,
         handler: Optional[Callable] = None,
         parent=None,
-    ) -> Optional["QPushButton"]:
+    ) -> Optional[QPushButton]:
         """
         Create a single button from a registry action.
 
@@ -474,8 +469,6 @@ class ToolbarBuilder:
         Returns:
             QPushButton or None if action not found
         """
-        from PySide6.QtWidgets import QPushButton
-
         spec = self.registry.get(action_id)
         if not spec:
             self.logger.warning(f"Action not found: {action_id}")

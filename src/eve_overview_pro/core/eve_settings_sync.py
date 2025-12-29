@@ -169,7 +169,7 @@ class EVESettingsSync:
                         try:
                             mtime = char_file.stat().st_mtime
                             last_seen = datetime.fromtimestamp(mtime)
-                        except:
+                        except OSError:
                             last_seen = None
 
                         char_info = EVECharacterInfo(
@@ -269,12 +269,12 @@ class EVESettingsSync:
     def sync_settings(self, source_char: str, target_chars: List[str],
                      backup: bool = True) -> Dict[str, bool]:
         """Synchronize settings from source to target characters
-        
+
         Args:
             source_char: Source character name
             target_chars: List of target character names
             backup: Create backups before overwriting
-            
+
         Returns:
             Dict mapping target character names to success status
         """
@@ -320,7 +320,7 @@ class EVESettingsSync:
 
     def _backup_settings(self, char_settings: EVECharacterSettings):
         """Create backup of character settings
-        
+
         Args:
             char_settings: Character settings to backup
         """
@@ -337,11 +337,11 @@ class EVESettingsSync:
     def _copy_settings(self, source: EVECharacterSettings,
                       target: EVECharacterSettings) -> bool:
         """Copy settings files from source to target
-        
+
         Args:
             source: Source character settings
             target: Target character settings
-            
+
         Returns:
             True if successful
         """
@@ -381,10 +381,10 @@ class EVESettingsSync:
 
     def get_settings_summary(self, char_name: str) -> Optional[Dict]:
         """Get summary of character's settings
-        
+
         Args:
             char_name: Character name
-            
+
         Returns:
             Dict with settings info, or None if not found
         """
@@ -411,7 +411,7 @@ class EVESettingsSync:
 
     def list_available_characters(self) -> List[str]:
         """Get list of characters with available settings
-        
+
         Returns:
             List of character names
         """

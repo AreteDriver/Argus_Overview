@@ -15,7 +15,7 @@ Exceptions: Keyboard shortcuts may exist in addition to canonical home,
 but must not create duplicate clickable UI.
 """
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Callable, Dict, List, Optional, Set
 

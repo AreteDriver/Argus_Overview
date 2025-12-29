@@ -176,7 +176,7 @@ class CharacterManager:
         for char in self.characters.values():
             if char.account:
                 accounts.add(char.account)
-        return sorted(list(accounts))
+        return sorted(accounts)
 
     # Team Management
     def create_team(self, team: Team) -> bool:
@@ -326,10 +326,10 @@ class CharacterManager:
     # Auto-detection
     def auto_assign_windows(self, windows: List[tuple]) -> Dict[str, str]:
         """Auto-assign windows to characters based on window titles
-        
+
         Args:
             windows: List of (window_id, window_title) tuples
-            
+
         Returns:
             Dict mapping character names to window IDs
         """

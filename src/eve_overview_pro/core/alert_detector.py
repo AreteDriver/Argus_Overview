@@ -47,7 +47,7 @@ class AlertDetector:
 
     def register_callback(self, window_id: str, callback: Callable):
         """Register callback for window alerts
-        
+
         Args:
             window_id: Window to monitor
             callback: Function to call on alert (receives AlertLevel)
@@ -63,11 +63,11 @@ class AlertDetector:
 
     def analyze_frame(self, window_id: str, image: Image.Image) -> Optional[AlertLevel]:
         """Analyze a frame for alert conditions
-        
+
         Args:
             window_id: Window being analyzed
             image: Current frame
-            
+
         Returns:
             AlertLevel if alert detected, None otherwise
         """
@@ -101,10 +101,10 @@ class AlertDetector:
 
     def _detect_red_flash(self, image: Image.Image) -> bool:
         """Detect red flash in image (damage indicator)
-        
+
         Args:
             image: Image to analyze
-            
+
         Returns:
             True if red flash detected
         """
@@ -136,11 +136,11 @@ class AlertDetector:
     def _detect_screen_change(self, current: Image.Image,
                              previous: Image.Image) -> bool:
         """Detect significant change between frames
-        
+
         Args:
             current: Current frame
             previous: Previous frame
-            
+
         Returns:
             True if significant change detected
         """
@@ -171,7 +171,7 @@ class AlertDetector:
 
     def clear_history(self, window_id: Optional[str] = None):
         """Clear frame history
-        
+
         Args:
             window_id: Specific window to clear, or None for all
         """

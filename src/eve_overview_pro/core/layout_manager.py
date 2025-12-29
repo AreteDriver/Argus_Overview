@@ -137,12 +137,12 @@ class LayoutManager:
     def create_preset_from_current(self, name: str, description: str,
                                    current_windows: Dict) -> LayoutPreset:
         """Create a preset from current window positions
-        
+
         Args:
             name: Preset name
             description: Preset description
             current_windows: Dict mapping window_id to geometry dict
-            
+
         Returns:
             Created LayoutPreset
         """
@@ -174,13 +174,13 @@ class LayoutManager:
                               screen_geometry: Dict,
                               spacing: int = 10) -> Dict[str, Dict]:
         """Calculate grid layout positions
-        
+
         Args:
             pattern: Grid pattern to use
             windows: List of window IDs
             screen_geometry: Dict with screen x, y, width, height
             spacing: Spacing between windows in pixels
-            
+
         Returns:
             Dict mapping window_id to geometry dict {x, y, width, height}
         """
@@ -295,13 +295,13 @@ class LayoutManager:
     def auto_arrange(self, windows: List[str], pattern: GridPattern,
                      screen_geometry: Dict, spacing: int = 10) -> Dict[str, Dict]:
         """Auto-arrange windows in a grid pattern
-        
+
         Args:
             windows: List of window IDs to arrange
             pattern: Grid pattern to use
             screen_geometry: Screen geometry dict
             spacing: Spacing between windows
-            
+
         Returns:
             Dict mapping window_id to geometry dict
         """
@@ -309,10 +309,10 @@ class LayoutManager:
 
     def get_best_pattern(self, num_windows: int) -> GridPattern:
         """Get best grid pattern for number of windows
-        
+
         Args:
             num_windows: Number of windows to arrange
-            
+
         Returns:
             Recommended GridPattern
         """

@@ -32,7 +32,6 @@ from PySide6.QtWidgets import (
 )
 
 from eve_overview_pro.core.character_manager import Character, Team
-from eve_overview_pro.ui.action_registry import ActionRegistry, PrimaryHome
 from eve_overview_pro.ui.menu_builder import ToolbarBuilder
 
 
@@ -624,13 +623,6 @@ class CharactersTeamsTab(QWidget):
         # Build toolbar from ActionRegistry
         toolbar_layout = QHBoxLayout()
         toolbar_builder = ToolbarBuilder()
-
-        # Roster toolbar actions
-        handlers = {
-            "add_character": self._add_character,
-            "scan_eve_folder": self._scan_eve_folder,
-            "new_team": self.team_builder._new_team if hasattr(self, 'team_builder') else None,
-        }
 
         # Add Character button from registry
         add_btn = toolbar_builder.create_button("add_character", self._add_character)

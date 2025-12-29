@@ -79,7 +79,7 @@ class SingleInstance:
             try:
                 fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
                 self.lock_file.close()
-            except:
+            except OSError:
                 pass
             self.lock_file = None
 
