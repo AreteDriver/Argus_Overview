@@ -2,12 +2,12 @@
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
-[![CI](https://github.com/AreteDriver/EVE_VelesEyes/actions/workflows/ci.yml/badge.svg)](https://github.com/AreteDriver/EVE_VelesEyes/actions)
-[![Version](https://img.shields.io/badge/version-2.3.0-blue)](https://github.com/AreteDriver/EVE_VelesEyes/releases)
+[![CI](https://github.com/AreteDriver/Argus_Overview/actions/workflows/ci.yml/badge.svg)](https://github.com/AreteDriver/Argus_Overview/actions)
+[![Version](https://img.shields.io/badge/version-2.3.0-blue)](https://github.com/AreteDriver/Argus_Overview/releases)
 [![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
 [![Python](https://img.shields.io/badge/python-3.8+-green)](https://python.org)
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)]()
-[![Downloads](https://img.shields.io/github/downloads/AreteDriver/EVE_VelesEyes/total)](https://github.com/AreteDriver/EVE_VelesEyes/releases)
+[![Downloads](https://img.shields.io/github/downloads/AreteDriver/Argus_Overview/total)](https://github.com/AreteDriver/Argus_Overview/releases)
 
 ## Screenshots
 
@@ -175,10 +175,10 @@ This release focuses on **usability, automation, and polish** with 14 new featur
 
 ```bash
 # One-liner install
-curl -sSL https://raw.githubusercontent.com/AreteDriver/EVE_VelesEyes/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/AreteDriver/Argus_Overview/main/install.sh | bash
 
 # Or manual installation
-git clone https://github.com/AreteDriver/EVE_VelesEyes
+git clone https://github.com/AreteDriver/Argus_Overview
 cd EVE_VelesEyes
 ./install.sh
 

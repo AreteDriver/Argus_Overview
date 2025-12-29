@@ -42,10 +42,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/AreteDriver/EVE_VelesEyes"
-Repository = "https://github.com/AreteDriver/EVE_VelesEyes.git"
-Issues = "https://github.com/AreteDriver/EVE_VelesEyes/issues"
-Changelog = "https://github.com/AreteDriver/EVE_VelesEyes/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/AreteDriver/Argus_Overview"
+Repository = "https://github.com/AreteDriver/Argus_Overview.git"
+Issues = "https://github.com/AreteDriver/Argus_Overview/issues"
+Changelog = "https://github.com/AreteDriver/Argus_Overview/blob/main/CHANGELOG.md"
 
 [project.scripts]
 argus-overview = "main:main"
