@@ -37,8 +37,13 @@
 
 ## Platform Support
 
-- **Linux Version**: Full-featured native Linux application (this README)
-- **Windows Version**: See [windows/README_WINDOWS.md](windows/README_WINDOWS.md) for Windows .exe
+| Platform | Status | Download |
+|----------|--------|----------|
+| **Linux** | Full-featured native application | [AppImage / Install Script](https://github.com/AreteDriver/Argus_Overview/releases) |
+| **Windows** | Standalone .exe available | [Download Windows .exe](https://github.com/AreteDriver/Argus_Overview_Windows/releases/latest) |
+
+- **Linux**: This repository - X11/Wayland support with native tools
+- **Windows**: [Argus_Overview_Windows](https://github.com/AreteDriver/Argus_Overview_Windows) - Native Win32 API implementation
 
 ## ☕ Support Development
 
