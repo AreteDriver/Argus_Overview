@@ -10,13 +10,14 @@ Tests cover:
 - Next position calculation
 - Grid layout calculation
 """
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import MagicMock, patch
 from PySide6.QtCore import QRect
 
 from eve_overview_pro.core.position import (
-    ThumbnailPosition,
     PositionManager,
+    ThumbnailPosition,
 )
 
 

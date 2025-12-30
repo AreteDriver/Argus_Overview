@@ -10,14 +10,15 @@ Tests cover:
 - Window assignment
 """
 import json
-import pytest
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from eve_overview_pro.core.character_manager import (
     Character,
-    Team,
     CharacterManager,
+    Team,
 )
 
 
@@ -167,7 +168,7 @@ class TestCharacterManagerInit:
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "new_config"
             assert not config_dir.exists()
-            manager = CharacterManager(config_dir=config_dir)
+            CharacterManager(config_dir=config_dir)
             assert config_dir.exists()
 
     def test_loads_empty_state(self):

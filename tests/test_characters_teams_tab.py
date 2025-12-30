@@ -2,8 +2,7 @@
 Unit tests for the Characters & Teams Tab module
 Tests CharacterTable, CharacterDialog, TeamBuilder, CharactersTeamsTab
 """
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 
 # Test CharacterTable
@@ -29,7 +28,7 @@ class TestCharacterTable:
                             with patch.object(CharacterTable, 'setSortingEnabled'):
                                 with patch.object(CharacterTable, 'itemSelectionChanged', MagicMock()):
                                     with patch.object(CharacterTable, 'populate_table'):
-                                        table = CharacterTable(mock_manager)
+                                        CharacterTable(mock_manager)
 
                                         mock_set_cols.assert_called_once_with(6)
                                         mock_labels.assert_called_once()
@@ -100,7 +99,7 @@ class TestCharacterDialog:
             with patch.object(CharacterDialog, 'setModal'):
                 with patch.object(CharacterDialog, 'resize'):
                     with patch.object(CharacterDialog, 'setLayout'):
-                        dialog = CharacterDialog(mock_manager, character=None)
+                        CharacterDialog(mock_manager, character=None)
 
                         mock_title.assert_called_with("Add Character")
 
@@ -116,7 +115,7 @@ class TestCharacterDialog:
         """Test dialog initialization in edit mode"""
         mock_dialog.return_value = None
 
-        from eve_overview_pro.ui.characters_teams_tab import CharacterDialog, Character
+        from eve_overview_pro.ui.characters_teams_tab import CharacterDialog
 
         mock_manager = MagicMock()
         mock_manager.get_accounts.return_value = []
@@ -129,7 +128,7 @@ class TestCharacterDialog:
                 with patch.object(CharacterDialog, 'resize'):
                     with patch.object(CharacterDialog, 'setLayout'):
                         with patch.object(CharacterDialog, '_load_character'):
-                            dialog = CharacterDialog(mock_manager, character=mock_char)
+                            CharacterDialog(mock_manager, character=mock_char)
 
                             mock_title.assert_called_with("Edit Character")
 

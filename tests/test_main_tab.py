@@ -2,8 +2,8 @@
 Unit tests for the Main Tab module
 Tests FlowLayout, DraggableTile, ArrangementGrid, GridApplier, WindowPreviewWidget, WindowManager, MainTab
 """
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
+
 from PIL import Image
 
 
@@ -214,8 +214,9 @@ class TestDraggableTile:
         """Test DraggableTile initialization"""
         mock_frame.return_value = None
 
-        from eve_overview_pro.ui.main_tab import DraggableTile
         from PySide6.QtGui import QColor
+
+        from eve_overview_pro.ui.main_tab import DraggableTile
 
         mock_color = QColor(255, 100, 100)
 
@@ -238,8 +239,9 @@ class TestDraggableTile:
         """Test set_position method"""
         mock_frame.return_value = None
 
-        from eve_overview_pro.ui.main_tab import DraggableTile
         from PySide6.QtGui import QColor
+
+        from eve_overview_pro.ui.main_tab import DraggableTile
 
         mock_color = QColor(255, 100, 100)
 
@@ -264,8 +266,9 @@ class TestDraggableTile:
         """Test set_stacked method"""
         mock_frame.return_value = None
 
-        from eve_overview_pro.ui.main_tab import DraggableTile
         from PySide6.QtGui import QColor
+
+        from eve_overview_pro.ui.main_tab import DraggableTile
 
         mock_color = QColor(255, 100, 100)
 
@@ -592,7 +595,7 @@ class TestMainTab:
 
         with patch.object(MainTab, '_setup_ui'):
             with patch.object(MainTab, '_load_cycling_groups'):
-                with patch('eve_overview_pro.ui.main_tab.WindowManager') as mock_wm:
+                with patch('eve_overview_pro.ui.main_tab.WindowManager'):
                     with patch('eve_overview_pro.ui.main_tab.GridApplier'):
                         tab = MainTab(
                             mock_capture_system,

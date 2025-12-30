@@ -2,11 +2,10 @@
 Unit tests for the Settings Manager module
 Tests SettingsManager class with JSON persistence and nested key support
 """
-import pytest
 import json
 import tempfile
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 
 class TestSettingsManagerInit:
@@ -20,7 +19,7 @@ class TestSettingsManagerInit:
             config_dir = Path(tmpdir) / "new_config_dir"
             assert not config_dir.exists()
 
-            manager = SettingsManager(config_dir=config_dir)
+            SettingsManager(config_dir=config_dir)
 
             assert config_dir.exists()
             assert config_dir.is_dir()
@@ -430,7 +429,7 @@ class TestSetSetting:
 
             # Get initial file content
             with open(manager.settings_file) as f:
-                initial = json.load(f)
+                json.load(f)
 
             result = manager.set("no_save_key", "value", auto_save=False)
 
@@ -448,8 +447,9 @@ class TestResetToDefaults:
 
     def test_reset_to_defaults(self):
         """Test resetting all settings to defaults"""
-        from eve_overview_pro.ui.settings_manager import SettingsManager
         import copy
+
+        from eve_overview_pro.ui.settings_manager import SettingsManager
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = SettingsManager(config_dir=Path(tmpdir))

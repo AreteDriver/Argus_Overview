@@ -2,8 +2,7 @@
 Unit tests for the Layouts Tab module
 Tests ScreenGeometry, DraggableTile, ArrangementGrid, GridApplier, LayoutsTab
 """
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 
 # Test ScreenGeometry dataclass
@@ -61,7 +60,7 @@ class TestHelperFunctions:
 
     def test_pattern_display_to_enum(self):
         """Test pattern_display_to_enum conversion"""
-        from eve_overview_pro.ui.layouts_tab import pattern_display_to_enum, GridPattern
+        from eve_overview_pro.ui.layouts_tab import GridPattern, pattern_display_to_enum
 
         assert pattern_display_to_enum("2x2 Grid") == GridPattern.GRID_2X2
         assert pattern_display_to_enum("3x1 Row") == GridPattern.GRID_3X1
@@ -69,7 +68,7 @@ class TestHelperFunctions:
 
     def test_pattern_display_to_enum_unknown(self):
         """Test pattern_display_to_enum with unknown pattern"""
-        from eve_overview_pro.ui.layouts_tab import pattern_display_to_enum, GridPattern
+        from eve_overview_pro.ui.layouts_tab import GridPattern, pattern_display_to_enum
 
         result = pattern_display_to_enum("Unknown Pattern")
 

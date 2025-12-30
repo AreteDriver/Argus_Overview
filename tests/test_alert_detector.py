@@ -11,15 +11,15 @@ Tests cover:
 - Screen change detection
 - History management
 """
-import pytest
 from unittest.mock import MagicMock
-import numpy as np
+
+import pytest
 from PIL import Image
 
 from eve_overview_pro.core.alert_detector import (
-    AlertLevel,
     AlertConfig,
     AlertDetector,
+    AlertLevel,
 )
 
 
@@ -227,21 +227,21 @@ class TestRedFlashDetection:
         img = Image.new('RGB', (100, 100), color=(255, 0, 0))
 
         result = detector._detect_red_flash(img)
-        assert result == True
+        assert result
 
     def test_blue_not_detected(self, detector):
         """Blue image not detected as flash"""
         img = Image.new('RGB', (100, 100), color=(0, 0, 255))
 
         result = detector._detect_red_flash(img)
-        assert result == False
+        assert not result
 
     def test_green_not_detected(self, detector):
         """Green image not detected as flash"""
         img = Image.new('RGB', (100, 100), color=(0, 255, 0))
 
         result = detector._detect_red_flash(img)
-        assert result == False
+        assert not result
 
     def test_threshold_respected(self, detector):
         """Threshold controls detection sensitivity"""
@@ -254,11 +254,11 @@ class TestRedFlashDetection:
 
         # High threshold - should not detect
         detector.config.red_flash_threshold = 0.7
-        assert detector._detect_red_flash(img) == False
+        assert not detector._detect_red_flash(img)
 
         # Low threshold - should detect
         detector.config.red_flash_threshold = 0.3
-        assert detector._detect_red_flash(img) == True
+        assert detector._detect_red_flash(img)
 
     def test_dark_red_not_detected(self, detector):
         """Dark red (below brightness threshold) not detected"""
@@ -266,7 +266,7 @@ class TestRedFlashDetection:
         img = Image.new('RGB', (100, 100), color=(150, 50, 50))
 
         result = detector._detect_red_flash(img)
-        assert result == False
+        assert not result
 
 
 class TestScreenChangeDetection:
@@ -283,7 +283,7 @@ class TestScreenChangeDetection:
         img2 = Image.new('RGB', (100, 100), color=(100, 100, 100))
 
         result = detector._detect_screen_change(img1, img2)
-        assert result == False
+        assert not result
 
     def test_completely_different_detected(self, detector):
         """Completely different images detected as change"""
@@ -291,7 +291,7 @@ class TestScreenChangeDetection:
         img2 = Image.new('RGB', (100, 100), color=(255, 255, 255))
 
         result = detector._detect_screen_change(img1, img2)
-        assert result == True
+        assert result
 
     def test_partial_change_threshold(self, detector):
         """Partial change respects threshold"""
@@ -305,11 +305,11 @@ class TestScreenChangeDetection:
 
         # High threshold - should not detect
         detector.config.change_threshold = 0.5
-        assert detector._detect_screen_change(img1, img2) == False
+        assert not detector._detect_screen_change(img1, img2)
 
         # Low threshold - should detect
         detector.config.change_threshold = 0.1
-        assert detector._detect_screen_change(img1, img2) == True
+        assert detector._detect_screen_change(img1, img2)
 
     def test_handles_different_sizes(self, detector):
         """Handles images of different sizes"""
@@ -318,7 +318,7 @@ class TestScreenChangeDetection:
 
         # Should not raise
         result = detector._detect_screen_change(img1, img2)
-        assert result == False
+        assert not result
 
 
 class TestHistoryManagement:

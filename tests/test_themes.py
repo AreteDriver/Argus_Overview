@@ -2,8 +2,7 @@
 Unit tests for the Themes module
 Tests ThemeColors, Theme, ThemeManager, and related functionality
 """
-import pytest
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 # Test ThemeColors dataclass
@@ -67,8 +66,9 @@ class TestThemeColors:
 
     def test_all_fields_present(self):
         """Test that all expected fields are present"""
-        from eve_overview_pro.ui.themes import ThemeColors
         from dataclasses import fields
+
+        from eve_overview_pro.ui.themes import ThemeColors
 
         colors = ThemeColors()
         field_names = {f.name for f in fields(colors)}
@@ -239,7 +239,7 @@ class TestBuiltinThemes:
 
     def test_builtin_themes_dict(self):
         """Test BUILTIN_THEMES contains all themes"""
-        from eve_overview_pro.ui.themes import BUILTIN_THEMES, DARK_THEME, LIGHT_THEME, EVE_THEME
+        from eve_overview_pro.ui.themes import BUILTIN_THEMES, DARK_THEME, EVE_THEME, LIGHT_THEME
 
         assert "dark" in BUILTIN_THEMES
         assert "light" in BUILTIN_THEMES
@@ -313,7 +313,7 @@ class TestThemeManager:
 
     def test_get_available_themes_with_custom(self):
         """Test getting available themes including custom ones"""
-        from eve_overview_pro.ui.themes import ThemeManager, Theme, ThemeColors
+        from eve_overview_pro.ui.themes import Theme, ThemeColors, ThemeManager
 
         manager = ThemeManager()
 
@@ -327,7 +327,7 @@ class TestThemeManager:
 
     def test_register_custom_theme(self):
         """Test registering a custom theme"""
-        from eve_overview_pro.ui.themes import ThemeManager, Theme, ThemeColors
+        from eve_overview_pro.ui.themes import Theme, ThemeColors, ThemeManager
 
         manager = ThemeManager()
 
@@ -347,7 +347,7 @@ class TestThemeManager:
 
     def test_get_accent_color_no_theme(self):
         """Test get_accent_color with no current theme"""
-        from eve_overview_pro.ui.themes import ThemeManager, DARK_THEME
+        from eve_overview_pro.ui.themes import DARK_THEME, ThemeManager
 
         manager = ThemeManager()
 
@@ -356,7 +356,7 @@ class TestThemeManager:
 
     def test_get_accent_color_with_theme(self):
         """Test get_accent_color with current theme"""
-        from eve_overview_pro.ui.themes import ThemeManager, Theme, ThemeColors
+        from eve_overview_pro.ui.themes import Theme, ThemeColors, ThemeManager
 
         manager = ThemeManager()
 
@@ -367,7 +367,7 @@ class TestThemeManager:
 
     def test_get_alert_colors_no_theme(self):
         """Test get_alert_colors with no current theme"""
-        from eve_overview_pro.ui.themes import ThemeManager, DARK_THEME
+        from eve_overview_pro.ui.themes import DARK_THEME, ThemeManager
 
         manager = ThemeManager()
 
@@ -379,7 +379,7 @@ class TestThemeManager:
 
     def test_get_alert_colors_with_theme(self):
         """Test get_alert_colors with current theme"""
-        from eve_overview_pro.ui.themes import ThemeManager, Theme, ThemeColors
+        from eve_overview_pro.ui.themes import Theme, ThemeColors, ThemeManager
 
         manager = ThemeManager()
 
@@ -437,7 +437,7 @@ class TestThemeManager:
 
     def test_apply_theme_light(self):
         """Test applying light theme"""
-        from eve_overview_pro.ui.themes import ThemeManager, LIGHT_THEME
+        from eve_overview_pro.ui.themes import LIGHT_THEME, ThemeManager
 
         manager = ThemeManager()
         mock_app = MagicMock()
@@ -449,7 +449,7 @@ class TestThemeManager:
 
     def test_apply_theme_eve(self):
         """Test applying EVE theme"""
-        from eve_overview_pro.ui.themes import ThemeManager, EVE_THEME
+        from eve_overview_pro.ui.themes import EVE_THEME, ThemeManager
 
         manager = ThemeManager()
         mock_app = MagicMock()
@@ -461,7 +461,7 @@ class TestThemeManager:
 
     def test_apply_custom_theme(self):
         """Test applying a custom theme"""
-        from eve_overview_pro.ui.themes import ThemeManager, Theme, ThemeColors
+        from eve_overview_pro.ui.themes import Theme, ThemeColors, ThemeManager
 
         manager = ThemeManager()
 
@@ -494,7 +494,7 @@ class TestGlobalThemeManager:
 
     def test_get_theme_manager(self):
         """Test getting the global theme manager"""
-        from eve_overview_pro.ui.themes import get_theme_manager, ThemeManager
+        from eve_overview_pro.ui.themes import ThemeManager, get_theme_manager
 
         manager = get_theme_manager()
 
@@ -532,7 +532,7 @@ class TestThemePalette:
 
     def test_apply_palette_sets_colors(self):
         """Test that _apply_palette sets palette colors correctly"""
-        from eve_overview_pro.ui.themes import ThemeManager, Theme, ThemeColors
+        from eve_overview_pro.ui.themes import Theme, ThemeColors, ThemeManager
 
         manager = ThemeManager()
         mock_app = MagicMock()
@@ -615,7 +615,7 @@ class TestEdgeCases:
 
     def test_multiple_custom_themes(self):
         """Test registering multiple custom themes"""
-        from eve_overview_pro.ui.themes import ThemeManager, Theme, ThemeColors
+        from eve_overview_pro.ui.themes import Theme, ThemeColors, ThemeManager
 
         manager = ThemeManager()
 
@@ -635,7 +635,7 @@ class TestEdgeCases:
 
     def test_override_custom_theme(self):
         """Test overriding a custom theme with same name"""
-        from eve_overview_pro.ui.themes import ThemeManager, Theme, ThemeColors
+        from eve_overview_pro.ui.themes import Theme, ThemeColors, ThemeManager
 
         manager = ThemeManager()
 

@@ -3,8 +3,7 @@ Unit tests for the Settings Tab module
 Tests HotkeyEditDialog, GeneralPanel, PerformancePanel, AlertsPanel,
 HotkeysPanel, AppearancePanel, AdvancedPanel, SettingsTab
 """
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 
 # Test HotkeyEditDialog
@@ -344,8 +343,9 @@ class TestSettingsTab:
         """Test _reset_all resets settings when confirmed"""
         mock_widget.return_value = None
 
-        from eve_overview_pro.ui.settings_tab import SettingsTab
         from PySide6.QtWidgets import QMessageBox
+
+        from eve_overview_pro.ui.settings_tab import SettingsTab
 
         mock_settings_manager = MagicMock()
         mock_settings_manager.get.return_value = {}

@@ -2,12 +2,9 @@
 Unit tests for the EVE Settings Sync module
 Tests EVECharacterSettings, EVECharacterInfo, EVESettingsSync class
 """
-import pytest
-from pathlib import Path
-from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
 import tempfile
-import os
+from datetime import datetime
+from pathlib import Path
 
 
 # Test EVECharacterSettings dataclass
@@ -225,7 +222,7 @@ class TestEVESettingsSync:
 
     def test_list_available_characters_with_settings(self):
         """Test listing characters with settings"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -270,7 +267,7 @@ class TestEVESettingsSync:
 
     def test_get_settings_summary_found(self):
         """Test getting summary for known character"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -309,7 +306,7 @@ class TestEVESettingsSync:
 
     def test_sync_settings_target_not_found(self):
         """Test sync when target character not found"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -331,7 +328,7 @@ class TestEVESettingsSync:
 
     def test_sync_settings_source_no_settings(self):
         """Test sync when source has no settings"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -556,7 +553,7 @@ class TestSettingsBackupCopy:
 
     def test_backup_settings(self):
         """Test creating settings backup"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -588,7 +585,7 @@ class TestSettingsBackupCopy:
 
     def test_copy_settings(self):
         """Test copying settings between characters"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -631,7 +628,7 @@ class TestSettingsBackupCopy:
 
     def test_copy_settings_empty_source(self):
         """Test copying from empty source directory"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -672,7 +669,7 @@ class TestSyncIntegration:
 
     def test_full_sync_workflow(self):
         """Test complete sync from source to target"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -715,7 +712,7 @@ class TestSyncIntegration:
 
     def test_sync_multiple_targets(self):
         """Test syncing to multiple targets"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync, EVECharacterSettings
+        from eve_overview_pro.core.eve_settings_sync import EVECharacterSettings, EVESettingsSync
 
         sync = EVESettingsSync()
 
@@ -760,10 +757,11 @@ class TestEdgeCases:
 
     def test_character_id_regex_matching(self):
         """Test character ID extraction from various filenames"""
-        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync
         import re
 
-        sync = EVESettingsSync()
+        from eve_overview_pro.core.eve_settings_sync import EVESettingsSync
+
+        EVESettingsSync()
 
         test_cases = [
             ("core_char_12345678.dat", "12345678"),

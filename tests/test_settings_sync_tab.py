@@ -2,8 +2,7 @@
 Unit tests for the Settings Sync Tab module
 Tests ScanWorker, SyncWorker, SyncPreviewDialog, SettingsSyncTab
 """
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 
 # Test ScanWorker
@@ -201,9 +200,9 @@ class TestSettingsSyncTab:
         """Test _get_last_modified returns N/A for missing path"""
         mock_widget.return_value = None
 
-        from eve_overview_pro.ui.settings_sync_tab import SettingsSyncTab
         from pathlib import Path
-        import tempfile
+
+        from eve_overview_pro.ui.settings_sync_tab import SettingsSyncTab
 
         mock_settings_sync = MagicMock()
         mock_char_manager = MagicMock()
@@ -306,8 +305,9 @@ class TestSettingsSyncTab:
         """Test _add_custom_path adds path to settings_sync"""
         mock_widget.return_value = None
 
-        from eve_overview_pro.ui.settings_sync_tab import SettingsSyncTab
         from PySide6.QtWidgets import QMessageBox
+
+        from eve_overview_pro.ui.settings_sync_tab import SettingsSyncTab
 
         mock_settings_sync = MagicMock()
         mock_char_manager = MagicMock()

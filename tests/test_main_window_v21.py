@@ -2,8 +2,7 @@
 Unit tests for the Main Window v2.1 module
 Tests MainWindowV21 - the main application window
 """
-import pytest
-from unittest.mock import Mock, MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
 
 
 # Test MainWindowV21 initialization
@@ -18,8 +17,9 @@ class TestMainWindowV21Init:
 
     def test_class_inherits_from_qmainwindow(self):
         """Test that MainWindowV21 inherits from QMainWindow"""
-        from eve_overview_pro.ui.main_window_v21 import MainWindowV21
         from PySide6.QtWidgets import QMainWindow
+
+        from eve_overview_pro.ui.main_window_v21 import MainWindowV21
 
         assert issubclass(MainWindowV21, QMainWindow)
 

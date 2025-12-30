@@ -10,13 +10,14 @@ Tests cover:
 - Known/active character tracking
 - Serialization
 """
-import pytest
 from datetime import datetime
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, patch
+
+import pytest
 
 from eve_overview_pro.core.discovery import (
-    DiscoveredCharacter,
     AutoDiscovery,
+    DiscoveredCharacter,
     scan_eve_windows,
 )
 

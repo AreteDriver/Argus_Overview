@@ -9,15 +9,16 @@ Tests cover:
 - Polling fallback
 - File change detection
 """
-import pytest
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from eve_overview_pro.core.config_watcher import (
+    WATCHDOG_AVAILABLE,
     ConfigFileHandler,
     ConfigWatcher,
-    WATCHDOG_AVAILABLE,
 )
 
 
@@ -208,7 +209,6 @@ class TestPollingFallback:
     def test_check_file_no_change(self, watcher):
         """Check file ignores if not changed"""
         watcher._update_mtime()
-        current_mtime = watcher._last_mtime
 
         with patch.object(watcher, '_on_file_changed') as mock_change:
             watcher._check_file()

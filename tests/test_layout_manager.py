@@ -10,15 +10,16 @@ Tests cover:
 - Auto-arrange functionality
 """
 import json
-import pytest
 import tempfile
 from pathlib import Path
 
+import pytest
+
 from eve_overview_pro.core.layout_manager import (
     GridPattern,
-    WindowLayout,
-    LayoutPreset,
     LayoutManager,
+    LayoutPreset,
+    WindowLayout,
 )
 
 
@@ -163,7 +164,7 @@ class TestLayoutManagerInit:
         """Manager creates config and layouts directories"""
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "new_config"
-            manager = LayoutManager(config_dir=config_dir)
+            LayoutManager(config_dir=config_dir)
             assert config_dir.exists()
             assert (config_dir / "layouts").exists()
 

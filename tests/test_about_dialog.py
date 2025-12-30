@@ -2,9 +2,8 @@
 Unit tests for the About Dialog module
 Tests AboutDialog class functionality
 """
-import pytest
 import sys
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 
 # Test AboutDialog class
@@ -30,7 +29,7 @@ class TestAboutDialog:
             with patch.object(AboutDialog, 'setMinimumWidth') as mock_width:
                 with patch.object(AboutDialog, 'setMinimumHeight') as mock_height:
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog()
+                        _dialog = AboutDialog()  # noqa: F841
 
                         mock_title.assert_called_once_with("About Argus Overview")
                         mock_width.assert_called_once_with(500)
@@ -55,7 +54,7 @@ class TestAboutDialog:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog()
+                        _dialog = AboutDialog()  # noqa: F841
 
                         # Labels should be created (title, version, platform, etc.)
                         assert mock_label.call_count >= 5
@@ -79,7 +78,7 @@ class TestAboutDialog:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog()
+                        _dialog = AboutDialog()  # noqa: F841
 
                         # Should create at least 2 buttons (Coffee, Close)
                         assert mock_button.call_count >= 2
@@ -138,11 +137,11 @@ class TestPlatformDetection:
                 with patch.object(AboutDialog, 'setMinimumWidth'):
                     with patch.object(AboutDialog, 'setMinimumHeight'):
                         with patch.object(AboutDialog, 'setLayout'):
-                            dialog = AboutDialog()
+                            _dialog = AboutDialog()  # noqa: F841
 
                             # Check that Label was called with Linux
                             label_calls = [str(call) for call in mock_label.call_args_list]
-                            has_linux = any('Linux' in str(call) for call in label_calls)
+                            any('Linux' in str(call) for call in label_calls)
                             # May or may not detect Linux depending on import timing
                             assert mock_label.called
 
@@ -200,8 +199,8 @@ class TestDialogBehavior:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        with patch.object(AboutDialog, 'accept') as mock_accept:
-                            dialog = AboutDialog()
+                        with patch.object(AboutDialog, 'accept'):
+                            AboutDialog()
 
                             # Close button should have clicked.connect called
                             mock_close_btn.clicked.connect.assert_called()
@@ -230,7 +229,7 @@ class TestDialogBehavior:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog()
+                        AboutDialog()
 
                         # Coffee button should have clicked.connect called
                         mock_coffee_btn.clicked.connect.assert_called()
@@ -259,7 +258,7 @@ class TestDialogContent:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog()
+                        AboutDialog()
 
                         # First QLabel call should be for title
                         calls = mock_label.call_args_list
@@ -285,7 +284,7 @@ class TestDialogContent:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog()
+                        AboutDialog()
 
                         calls = mock_label.call_args_list
                         # Check that one of the labels contains version
@@ -312,7 +311,7 @@ class TestDialogContent:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog()
+                        AboutDialog()
 
                         calls = mock_label.call_args_list
                         label_texts = [str(call) for call in calls]
@@ -345,7 +344,7 @@ class TestEdgeCases:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog(parent=mock_parent)
+                        AboutDialog(parent=mock_parent)
 
                         # Should pass parent to QDialog.__init__
                         mock_dialog_init.assert_called_once_with(mock_parent)
@@ -369,7 +368,7 @@ class TestEdgeCases:
             with patch.object(AboutDialog, 'setMinimumWidth'):
                 with patch.object(AboutDialog, 'setMinimumHeight'):
                     with patch.object(AboutDialog, 'setLayout'):
-                        dialog = AboutDialog()
+                        AboutDialog()
 
                         # Should pass None to QDialog.__init__
                         mock_dialog_init.assert_called_once_with(None)

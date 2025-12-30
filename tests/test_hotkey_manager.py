@@ -8,8 +8,9 @@ Tests cover:
 - Key combo formatting
 - Modifier tracking
 """
-import pytest
 from unittest.mock import MagicMock, patch
+
+import pytest
 
 from eve_overview_pro.core.hotkey_manager import HotkeyManager
 

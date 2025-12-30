@@ -9,12 +9,13 @@ Tests cover:
 - Audit functions for duplicate detection
 """
 import pytest
+
 from eve_overview_pro.ui.action_registry import (
-    ActionSpec,
-    ActionScope,
-    PrimaryHome,
-    ActionRegistry,
     HOME_TIERS,
+    ActionRegistry,
+    ActionScope,
+    ActionSpec,
+    PrimaryHome,
     audit_actions,
 )
 

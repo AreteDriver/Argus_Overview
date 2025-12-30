@@ -2,9 +2,7 @@
 Unit tests for the System Tray module
 Tests SystemTray class functionality
 """
-import pytest
-from pathlib import Path
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
+from unittest.mock import MagicMock, patch
 
 
 class TestSystemTrayInit:
@@ -52,7 +50,7 @@ class TestSystemTrayInit:
 
         with patch.object(SystemTray, '_create_icon', return_value=MagicMock()):
             with patch.object(SystemTray, '_setup_menu'):
-                tray = SystemTray()
+                SystemTray()
 
                 mock_tray_icon.setToolTip.assert_called_once()
                 tooltip_arg = mock_tray_icon.setToolTip.call_args[0][0]
@@ -101,7 +99,7 @@ class TestCreateIcon:
 
         with patch.object(SystemTray, '_create_icon', return_value=MagicMock()):
             with patch.object(SystemTray, '_setup_menu'):
-                tray = SystemTray()
+                SystemTray()
 
                 # setIcon should have been called with the mocked icon
                 mock_tray_icon.return_value.setIcon.assert_called()
@@ -123,7 +121,7 @@ class TestCreateIcon:
 
         with patch.object(SystemTray, '_create_icon', return_value=MagicMock()):
             with patch.object(SystemTray, '_setup_menu'):
-                tray = SystemTray()
+                SystemTray()
 
                 # Method should exist
                 assert hasattr(SystemTray, '_create_icon')
@@ -367,7 +365,7 @@ class TestTrayActivation:
         mock_tray_icon = MagicMock()
         mock_tray_icon_class.return_value = mock_tray_icon
 
-        from eve_overview_pro.ui.tray import SystemTray, QSystemTrayIcon
+        from eve_overview_pro.ui.tray import QSystemTrayIcon, SystemTray
 
         with patch.object(SystemTray, '_create_icon', return_value=MagicMock()):
             with patch.object(SystemTray, '_setup_menu'):
@@ -397,7 +395,7 @@ class TestTrayActivation:
         mock_tray_icon = MagicMock()
         mock_tray_icon_class.return_value = mock_tray_icon
 
-        from eve_overview_pro.ui.tray import SystemTray, QSystemTrayIcon
+        from eve_overview_pro.ui.tray import QSystemTrayIcon, SystemTray
 
         with patch.object(SystemTray, '_create_icon', return_value=MagicMock()):
             with patch.object(SystemTray, '_setup_menu'):
@@ -497,7 +495,7 @@ class TestMenuSetup:
         from eve_overview_pro.ui.tray import SystemTray
 
         with patch.object(SystemTray, '_create_icon', return_value=MagicMock()):
-            tray = SystemTray()
+            SystemTray()
 
             mock_menu_builder.build_tray_menu.assert_called()
             mock_tray_icon.setContextMenu.assert_called()
@@ -525,7 +523,7 @@ class TestMenuSetup:
         from eve_overview_pro.ui.tray import SystemTray
 
         with patch.object(SystemTray, '_create_icon', return_value=MagicMock()):
-            tray = SystemTray()
+            SystemTray()
 
             # Verify build_tray_menu was called with handlers
             call_kwargs = mock_menu_builder.build_tray_menu.call_args[1]

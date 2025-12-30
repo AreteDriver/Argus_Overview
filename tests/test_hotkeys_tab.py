@@ -2,8 +2,7 @@
 Unit tests for the Hotkeys & Cycling Tab module
 Tests DraggableCharacterList, CyclingGroupList, HotkeysTab
 """
-import pytest
-from unittest.mock import Mock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 
 # Test DraggableCharacterList
@@ -21,7 +20,7 @@ class TestDraggableCharacterList:
             with patch.object(DraggableCharacterList, 'setDefaultDropAction'):
                 with patch.object(DraggableCharacterList, 'setSelectionMode'):
                     with patch.object(DraggableCharacterList, 'setAlternatingRowColors'):
-                        list_widget = DraggableCharacterList()
+                        DraggableCharacterList()
 
                         mock_drag.assert_called_once_with(True)
 
@@ -44,7 +43,7 @@ class TestCyclingGroupList:
                         with patch.object(CyclingGroupList, 'setSelectionMode'):
                             with patch.object(CyclingGroupList, 'setAlternatingRowColors'):
                                 with patch.object(CyclingGroupList, 'setStyleSheet'):
-                                    list_widget = CyclingGroupList()
+                                    CyclingGroupList()
 
                                     mock_drops.assert_called_once_with(True)
 

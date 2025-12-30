@@ -9,19 +9,20 @@ Tests cover:
 Note: These tests focus on logic that can be tested without a full Qt display.
 Full integration tests would require pytest-qt and a display.
 """
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from eve_overview_pro.ui.action_registry import (
-    ActionSpec,
-    ActionScope,
-    PrimaryHome,
     ActionRegistry,
+    ActionScope,
+    ActionSpec,
+    PrimaryHome,
 )
 from eve_overview_pro.ui.menu_builder import (
+    ContextMenuBuilder,
     MenuBuilder,
     ToolbarBuilder,
-    ContextMenuBuilder,
     build_toolbar_actions,
 )
 
@@ -624,7 +625,7 @@ class TestToolbarBuilderCreateButton:
         mock_button.return_value = mock_button_instance
 
         builder = ToolbarBuilder()
-        result = builder.create_button("new_team")
+        builder.create_button("new_team")
 
         mock_button_instance.setStyleSheet.assert_called()
         call_args = mock_button_instance.setStyleSheet.call_args[0][0]
@@ -637,7 +638,7 @@ class TestToolbarBuilderCreateButton:
         mock_button.return_value = mock_button_instance
 
         builder = ToolbarBuilder()
-        result = builder.create_button("delete_group")
+        builder.create_button("delete_group")
 
         mock_button_instance.setStyleSheet.assert_called()
         call_args = mock_button_instance.setStyleSheet.call_args[0][0]

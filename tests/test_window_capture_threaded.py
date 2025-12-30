@@ -2,12 +2,10 @@
 Unit tests for the Window Capture Threaded module
 Tests WindowCaptureThreaded class with mocked subprocess and threading
 """
-import pytest
-import io
 import threading
 import time
-from queue import Queue, Empty
-from unittest.mock import Mock, patch, MagicMock, PropertyMock
+from queue import Queue
+from unittest.mock import MagicMock, patch
 
 
 class TestWindowCaptureThreadedInit:
@@ -328,6 +326,7 @@ class TestCaptureWindowSync:
     def test_capture_window_sync_timeout(self, mock_subprocess):
         """Test capture handles timeout"""
         import subprocess as subprocess_module
+
         from eve_overview_pro.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_subprocess.side_effect = subprocess_module.TimeoutExpired("import", 1)
@@ -829,7 +828,7 @@ class TestEdgeCases:
             capture = WindowCaptureThreaded(max_workers=2)
 
             capture.start()
-            initial_workers = len(capture.workers)
+            len(capture.workers)
 
             capture.start()  # Second start
             # Workers accumulate (may be a bug, but we test current behavior)
