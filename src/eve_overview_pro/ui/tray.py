@@ -88,16 +88,16 @@ class SystemTray(QObject):
             if icon_path.exists():
                 return QIcon(str(icon_path))
 
-        # Fallback: Create programmatic icon
+        # Fallback: Create programmatic Argus icon
         pixmap = QPixmap(32, 32)
-        pixmap.fill(QColor(26, 10, 10))  # Dark red background
+        pixmap.fill(QColor(20, 20, 30))  # Dark blue-gray background
 
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        font = QFont("Arial", 20, QFont.Weight.Bold)
+        font = QFont("Arial", 18, QFont.Weight.Bold)
         painter.setFont(font)
-        painter.setPen(QColor(255, 68, 68))  # Veles red
-        painter.drawText(pixmap.rect(), 0x0084, "V")
+        painter.setPen(QColor(100, 180, 255))  # Argus blue
+        painter.drawText(pixmap.rect(), 0x0084, "A")
         painter.end()
 
         return QIcon(pixmap)

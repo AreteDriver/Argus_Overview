@@ -63,21 +63,21 @@ class SystemTray(QObject):
         """
         # Create 32x32 pixmap
         pixmap = QPixmap(32, 32)
-        pixmap.fill(QColor(26, 26, 46))  # Dark blue background
+        pixmap.fill(QColor(20, 20, 30))  # Dark blue-gray background
 
-        # Draw orange 'V'
+        # Draw Argus 'A'
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         # Set font
-        font = QFont("Arial", 20, QFont.Weight.Bold)
+        font = QFont("Arial", 18, QFont.Weight.Bold)
         painter.setFont(font)
 
-        # Orange color
-        painter.setPen(QColor(255, 140, 0))  # Orange
+        # Argus blue color
+        painter.setPen(QColor(100, 180, 255))  # Argus blue
 
-        # Draw centered 'V'
-        painter.drawText(pixmap.rect(), 0x0084, "V")  # AlignCenter
+        # Draw centered 'A'
+        painter.drawText(pixmap.rect(), 0x0084, "A")  # AlignCenter
         painter.end()
 
         return QIcon(pixmap)
