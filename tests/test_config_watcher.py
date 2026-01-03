@@ -245,6 +245,124 @@ class TestWatchdogIntegration:
             watcher.stop()
 
 
+class TestWatchdogFallback:
+    """Tests for watchdog exception handling and fallback to polling"""
+
+    @pytest.mark.skipif(not WATCHDOG_AVAILABLE, reason="watchdog not installed")
+    def test_start_watchdog_success(self):
+        """Watchdog starts successfully and schedules observer"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+            config_path.write_text("{}")
+            watcher = ConfigWatcher(config_path)
+
+            # Mock Observer to avoid actual file watching
+            mock_observer_instance = MagicMock()
+            with patch('eve_overview_pro.core.config_watcher.Observer',
+                       return_value=mock_observer_instance):
+                watcher._start_watchdog()
+
+                # Verify schedule was called with correct args
+                mock_observer_instance.schedule.assert_called_once()
+                call_args = mock_observer_instance.schedule.call_args
+                assert call_args[1]['recursive'] is False
+
+                # Verify start was called
+                mock_observer_instance.start.assert_called_once()
+
+                # Verify observer is stored
+                assert watcher._observer is mock_observer_instance
+
+    def test_start_watchdog_falls_back_on_exception(self):
+        """Watchdog exception falls back to polling"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+            config_path.write_text("{}")
+            watcher = ConfigWatcher(config_path)
+
+            # Make Observer raise an exception
+            with patch('eve_overview_pro.core.config_watcher.Observer') as mock_observer:
+                mock_observer.side_effect = Exception("Observer failed")
+
+                with patch.object(watcher, '_start_polling') as mock_polling:
+                    watcher._start_watchdog()
+                    # Should fall back to polling
+                    mock_polling.assert_called_once()
+
+    def test_start_uses_polling_when_watchdog_unavailable(self):
+        """Start uses polling when WATCHDOG_AVAILABLE is False"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+            config_path.write_text("{}")
+            watcher = ConfigWatcher(config_path)
+
+            with patch('eve_overview_pro.core.config_watcher.WATCHDOG_AVAILABLE', False):
+                with patch.object(watcher, '_start_polling') as mock_polling:
+                    watcher.start()
+                    mock_polling.assert_called_once()
+
+            watcher.stop()
+
+
+class TestExceptionHandling:
+    """Tests for exception handling in file operations"""
+
+    def test_update_mtime_handles_stat_exception(self):
+        """_update_mtime handles stat() exception gracefully"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+            config_path.write_text("{}")
+            watcher = ConfigWatcher(config_path)
+
+            # Replace config_path with a mock that raises on stat()
+            mock_path = MagicMock()
+            mock_path.exists.return_value = True
+            mock_path.stat.side_effect = OSError("Permission denied")
+            watcher.config_path = mock_path
+
+            # Should not raise, just silently fail
+            watcher._update_mtime()
+            # _last_mtime should remain None
+            assert watcher._last_mtime is None
+
+    def test_check_file_handles_stat_exception(self):
+        """_check_file handles stat() exception gracefully"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+            config_path.write_text("{}")
+            watcher = ConfigWatcher(config_path)
+
+            # Set initial mtime from real file
+            watcher._update_mtime()
+            initial_mtime = watcher._last_mtime
+
+            # Replace config_path with a mock that raises on stat()
+            mock_path = MagicMock()
+            mock_path.exists.return_value = True
+            mock_path.stat.side_effect = OSError("Permission denied")
+            watcher.config_path = mock_path
+
+            # Should not raise
+            watcher._check_file()
+            # mtime should remain unchanged
+            assert watcher._last_mtime == initial_mtime
+
+    def test_check_file_handles_exists_exception(self):
+        """_check_file handles exists() exception gracefully"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_path = Path(tmpdir) / "config.json"
+            config_path.write_text("{}")
+            watcher = ConfigWatcher(config_path)
+
+            # Replace config_path with a mock that raises on exists()
+            mock_path = MagicMock()
+            mock_path.exists.side_effect = OSError("Error")
+            watcher.config_path = mock_path
+
+            # Should not raise
+            watcher._check_file()
+
+
 class TestStopCleansUp:
     """Tests for cleanup on stop"""
 
