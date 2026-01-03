@@ -2,11 +2,11 @@
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
+[![PyPI](https://img.shields.io/pypi/v/argus-overview)](https://pypi.org/project/argus-overview/)
+[![Python](https://img.shields.io/pypi/pyversions/argus-overview)](https://pypi.org/project/argus-overview/)
 [![CI](https://github.com/AreteDriver/Argus_Overview/actions/workflows/ci.yml/badge.svg)](https://github.com/AreteDriver/Argus_Overview/actions)
-[![Version](https://img.shields.io/badge/version-2.4.2-blue)](https://github.com/AreteDriver/Argus_Overview/releases)
 [![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.8+-green)](https://python.org)
-[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)]()
+[![Platform](https://img.shields.io/badge/platform-Linux-lightgrey)]()
 [![Downloads](https://img.shields.io/github/downloads/AreteDriver/Argus_Overview/total)](https://github.com/AreteDriver/Argus_Overview/releases)
 
 ## Screenshots
