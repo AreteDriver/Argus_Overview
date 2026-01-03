@@ -382,3 +382,78 @@ class TestMediumAlertOnChange:
         result = detector.analyze_frame("win1", img.copy())
 
         assert result is None
+
+
+class TestExceptionHandling:
+    """Tests for exception handling in detection methods"""
+
+    @pytest.fixture
+    def detector(self):
+        """Create a fresh detector"""
+        return AlertDetector()
+
+    def test_red_flash_handles_conversion_error(self, detector):
+        """_detect_red_flash handles image conversion errors"""
+        from unittest.mock import patch, MagicMock
+
+        # Create a mock image that raises on convert
+        mock_image = MagicMock()
+        mock_image.convert.side_effect = Exception("Conversion failed")
+
+        result = detector._detect_red_flash(mock_image)
+
+        # Should return False on error, not raise
+        assert result is False
+
+    def test_red_flash_handles_numpy_error(self, detector):
+        """_detect_red_flash handles numpy array errors"""
+        from unittest.mock import patch
+
+        img = Image.new('RGB', (100, 100), color=(255, 0, 0))
+
+        # Mock numpy.array to raise
+        with patch('eve_overview_pro.core.alert_detector.np.array',
+                   side_effect=Exception("numpy failed")):
+            result = detector._detect_red_flash(img)
+
+        # Should return False on error
+        assert result is False
+
+    def test_screen_change_handles_resize_error(self, detector):
+        """_detect_screen_change handles resize errors"""
+        from unittest.mock import MagicMock
+
+        # Create mock images where resize fails
+        mock_current = MagicMock()
+        mock_current.resize.side_effect = Exception("Resize failed")
+
+        mock_previous = MagicMock()
+
+        result = detector._detect_screen_change(mock_current, mock_previous)
+
+        # Should return False on error
+        assert result is False
+
+    def test_screen_change_handles_numpy_error(self, detector):
+        """_detect_screen_change handles numpy errors"""
+        from unittest.mock import patch
+
+        img1 = Image.new('RGB', (100, 100), color=(50, 50, 50))
+        img2 = Image.new('RGB', (100, 100), color=(200, 200, 200))
+
+        # Mock numpy.array to raise on second call (during comparison)
+        call_count = [0]
+        original_array = __import__('numpy').array
+
+        def mock_array(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] > 1:
+                raise Exception("numpy failed")
+            return original_array(*args, **kwargs)
+
+        with patch('eve_overview_pro.core.alert_detector.np.array',
+                   side_effect=mock_array):
+            result = detector._detect_screen_change(img1, img2)
+
+        # Should return False on error
+        assert result is False
