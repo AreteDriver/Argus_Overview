@@ -127,14 +127,14 @@ jobs:
         tar -czf Argus-Overview-${{ steps.version.outputs.version }}-Linux.tar.gz argus-overview-linux
 
     - name: Upload AppImage artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: Argus-Overview-AppImage
         path: Argus-Overview-*.AppImage
         retention-days: 30
 
     - name: Upload tarball artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v6
       with:
         name: Argus-Overview-Linux-tarball
         path: Argus-Overview-*-Linux.tar.gz
