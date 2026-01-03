@@ -516,6 +516,211 @@ class TestAutoAssignWindows:
         assert "MainPilot" in assignments
 
 
+class TestExceptionHandling:
+    """Tests for exception handling in load/save operations"""
+
+    def test_handles_corrupted_characters_file(self):
+        """Handles corrupted characters.json gracefully"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir)
+            chars_file = config_dir / "characters.json"
+            chars_file.write_text("not valid json {{{")
+
+            # Should not raise, just log error and start empty
+            manager = CharacterManager(config_dir=config_dir)
+            assert len(manager.characters) == 0
+
+    def test_handles_corrupted_teams_file(self):
+        """Handles corrupted teams.json gracefully"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir)
+            teams_file = config_dir / "teams.json"
+            teams_file.write_text("invalid json content")
+
+            # Should not raise, just log error and start empty
+            manager = CharacterManager(config_dir=config_dir)
+            assert len(manager.teams) == 0
+
+    def test_save_data_handles_write_error(self):
+        """save_data returns False when write fails"""
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = CharacterManager(config_dir=Path(tmpdir))
+
+            # Mock open to raise an exception
+            with patch("builtins.open", side_effect=PermissionError("No write access")):
+                result = manager.save_data()
+                assert result is False
+
+    def test_uses_default_config_dir_when_none(self):
+        """Uses home config dir when config_dir is None"""
+        from unittest.mock import patch, MagicMock
+
+        mock_home = Path("/fake/home")
+        mock_path = mock_home / '.config' / 'eve-overview-pro'
+
+        with patch.object(Path, 'home', return_value=mock_home):
+            with patch.object(Path, 'mkdir'):
+                with patch.object(Path, 'exists', return_value=False):
+                    manager = CharacterManager(config_dir=None)
+                    assert manager.config_dir == mock_path
+
+
+class TestMissingEdgeCases:
+    """Tests for edge cases not covered elsewhere"""
+
+    @pytest.fixture
+    def manager(self):
+        """Create a fresh manager for each test"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield CharacterManager(config_dir=Path(tmpdir))
+
+    def test_update_nonexistent_team(self, manager):
+        """Updating nonexistent team returns False"""
+        result = manager.update_team("NonexistentTeam", description="New desc")
+        assert result is False
+
+    def test_remove_character_from_nonexistent_team(self, manager):
+        """Removing character from nonexistent team returns False"""
+        manager.add_character(Character(name="Pilot1"))
+        result = manager.remove_character_from_team("NonexistentTeam", "Pilot1")
+        assert result is False
+
+    def test_unassign_window_nonexistent_character(self, manager):
+        """Unassigning window from nonexistent character returns False"""
+        result = manager.unassign_window("NonexistentPilot")
+        assert result is False
+
+
+class TestImportFromEveSync:
+    """Tests for import_from_eve_sync functionality"""
+
+    @pytest.fixture
+    def manager(self):
+        """Create a fresh manager for each test"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield CharacterManager(config_dir=Path(tmpdir))
+
+    def test_imports_new_characters(self, manager):
+        """Imports new characters from EVE sync data"""
+        from unittest.mock import MagicMock
+        from datetime import datetime
+
+        eve_char = MagicMock()
+        eve_char.character_name = "NewEVEPilot"
+        eve_char.character_id = 12345678
+        eve_char.last_seen = datetime(2025, 1, 1, 12, 0, 0)
+
+        imported = manager.import_from_eve_sync([eve_char])
+
+        assert imported == 1
+        assert "NewEVEPilot" in manager.characters
+        char = manager.characters["NewEVEPilot"]
+        assert "12345678" in char.notes
+        assert char.last_seen is not None
+
+    def test_skips_existing_characters(self, manager):
+        """Skips characters that already exist"""
+        from unittest.mock import MagicMock
+
+        # Add existing character
+        manager.add_character(Character(name="ExistingPilot"))
+
+        eve_char = MagicMock()
+        eve_char.character_name = "ExistingPilot"
+        eve_char.character_id = 99999999
+        eve_char.last_seen = None
+
+        imported = manager.import_from_eve_sync([eve_char])
+
+        assert imported == 0
+        # Should still have only 1 character
+        assert len(manager.characters) == 1
+
+    def test_updates_last_seen_for_existing(self, manager):
+        """Updates last_seen for existing characters"""
+        from unittest.mock import MagicMock
+        from datetime import datetime
+
+        # Add existing character without last_seen
+        manager.add_character(Character(name="ExistingPilot", last_seen=None))
+
+        eve_char = MagicMock()
+        eve_char.character_name = "ExistingPilot"
+        eve_char.character_id = 99999999
+        eve_char.last_seen = datetime(2025, 6, 15, 10, 30, 0)
+
+        manager.import_from_eve_sync([eve_char])
+
+        char = manager.characters["ExistingPilot"]
+        assert char.last_seen == "2025-06-15T10:30:00"
+
+    def test_handles_none_last_seen(self, manager):
+        """Handles characters with no last_seen timestamp"""
+        from unittest.mock import MagicMock
+
+        eve_char = MagicMock()
+        eve_char.character_name = "NoLastSeenPilot"
+        eve_char.character_id = 11111111
+        eve_char.last_seen = None
+
+        imported = manager.import_from_eve_sync([eve_char])
+
+        assert imported == 1
+        char = manager.characters["NoLastSeenPilot"]
+        assert char.last_seen is None
+
+    def test_imports_multiple_characters(self, manager):
+        """Imports multiple characters at once"""
+        from unittest.mock import MagicMock
+        from datetime import datetime
+
+        eve_chars = []
+        for i in range(3):
+            eve_char = MagicMock()
+            eve_char.character_name = f"Pilot{i}"
+            eve_char.character_id = 10000000 + i
+            eve_char.last_seen = datetime(2025, 1, i + 1)
+            eve_chars.append(eve_char)
+
+        imported = manager.import_from_eve_sync(eve_chars)
+
+        assert imported == 3
+        assert len(manager.characters) == 3
+
+    def test_saves_after_import(self, manager):
+        """Saves data after importing characters"""
+        from unittest.mock import MagicMock, patch
+        from datetime import datetime
+
+        eve_char = MagicMock()
+        eve_char.character_name = "SavedPilot"
+        eve_char.character_id = 12345678
+        eve_char.last_seen = datetime(2025, 1, 1)
+
+        with patch.object(manager, 'save_data') as mock_save:
+            manager.import_from_eve_sync([eve_char])
+            mock_save.assert_called_once()
+
+    def test_no_save_when_nothing_imported(self, manager):
+        """Does not save when no new characters imported"""
+        from unittest.mock import MagicMock, patch
+
+        # Add existing character first
+        manager.add_character(Character(name="ExistingPilot"))
+
+        eve_char = MagicMock()
+        eve_char.character_name = "ExistingPilot"
+        eve_char.character_id = 99999999
+        eve_char.last_seen = None
+
+        with patch.object(manager, 'save_data') as mock_save:
+            mock_save.reset_mock()  # Reset from add_character call
+            manager.import_from_eve_sync([eve_char])
+            mock_save.assert_not_called()
+
+
 class TestDataPersistence:
     """Tests for data persistence"""
 
