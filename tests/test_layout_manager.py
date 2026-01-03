@@ -458,6 +458,73 @@ class TestGetBestPattern:
         assert manager.get_best_pattern(10) == GridPattern.MAIN_PLUS_SIDES
 
 
+class TestExceptionHandling:
+    """Tests for exception handling in file operations"""
+
+    def test_load_presets_handles_corrupted_file(self):
+        """Manager handles corrupted preset files gracefully"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir)
+            layouts_dir = config_dir / "layouts"
+            layouts_dir.mkdir(parents=True)
+
+            # Create a corrupted preset file (invalid JSON)
+            (layouts_dir / "corrupted.json").write_text("not valid json {{{")
+
+            # Should not raise, just log error and skip
+            manager = LayoutManager(config_dir=config_dir)
+            assert "corrupted" not in manager.presets
+
+    def test_save_preset_handles_write_error(self):
+        """save_preset handles write errors gracefully"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = LayoutManager(config_dir=Path(tmpdir))
+            preset = LayoutPreset(name="Test")
+
+            # Make layouts_dir read-only to cause write error
+            manager.layouts_dir.chmod(0o444)
+
+            try:
+                result = manager.save_preset(preset)
+                assert result is False
+            finally:
+                # Restore permissions for cleanup
+                manager.layouts_dir.chmod(0o755)
+
+    def test_delete_preset_handles_unlink_error(self):
+        """delete_preset handles file deletion errors gracefully"""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            from unittest.mock import patch, MagicMock
+
+            manager = LayoutManager(config_dir=Path(tmpdir))
+            preset = LayoutPreset(name="ToDelete")
+            manager.save_preset(preset)
+
+            # Mock unlink to raise an exception
+            with patch.object(Path, 'unlink', side_effect=OSError("Permission denied")):
+                result = manager.delete_preset("ToDelete")
+                assert result is False
+
+
+class TestDefaultConfigDir:
+    """Tests for default config directory behavior"""
+
+    def test_uses_home_config_when_none_provided(self):
+        """Manager uses ~/.config/eve-overview-pro when no config_dir provided"""
+        from unittest.mock import patch
+
+        # Mock Path.home() to use temp directory
+        with tempfile.TemporaryDirectory() as tmpdir:
+            mock_home = Path(tmpdir)
+
+            with patch.object(Path, 'home', return_value=mock_home):
+                manager = LayoutManager(config_dir=None)
+
+                expected_dir = mock_home / '.config' / 'eve-overview-pro'
+                assert manager.config_dir == expected_dir
+                assert expected_dir.exists()
+
+
 class TestDataPersistence:
     """Tests for data persistence"""
 
