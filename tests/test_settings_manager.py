@@ -760,6 +760,77 @@ class TestValidate:
             assert manager.settings["alerts"]["red_flash"]["threshold"] == 0.7
 
 
+class TestExceptionHandling:
+    """Tests for exception handling paths"""
+
+    def test_export_config_handles_write_error(self):
+        """Test export_config returns False when write fails"""
+        from eve_overview_pro.ui.settings_manager import SettingsManager
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir) / "config"
+
+            manager = SettingsManager(config_dir=config_dir)
+
+            # Try to export to an invalid path (directory, not file)
+            with patch('builtins.open', side_effect=PermissionError("denied")):
+                result = manager.export_config(Path(tmpdir) / "export.json")
+
+            assert result is False
+
+    def test_import_config_returns_false_when_save_fails(self):
+        """Test import_config returns False when save_settings fails"""
+        from eve_overview_pro.ui.settings_manager import SettingsManager
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir) / "config"
+            import_path = Path(tmpdir) / "import.json"
+
+            # Create valid import file
+            import_data = {
+                "settings": {
+                    "version": "imported",
+                    "general": {"start_with_system": True}
+                }
+            }
+            with open(import_path, 'w') as f:
+                json.dump(import_data, f)
+
+            manager = SettingsManager(config_dir=config_dir)
+
+            # Make save_settings return False
+            with patch.object(manager, 'save_settings', return_value=False):
+                result = manager.import_config(import_path)
+
+            assert result is False
+
+    def test_validate_fixes_invalid_screen_change_threshold(self):
+        """Test validate fixes screen_change threshold outside 0-1 range"""
+        from eve_overview_pro.ui.settings_manager import SettingsManager
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = SettingsManager(config_dir=Path(tmpdir))
+            manager.settings["alerts"]["screen_change"]["threshold"] = 1.5
+
+            result = manager.validate()
+
+            assert result is True
+            assert manager.settings["alerts"]["screen_change"]["threshold"] == 0.3
+
+    def test_validate_handles_exception(self):
+        """Test validate returns False on exception"""
+        from eve_overview_pro.ui.settings_manager import SettingsManager
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            manager = SettingsManager(config_dir=Path(tmpdir))
+
+            # Make get() raise an exception
+            with patch.object(manager, 'get', side_effect=Exception("get failed")):
+                result = manager.validate()
+
+            assert result is False
+
+
 class TestEdgeCases:
     """Tests for edge cases and error handling"""
 
