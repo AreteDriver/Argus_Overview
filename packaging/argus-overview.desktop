@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Argus Overview
+GenericName=EVE Online Multiboxing Tool
+Comment=Professional multi-boxing tool for EVE Online - window preview, layouts, and settings sync
+Exec=argus-overview
+Icon=argus-overview
+Terminal=false
+Type=Application
+Categories=Game;Utility;
+Keywords=eve;online;multibox;preview;gaming;mmo;
+StartupNotify=true
+StartupWMClass=argus-overview

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <!-- Background - space/dark theme -->
+  <circle cx="64" cy="64" r="60" fill="#0a0a14"/>
+
+  <!-- Outer ring - EVE golden/amber glow -->
+  <circle cx="64" cy="64" r="52" fill="none" stroke="#d4a012" stroke-width="3" opacity="0.4"/>
+  <circle cx="64" cy="64" r="48" fill="none" stroke="#d4a012" stroke-width="1" opacity="0.2"/>
+
+  <!-- Eye of Argus - all-seeing eye motif -->
+  <!-- Outer eye shape -->
+  <ellipse cx="64" cy="64" rx="38" ry="24" fill="none" stroke="#d4a012" stroke-width="2.5"/>
+
+  <!-- Inner eye glow -->
+  <ellipse cx="64" cy="64" rx="32" ry="20" fill="#1a1520" stroke="#d4a012" stroke-width="1" opacity="0.5"/>
+
+  <!-- Iris -->
+  <circle cx="64" cy="64" r="16" fill="#0d2847"/>
+  <circle cx="64" cy="64" r="16" fill="none" stroke="#3498db" stroke-width="2"/>
+
+  <!-- Pupil with highlight -->
+  <circle cx="64" cy="64" r="8" fill="#000"/>
+  <circle cx="60" cy="60" r="3" fill="#fff" opacity="0.7"/>
+
+  <!-- Grid lines representing multiple windows/overview -->
+  <line x1="40" y1="64" x2="30" y2="64" stroke="#d4a012" stroke-width="1" opacity="0.6"/>
+  <line x1="88" y1="64" x2="98" y2="64" stroke="#d4a012" stroke-width="1" opacity="0.6"/>
+  <line x1="64" y1="44" x2="64" y2="34" stroke="#d4a012" stroke-width="1" opacity="0.6"/>
+  <line x1="64" y1="84" x2="64" y2="94" stroke="#d4a012" stroke-width="1" opacity="0.6"/>
+
+  <!-- Corner window indicators -->
+  <rect x="20" y="20" width="12" height="8" rx="1" fill="none" stroke="#3498db" stroke-width="1" opacity="0.5"/>
+  <rect x="96" y="20" width="12" height="8" rx="1" fill="none" stroke="#3498db" stroke-width="1" opacity="0.5"/>
+  <rect x="20" y="100" width="12" height="8" rx="1" fill="none" stroke="#3498db" stroke-width="1" opacity="0.5"/>
+  <rect x="96" y="100" width="12" height="8" rx="1" fill="none" stroke="#3498db" stroke-width="1" opacity="0.5"/>
+
+  <!-- Small dots - stars -->
+  <circle cx="30" cy="35" r="1" fill="#fff" opacity="0.4"/>
+  <circle cx="98" cy="42" r="1" fill="#fff" opacity="0.3"/>
+  <circle cx="25" cy="90" r="1" fill="#fff" opacity="0.4"/>
+  <circle cx="103" cy="85" r="1" fill="#fff" opacity="0.3"/>
+</svg>
