@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="argus-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#7c3aed"/>
-      <stop offset="100%" style="stop-color:#4f46e5"/>
+      <stop offset="0%" style="stop-color:#38bdf8"/>
+      <stop offset="100%" style="stop-color:#3498db"/>
     </linearGradient>
   </defs>
   <!-- Background -->
@@ -33,6 +33,6 @@
   <circle cx="285" cy="260" r="5" fill="#ffbd2e"/>
   <circle cx="300" cy="260" r="5" fill="#27ca40"/>
   <!-- Eye of Argus overlay -->
-  <ellipse cx="256" cy="400" rx="120" ry="40" fill="none" stroke="#7c3aed" stroke-width="6" opacity="0.8"/>
-  <circle cx="256" cy="400" r="20" fill="#7c3aed"/>
+  <ellipse cx="256" cy="400" rx="120" ry="40" fill="none" stroke="#3498db" stroke-width="6" opacity="0.8"/>
+  <circle cx="256" cy="400" r="20" fill="#38bdf8"/>
 </svg>
