@@ -5455,9 +5455,7 @@ class TestGridApplierScreenGeometry:
             applier = GridApplier.__new__(GridApplier)
             applier.logger = MagicMock()
 
-            with patch(
-                "argus_overview.utils.screen.subprocess.run", side_effect=FileNotFoundError
-            ):
+            with patch("argus_overview.utils.screen.subprocess.run", side_effect=FileNotFoundError):
                 result = applier.get_screen_geometry(0)
 
                 # Method returns fallback on exception

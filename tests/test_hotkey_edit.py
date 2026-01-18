@@ -73,15 +73,18 @@ class TestHotkeyEditRecording:
     def test_start_recording_changes_button_text(self, qapp):
         """Test that start recording changes button."""
         widget = HotkeyEdit()
-        widget._start_recording()
-        assert "Press" in widget.record_btn.text()
-        widget._stop_recording()
+        # Mock the keyboard listener to avoid X11 connection issues in CI
+        with patch("argus_overview.ui.hotkey_edit.keyboard.Listener"):
+            widget._start_recording()
+            assert "Press" in widget.record_btn.text()
+            widget._stop_recording()
 
     def test_stop_recording_restores_button(self, qapp):
         """Test that stop recording restores button."""
         widget = HotkeyEdit()
-        widget._start_recording()
-        widget._stop_recording()
+        with patch("argus_overview.ui.hotkey_edit.keyboard.Listener"):
+            widget._start_recording()
+            widget._stop_recording()
         assert widget.record_btn.text() == "Record"
 
     def test_toggle_recording_starts_then_stops(self, qapp):
@@ -89,11 +92,13 @@ class TestHotkeyEditRecording:
         widget = HotkeyEdit()
         assert not widget._recording
 
-        widget._toggle_recording()
-        assert widget._recording
+        # Mock the keyboard listener to avoid X11 connection issues in CI
+        with patch("argus_overview.ui.hotkey_edit.keyboard.Listener"):
+            widget._toggle_recording()
+            assert widget._recording
 
-        widget._toggle_recording()
-        assert not widget._recording
+            widget._toggle_recording()
+            assert not widget._recording
 
 
 class TestHotkeyEditKeyConversion:

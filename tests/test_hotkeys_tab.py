@@ -1228,9 +1228,7 @@ class TestHotkeysTabSetupUI:
             mock_combo.count.return_value = 0
 
             with patch("argus_overview.ui.hotkeys_tab.QWidget", return_value=mock_panel):
-                with patch(
-                    "argus_overview.ui.hotkeys_tab.QVBoxLayout", return_value=mock_vlayout
-                ):
+                with patch("argus_overview.ui.hotkeys_tab.QVBoxLayout", return_value=mock_vlayout):
                     with patch("argus_overview.ui.hotkeys_tab.ToolbarBuilder"):
                         with patch("argus_overview.ui.hotkeys_tab.QGroupBox"):
                             with patch("argus_overview.ui.hotkeys_tab.QHBoxLayout"):
@@ -1242,9 +1240,7 @@ class TestHotkeysTabSetupUI:
                                         with patch(
                                             "argus_overview.ui.hotkeys_tab.CyclingGroupList"
                                         ):
-                                            with patch(
-                                                "argus_overview.ui.hotkeys_tab.QPushButton"
-                                            ):
+                                            with patch("argus_overview.ui.hotkeys_tab.QPushButton"):
                                                 with patch(
                                                     "argus_overview.ui.hotkeys_tab.QFormLayout"
                                                 ):
@@ -1285,9 +1281,7 @@ class TestHotkeysTabSetupUI:
                                         with patch(
                                             "argus_overview.ui.hotkeys_tab.CyclingGroupList"
                                         ):
-                                            with patch(
-                                                "argus_overview.ui.hotkeys_tab.QPushButton"
-                                            ):
+                                            with patch("argus_overview.ui.hotkeys_tab.QPushButton"):
                                                 with patch(
                                                     "argus_overview.ui.hotkeys_tab.QFormLayout"
                                                 ):

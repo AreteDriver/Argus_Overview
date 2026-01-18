@@ -1819,9 +1819,7 @@ class TestLayoutsTabCreateBottomSection:
                 "argus_overview.ui.layouts_tab.QHBoxLayout"
             ) as mock_hlayout_cls, patch(
                 "argus_overview.ui.layouts_tab.QLabel"
-            ) as mock_label_cls, patch(
-                "argus_overview.ui.layouts_tab.QPushButton"
-            ) as mock_btn_cls:
+            ) as mock_label_cls, patch("argus_overview.ui.layouts_tab.QPushButton") as mock_btn_cls:
                 mock_widget = MagicMock()
                 mock_widget_cls.return_value = mock_widget
 
