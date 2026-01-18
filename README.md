@@ -11,27 +11,25 @@
 
 ## Screenshots
 
-<p align="center">
-  <img src="docs/screenshots/main-window.png" alt="Main Window" width="800"/>
-</p>
+### Overview Tab
+Window preview management with grid layouts and auto-arrange.
+![Overview](docs/screenshot-overview.png)
 
-<details>
-<summary>More Screenshots</summary>
+### Roster Tab
+Character management with roles, status, and team organization.
+![Roster](docs/screenshot-roster.png)
 
-### Team Management
-![Team Management](docs/screenshots/team-management.png)
+### Automation Tab
+Cycling groups with hotkey recording and broadcast hotkeys.
+![Automation](docs/screenshot-automation.png)
 
-### Layout Presets
-![Layouts](docs/screenshots/layout-presets.png)
+### Sync Tab
+EVE settings synchronization between characters.
+![Sync](docs/screenshot-sync.png)
 
-### Visual Alerts
-![Alerts](docs/screenshots/visual-alerts.png)
-
-</details>
-
-## Demo
-
-![Demo GIF](docs/screenshots/demo.gif)
+### Settings Tab
+General settings with auto-save and notifications.
+![Settings](docs/screenshot-settings.png)
 
 ---
 
