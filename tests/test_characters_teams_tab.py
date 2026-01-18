@@ -905,9 +905,7 @@ class TestTeamBuilderMethods:
             mock_char.name = "Pilot1"
             mock_char.role = "DPS"
 
-            with patch(
-                "argus_overview.ui.characters_teams_tab.QListWidgetItem"
-            ) as mock_item_class:
+            with patch("argus_overview.ui.characters_teams_tab.QListWidgetItem") as mock_item_class:
                 mock_item = MagicMock()
                 mock_item_class.return_value = mock_item
 
@@ -1631,9 +1629,7 @@ class TestUISetupMethods:
             tab._edit_character = MagicMock()
             tab._delete_character = MagicMock()
 
-            with patch(
-                "argus_overview.ui.characters_teams_tab.QWidget"
-            ) as mock_widget_cls, patch(
+            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
                 "argus_overview.ui.characters_teams_tab.QVBoxLayout"
             ) as mock_vlayout_cls, patch(
                 "argus_overview.ui.characters_teams_tab.QHBoxLayout"
@@ -1710,9 +1706,7 @@ class TestUISetupMethods:
             tab._edit_character = MagicMock()
             tab._delete_character = MagicMock()
 
-            with patch(
-                "argus_overview.ui.characters_teams_tab.QWidget"
-            ) as mock_widget_cls, patch(
+            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
                 "argus_overview.ui.characters_teams_tab.QVBoxLayout"
             ), patch(
                 "argus_overview.ui.characters_teams_tab.QHBoxLayout"
@@ -1749,9 +1743,7 @@ class TestUISetupMethods:
             tab._on_team_modified = MagicMock()
             tab._refresh_teams = MagicMock()
 
-            with patch(
-                "argus_overview.ui.characters_teams_tab.QWidget"
-            ) as mock_widget_cls, patch(
+            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
                 "argus_overview.ui.characters_teams_tab.QVBoxLayout"
             ) as mock_vlayout_cls, patch(
                 "argus_overview.ui.characters_teams_tab.QHBoxLayout"

@@ -244,9 +244,7 @@ class TestSyncPreviewDialog:
 
             mock_layout = MagicMock()
 
-            with patch(
-                "argus_overview.ui.settings_sync_tab.QVBoxLayout", return_value=mock_layout
-            ):
+            with patch("argus_overview.ui.settings_sync_tab.QVBoxLayout", return_value=mock_layout):
                 with patch("argus_overview.ui.settings_sync_tab.QLabel"):
                     with patch("argus_overview.ui.settings_sync_tab.QTableWidget") as mock_table:
                         mock_table_instance = MagicMock()
@@ -373,9 +371,7 @@ class TestSettingsSyncTab:
             mock_layout = MagicMock()
             mock_splitter = MagicMock()
 
-            with patch(
-                "argus_overview.ui.settings_sync_tab.QVBoxLayout", return_value=mock_layout
-            ):
+            with patch("argus_overview.ui.settings_sync_tab.QVBoxLayout", return_value=mock_layout):
                 with patch(
                     "argus_overview.ui.settings_sync_tab.QSplitter", return_value=mock_splitter
                 ):
