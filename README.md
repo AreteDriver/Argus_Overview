@@ -367,8 +367,8 @@ cd Argus_Overview
 
 ## ⚙️ **System Requirements**
 
-- **OS**: Linux (X11 or Wayland/XWayland)
-- **Python**: 3.8 or higher
+- **OS**: Linux (X11 or XWayland required - see Wayland note below)
+- **Python**: 3.10 or higher
 - **System Tools**: wmctrl, xdotool, ImageMagick, x11-apps
 
 ### Dependencies
@@ -382,6 +382,36 @@ sudo dnf install wmctrl xdotool ImageMagick xorg-x11-apps python3-pip
 # Arch Linux
 sudo pacman -S wmctrl xdotool imagemagick xorg-xwd python-pip
 ```
+
+### Wayland Compatibility
+
+Argus Overview requires X11 tools (`wmctrl`, `xdotool`) to function. These tools **do not work on pure Wayland** sessions.
+
+| Session Type | Works? | Notes |
+|--------------|--------|-------|
+| X11 (Xorg) | Yes | Full functionality |
+| XWayland | Yes | Most Wayland sessions include XWayland by default |
+| Pure Wayland | No | Wayland security model prevents window management |
+
+**Why doesn't pure Wayland work?**
+
+Wayland's security model intentionally prevents applications from:
+- Listing windows from other applications
+- Capturing screenshots of other windows
+- Moving or focusing other application windows
+- Sending keystrokes to other windows
+
+This is a security feature, not a bug. EVE-O Preview on Windows works because Windows allows these operations.
+
+**Running EVE with `PROTON_ENABLE_WAYLAND`?**
+
+When EVE runs as a native Wayland window, Argus Overview cannot capture or control it. Solutions:
+
+1. **Remove `PROTON_ENABLE_WAYLAND`** - Let EVE run under XWayland (default behavior)
+2. **Use an X11 session** - Select "GNOME on Xorg" or similar at login
+3. **Check XWayland is running** - Most compositors enable it by default. Verify with: `echo $DISPLAY`
+
+Argus Overview will detect pure Wayland sessions at startup and display a warning.
 
 ---
 
@@ -406,6 +436,12 @@ sudo pacman -S wmctrl xdotool imagemagick xorg-xwd python-pip
 ---
 
 ## 🛠️ **Troubleshooting**
+
+**"Wayland Detected" warning at startup?**
+→ See [Wayland Compatibility](#wayland-compatibility) section above. Run EVE without `PROTON_ENABLE_WAYLAND` or use an X11 session.
+
+**No windows detected / empty window list?**
+→ Check if running pure Wayland: `echo $XDG_SESSION_TYPE`. If "wayland" and `echo $DISPLAY` is empty, X11 tools won't work.
 
 **Characters not found for settings sync?**
 → Add custom EVE installation path in Settings Sync tab

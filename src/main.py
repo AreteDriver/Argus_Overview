@@ -129,6 +129,45 @@ def setup_dark_theme(app):
     app.setPalette(palette)
 
 
+def check_wayland_compatibility() -> bool:
+    """Check for Wayland compatibility and warn user if needed.
+
+    Returns:
+        True if should continue, False if user cancelled.
+    """
+    from argus_overview.utils.display_server import (
+        DisplayServer,
+        detect_display_server,
+        get_wayland_limitation_message,
+    )
+
+    info = detect_display_server()
+
+    if info.server == DisplayServer.WAYLAND and not info.has_x11_access:
+        # Pure Wayland - show warning
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setWindowTitle("Wayland Detected")
+        msg_box.setText("Pure Wayland session detected - limited functionality")
+        msg_box.setInformativeText(get_wayland_limitation_message())
+        msg_box.setStandardButtons(
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel
+        )
+        msg_box.setDefaultButton(QMessageBox.StandardButton.Cancel)
+
+        result = msg_box.exec()
+        if result == QMessageBox.StandardButton.Cancel:
+            return False
+
+    elif info.server == DisplayServer.XWAYLAND:
+        # XWayland - log info, should work
+        logging.getLogger(__name__).info(
+            "Running under XWayland - X11 tools available, full functionality expected"
+        )
+
+    return True
+
+
 def main():
     """Main application entry point"""
     # Setup logging
@@ -137,12 +176,13 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info("Starting Argus Overview v2.4")
 
+    # Create QApplication early (needed for dialogs)
+    app = QApplication(sys.argv)
+
     # Single instance check
     single_instance = SingleInstance()
     if not single_instance.try_lock():
         logger.warning("Another instance is already running")
-        # Need QApplication to show message box
-        app = QApplication(sys.argv)
         QMessageBox.warning(
             None,
             "Already Running",
@@ -151,12 +191,17 @@ def main():
         )
         sys.exit(1)
 
-    # Import main window AFTER lock acquired to avoid race conditions
+    # Check Wayland compatibility before importing X11-dependent modules
+    if not check_wayland_compatibility():
+        logger.info("User cancelled due to Wayland limitations")
+        single_instance.release()
+        sys.exit(0)
+
+    # Import main window AFTER lock acquired and Wayland check passed
     # (importing can start background threads/X11 hooks)
     from argus_overview.ui.main_window_v21 import MainWindowV21
 
-    # Create application
-    app = QApplication(sys.argv)
+    # Configure application (QApplication already created above)
     app.setApplicationName("Argus Overview")
     app.setOrganizationName("Argus Overview")
     app.setDesktopFileName("argus-overview")  # Matches .desktop file name
