@@ -37,10 +37,10 @@ General settings with auto-save and notifications.
 
 | Platform | Status | Download |
 |----------|--------|----------|
-| **Linux** | Full-featured native application | [AppImage / Install Script](https://github.com/AreteDriver/Argus_Overview/releases) |
+| **Linux** | Full-featured native application | [Portable Tarball / AppImage](https://github.com/AreteDriver/Argus_Overview/releases) |
 | **Windows** | Standalone .exe available | [Download Windows .exe](https://github.com/AreteDriver/Argus_Overview_Windows/releases/latest) |
 
-- **Linux**: This repository - X11/Wayland support with native tools
+- **Linux**: This repository - X11/XWayland support with native tools. **Portable tarball** runs directly after unpacking.
 - **Windows**: [Argus_Overview_Windows](https://github.com/AreteDriver/Argus_Overview_Windows) - Native Win32 API implementation
 
 ## ☕ Support Development
@@ -288,7 +288,25 @@ argus-overview
 
 </details>
 
-#### Option 2: Install from Source
+#### Option 2: Portable Tarball (No Installation)
+
+Download the portable tarball from [Releases](https://github.com/AreteDriver/Argus_Overview/releases) - runs directly after extraction with no installation required.
+
+```bash
+# Download and extract
+tar xf argus-overview-X.X.X-portable-linux-x86_64.tar.gz
+cd argus-overview-X.X.X
+
+# Run immediately
+./run.sh
+
+# Optional: Add to applications menu
+./install-desktop.sh
+```
+
+This is the simplest option - just unpack and run. The tarball includes a bundled Python virtual environment with all dependencies.
+
+#### Option 3: Install from Source
 
 ```bash
 # One-liner install
