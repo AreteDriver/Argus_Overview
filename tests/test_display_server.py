@@ -3,8 +3,6 @@
 import subprocess
 from unittest.mock import patch
 
-import pytest
-
 from argus_overview.utils.display_server import (
     DisplayInfo,
     DisplayServer,
