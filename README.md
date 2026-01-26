@@ -20,7 +20,7 @@ Character management with roles, status, and team organization.
 ![Roster](docs/screenshot-roster.png)
 
 ### Automation Tab
-Cycling groups with hotkey recording and broadcast hotkeys.
+Cycling groups with hotkey recording.
 ![Automation](docs/screenshot-automation.png)
 
 ### Sync Tab
@@ -54,35 +54,29 @@ Your support helps keep this project maintained and improving! o7
 
 ---
 
-## 🌟 **v2.7 Performance & Broadcast Edition**
+## 🌟 **v2.7 Performance Edition**
 
-This release focuses on **performance optimization, security hardening, and fleet broadcasting features**!
+This release focuses on **performance optimization and security hardening**!
 
 ### ✅ **NEW in v2.7:**
 
-#### 1. **Broadcast Hotkeys** ⭐⭐⭐⭐⭐
-- Send keystrokes to ALL EVE windows simultaneously
-- Configure trigger key (Ctrl+F1) to broadcast (F1) to all clients
-- Perfect for fleet broadcasts, jump commands, F1-F9 in sync
-- Add multiple broadcast hotkey mappings in Automation tab
-
-#### 2. **Preview Filter** ⭐⭐⭐⭐
+#### 1. **Preview Filter** ⭐⭐⭐⭐
 - Quick search box in Overview toolbar
 - Type to filter visible windows by character name
 - Status bar shows filtered count
 
-#### 3. **Keyboard Window Control** ⭐⭐⭐
+#### 2. **Keyboard Window Control** ⭐⭐⭐
 - Number keys 1-9 activate windows by position
 - Works when Overview tab is focused
 - Quick direct access to specific windows
 
-#### 4. **Performance Optimizations** ⭐⭐⭐⭐⭐
+#### 3. **Performance Optimizations** ⭐⭐⭐⭐⭐
 - Fixed CPU busy loop (15-20% CPU reduction)
 - Fixed memory leak (~600x memory reduction per window)
 - Added wmctrl result caching (1-second TTL)
 - Fixed O(n²) duplicate detection in hotkey groups
 
-#### 5. **Security Hardening** ⭐⭐⭐
+#### 4. **Security Hardening** ⭐⭐⭐
 - Window ID validation on all subprocess calls
 - Path traversal prevention in layout manager
 - Narrowed exception handlers to specific types

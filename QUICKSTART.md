@@ -51,11 +51,6 @@ Log in to your EVE characters as normal.
 
 ## Top Features (v2.8)
 
-### Broadcast Hotkeys (NEW!)
-- Send keystrokes to ALL EVE windows at once
-- Configure trigger key (Ctrl+F1) to broadcast (F1)
-- Perfect for fleet commands, F1 spam, jump orders
-
 ### Preview Filter (NEW!)
 - Quick search box filters previews by character name
 - Type to filter, clear to show all

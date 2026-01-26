@@ -123,9 +123,6 @@ class HotkeysTab(QWidget):
     """
 
     group_changed = Signal(str, list)  # group_name, members
-    broadcast_recording_started = Signal()  # Pause hotkey manager during recording
-    broadcast_recording_stopped = Signal()  # Resume hotkey manager after recording
-    broadcast_hotkeys_changed = Signal()  # Broadcast hotkeys were saved
 
     def __init__(self, character_manager, settings_manager, main_tab=None, parent=None):
         super().__init__(parent)
@@ -137,9 +134,6 @@ class HotkeysTab(QWidget):
         # Cycling groups data: {group_name: [char_names in order]}
         self.cycling_groups: Dict[str, List[str]] = {}
         self.current_group: Optional[str] = None
-
-        # Broadcast hotkeys data (initialized before UI setup)
-        self.broadcast_entries: List[Dict] = []
 
         self._load_groups()
         self._setup_ui()
@@ -322,40 +316,6 @@ class HotkeysTab(QWidget):
             hotkey_layout.addRow("", save_hotkeys_btn)
 
         layout.addWidget(hotkey_group)
-
-        # Broadcast hotkeys section
-        broadcast_group = QGroupBox("Broadcast Hotkeys")
-        broadcast_layout = QVBoxLayout()
-        broadcast_group.setLayout(broadcast_layout)
-
-        # Instructions
-        broadcast_instructions = QLabel(
-            "Send a keystroke to all EVE windows when a trigger key is pressed.\n"
-            "Useful for fleet broadcasts (F1-F9), jump commands, etc."
-        )
-        broadcast_instructions.setStyleSheet("color: #888; font-style: italic;")
-        broadcast_instructions.setWordWrap(True)
-        broadcast_layout.addWidget(broadcast_instructions)
-
-        # Broadcast hotkey entries container
-        self.broadcast_container = QWidget()
-        self.broadcast_container_layout = QVBoxLayout()
-        self.broadcast_container_layout.setContentsMargins(0, 0, 0, 0)
-        self.broadcast_container.setLayout(self.broadcast_container_layout)
-        broadcast_layout.addWidget(self.broadcast_container)
-
-        # Add/Remove broadcast hotkey buttons
-        broadcast_btn_layout = QHBoxLayout()
-        add_broadcast_btn = QPushButton("+ Add Broadcast Hotkey")
-        add_broadcast_btn.clicked.connect(self._add_broadcast_entry)
-        broadcast_btn_layout.addWidget(add_broadcast_btn)
-        broadcast_btn_layout.addStretch()
-        broadcast_layout.addLayout(broadcast_btn_layout)
-
-        # Load existing broadcast hotkeys
-        self._load_broadcast_hotkeys()
-
-        layout.addWidget(broadcast_group)
 
         # Load initial group
         if self.cycling_groups:
@@ -568,27 +528,18 @@ class HotkeysTab(QWidget):
         forward = self.cycle_forward_edit.text()
         backward = self.cycle_backward_edit.text()
 
-        self.settings_manager.set("hotkeys.cycle_next", forward, auto_save=False)
-        self.settings_manager.set("hotkeys.cycle_prev", backward, auto_save=False)
-
-        # Save broadcast hotkeys
-        broadcasts = self._save_broadcast_hotkeys()
-
-        # Emit signal so main window can re-register hotkeys
-        self.broadcast_hotkeys_changed.emit()
+        self.settings_manager.set("hotkeys.cycle_next", forward, auto_save=True)
+        self.settings_manager.set("hotkeys.cycle_prev", backward, auto_save=True)
 
         QMessageBox.information(
             self,
             "Saved",
             f"Hotkey settings saved.\n\n"
             f"Cycling Forward: {forward}\n"
-            f"Cycling Backward: {backward}\n"
-            f"Broadcast Hotkeys: {len(broadcasts)}\n\n"
+            f"Cycling Backward: {backward}\n\n"
             f"Restart the app for hotkeys to take effect.",
         )
-        self.logger.info(
-            f"Saved hotkeys: forward={forward}, backward={backward}, broadcasts={len(broadcasts)}"
-        )
+        self.logger.info(f"Saved hotkeys: forward={forward}, backward={backward}")
 
     def get_cycling_group(self, name: str) -> List[str]:
         """Get members of a cycling group"""
@@ -601,93 +552,3 @@ class HotkeysTab(QWidget):
     def refresh_characters(self):
         """Refresh character list (called when characters change)"""
         self._populate_character_list()
-
-    # Broadcast hotkey methods
-
-    def _load_broadcast_hotkeys(self):
-        """Load broadcast hotkeys from settings"""
-        broadcasts = self.settings_manager.get("broadcast_hotkeys", [])
-        if not isinstance(broadcasts, list):
-            broadcasts = []
-
-        for entry in broadcasts:
-            if isinstance(entry, dict) and "trigger" in entry and "key_to_send" in entry:
-                self._add_broadcast_entry(entry["trigger"], entry["key_to_send"])
-
-    def _add_broadcast_entry(self, trigger: str = "", key_to_send: str = ""):
-        """Add a broadcast hotkey entry to the UI"""
-        entry_widget = QWidget()
-        entry_layout = QHBoxLayout()
-        entry_layout.setContentsMargins(0, 2, 0, 2)
-        entry_widget.setLayout(entry_layout)
-
-        # Trigger key edit
-        trigger_edit = HotkeyEdit()
-        trigger_edit.setPlaceholderText("Trigger key (e.g., Ctrl+F1)")
-        if trigger:
-            trigger_edit.setText(trigger)
-        entry_layout.addWidget(trigger_edit)
-
-        entry_layout.addWidget(QLabel("→"))
-
-        # Key to send edit
-        key_to_send_edit = HotkeyEdit()
-        key_to_send_edit.setPlaceholderText("Key to send (e.g., F1)")
-        if key_to_send:
-            key_to_send_edit.setText(key_to_send)
-        entry_layout.addWidget(key_to_send_edit)
-
-        # Remove button
-        remove_btn = QPushButton("×")
-        remove_btn.setMaximumWidth(30)
-        remove_btn.setToolTip("Remove this broadcast hotkey")
-        entry_layout.addWidget(remove_btn)
-
-        # Store entry reference
-        entry_data = {
-            "widget": entry_widget,
-            "trigger_edit": trigger_edit,
-            "key_to_send_edit": key_to_send_edit,
-        }
-        self.broadcast_entries.append(entry_data)
-
-        # Connect remove button
-        remove_btn.clicked.connect(lambda: self._remove_broadcast_entry(entry_data))
-
-        # Connect recording signals to pause/resume hotkey manager
-        if hasattr(self, "broadcast_recording_started"):
-            trigger_edit.recordingStarted.connect(self.broadcast_recording_started.emit)
-            trigger_edit.recordingStopped.connect(self.broadcast_recording_stopped.emit)
-            key_to_send_edit.recordingStarted.connect(self.broadcast_recording_started.emit)
-            key_to_send_edit.recordingStopped.connect(self.broadcast_recording_stopped.emit)
-
-        self.broadcast_container_layout.addWidget(entry_widget)
-
-    def _remove_broadcast_entry(self, entry_data: Dict):
-        """Remove a broadcast hotkey entry"""
-        if entry_data in self.broadcast_entries:
-            self.broadcast_entries.remove(entry_data)
-            entry_data["widget"].deleteLater()
-
-    def _save_broadcast_hotkeys(self):
-        """Save broadcast hotkeys to settings"""
-        broadcasts = []
-        for entry in self.broadcast_entries:
-            trigger = entry["trigger_edit"].text().strip()
-            key_to_send = entry["key_to_send_edit"].text().strip()
-            if trigger and key_to_send:
-                broadcasts.append({"trigger": trigger, "key_to_send": key_to_send})
-
-        self.settings_manager.set("broadcast_hotkeys", broadcasts, auto_save=True)
-        self.logger.info(f"Saved {len(broadcasts)} broadcast hotkeys")
-        return broadcasts
-
-    def get_broadcast_hotkeys(self) -> List[Dict[str, str]]:
-        """Get current broadcast hotkeys from UI"""
-        broadcasts = []
-        for entry in self.broadcast_entries:
-            trigger = entry["trigger_edit"].text().strip()
-            key_to_send = entry["key_to_send_edit"].text().strip()
-            if trigger and key_to_send:
-                broadcasts.append({"trigger": trigger, "key_to_send": key_to_send})
-        return broadcasts

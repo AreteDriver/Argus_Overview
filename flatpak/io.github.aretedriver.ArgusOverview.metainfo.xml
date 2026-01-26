@@ -9,13 +9,12 @@
   <description>
     <p>
       Argus Overview is the complete professional multi-boxing solution for EVE Online
-      that provides live window previews, team management, layout presets, broadcast
-      hotkeys, and EVE settings synchronization.
+      that provides live window previews, team management, layout presets,
+      hotkey controls, and EVE settings synchronization.
     </p>
     <p>Key features:</p>
     <ul>
       <li>Live window previews at configurable FPS (1-60)</li>
-      <li>Broadcast hotkeys - send keystrokes to all EVE windows</li>
       <li>Preview filter - quick search by character name</li>
       <li>Keyboard window control (1-9 keys)</li>
       <li>System tray integration with minimize-to-tray</li>
@@ -78,9 +77,8 @@
     </release>
     <release version="2.8.0" date="2026-01-10">
       <description>
-        <p>Broadcast Hotkeys and Preview Filter edition</p>
+        <p>Preview Filter and Keyboard Control edition</p>
         <ul>
-          <li>Broadcast hotkeys - send keystrokes to all EVE windows</li>
           <li>Preview filter - quick search by character name</li>
           <li>Keyboard window control (1-9 keys)</li>
         </ul>

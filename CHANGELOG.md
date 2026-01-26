@@ -22,11 +22,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [2.8.0] - 2026-01-10
 
 ### Added
-- **Broadcast Hotkeys** - Send keystrokes to all EVE windows simultaneously
-  - Configure trigger key (e.g., Ctrl+F1) and key to send (e.g., F1)
-  - Useful for fleet broadcasts (F1-F9), jump commands, etc.
-  - UI in Automation tab with add/remove entries
-  - Supports multiple broadcast hotkey mappings
 - **Preview Filter** - Quick filter in Overview toolbar to search windows by character name
   - Type to filter visible previews
   - Status bar shows filtered count
@@ -54,7 +49,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Now well under 1ms target, enabling higher frame rates
 
 ### Testing
-- Added 22 new tests for v2.7 features (broadcast hotkeys, preview filter, keyboard control)
+- Added tests for v2.7 features (preview filter, keyboard control)
 - Total test count: 1497
 
 ## [2.7.0] - 2026-01-10

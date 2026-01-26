@@ -58,7 +58,7 @@ Argus Overview uses a tabbed interface:
 | **Overview** | Live window previews, capture settings |
 | **Characters & Teams** | Character database, team management |
 | **Layouts** | Window arrangement presets |
-| **Automation** | Hotkeys, broadcast keys, alerts |
+| **Automation** | Hotkeys, cycling groups, alerts |
 | **Settings Sync** | EVE settings synchronization |
 | **Settings** | Application configuration |
 
@@ -149,7 +149,6 @@ Teams group characters for activities:
 - Auto-add windows when team members log in
 - Apply layouts to entire team
 - Sync settings to team members
-- Broadcast hotkeys to team
 
 ### Account Grouping
 
@@ -206,7 +205,7 @@ One-click arrangements:
 
 ## Automation Tab
 
-Configure hotkeys, broadcast keys, and alerts.
+Configure hotkeys and alerts.
 
 ### Global Hotkeys
 
@@ -220,20 +219,6 @@ Configure hotkeys, broadcast keys, and alerts.
 - Bind specific keys to specific characters
 - Example: Ctrl+1 → "Main Character"
 - Configure in the character hotkey list
-
-### Broadcast Hotkeys
-
-Send keystrokes to ALL EVE windows simultaneously:
-
-1. Click **Add Broadcast Key**
-2. Set **Trigger**: The key you press (e.g., Ctrl+F1)
-3. Set **Broadcast**: The key sent to EVE windows (e.g., F1)
-4. Enable the broadcast
-
-**Use Cases:**
-- Fleet broadcasts: Ctrl+F1 sends F1 to all clients
-- Jump commands: Ctrl+J sends Jump to all
-- Emergency warp: Ctrl+W sends warp-out to all
 
 ### Visual Alerts
 
@@ -379,7 +364,7 @@ The tray shows notifications for:
 
 ### Configurable
 
-Per-character hotkeys and broadcast keys are user-configurable in the Automation tab.
+Per-character hotkeys and cycling groups are user-configurable in the Automation tab.
 
 ---
 

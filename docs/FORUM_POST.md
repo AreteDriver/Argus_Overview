@@ -18,7 +18,7 @@ I'm excited to share **Argus Overview**, a native Linux application for managing
 
 ### What It Does
 
-Argus Overview provides live window previews, team management, and broadcast hotkeys for multiboxing EVE Online on Linux. Think of it as a command center for your fleet.
+Argus Overview provides live window previews, team management, and hotkey controls for multiboxing EVE Online on Linux. Think of it as a command center for your fleet.
 
 **Screenshot:** [Main window with 4 EVE previews in 2x2 grid]
 
@@ -27,7 +27,6 @@ Argus Overview provides live window previews, team management, and broadcast hot
 ### Key Features
 
 **NEW in v2.8:**
-- **Broadcast Hotkeys** - Send keystrokes to ALL EVE windows at once. Configure Ctrl+F1 to broadcast F1 to your entire fleet. Perfect for synchronized jump commands.
 - **Preview Filter** - Type to instantly filter windows by character name
 - **Keyboard Control** - Press 1-9 to activate windows by position
 
@@ -77,7 +76,7 @@ Available via Flathub (pending review)
 ### Use Cases
 
 **Mining Fleet:**
-Create "Mining Team" with your Orca + 3 miners. Set to 2x2 grid. Enable alerts for bumping or ganks. Use broadcast hotkey to recall drones on all accounts.
+Create "Mining Team" with your Orca + 3 miners. Set to 2x2 grid. Enable alerts for bumping or ganks.
 
 **PvP Operations:**
 FC in center, scouts and logi on sides. Red flash alerts let you react instantly to combat on any client. Press 5 to jump to your tackle alt when they get a point.
@@ -91,7 +90,7 @@ Keep one main window visible, others minimized. "Minimize Inactive" saves GPU wh
 
 - **ISBoxer**: Windows only, not natively supported on Linux
 - **EVE-O-Preview**: Windows only
-- **Virtual desktops**: No live previews, no alerts, no broadcast
+- **Virtual desktops**: No live previews, no alerts, no hotkey cycling
 - **Manual window management**: Life's too short
 
 Argus is MIT-licensed open source. No account linking, no third-party servers, no shenanigans.

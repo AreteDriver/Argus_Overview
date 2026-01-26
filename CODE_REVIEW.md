@@ -44,18 +44,7 @@ frame.window_activated.connect(self.main_tab._on_window_activated)
 - **Impact:** Memory leaks with long-running sessions
 - **Fix:** Add disconnection in closeEvent() or use weak references
 
-**1.2 Lambda Captures Preventing Garbage Collection**
-- **Location:** `src/argus_overview/ui/hotkeys_tab.py:655`
-- **Issue:** Lambda captures dict, preventing cleanup
-```python
-# ❌ PROBLEM
-remove_btn.clicked.connect(lambda: self._remove_broadcast_entry(entry_data))
-# entry_data kept alive longer than necessary
-```
-- **Impact:** Increased memory usage
-- **Fix:** Use `functools.partial` instead of lambda
-
-**1.3 Duplicate Code**
+**1.2 Duplicate Code**
 - **Location:** `src/argus_overview/core/alert_detector.py:118-188`
 - **Issue:** `_detect_red_flash_fast()` and `_detect_red_flash()` are nearly identical
 - **Impact:** Maintenance burden, potential for bugs

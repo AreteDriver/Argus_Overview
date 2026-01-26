@@ -185,73 +185,6 @@ class MainWindowV21(QMainWindow):
             f"Registered cycling hotkeys: next={cycle_next_combo}, prev={cycle_prev_combo}"
         )
 
-        # v2.7: Broadcast hotkeys
-        self._register_broadcast_hotkeys()
-
-    def _register_broadcast_hotkeys(self):
-        """Register broadcast hotkeys that send keys to all EVE windows"""
-        # Unregister existing broadcast hotkeys
-        existing = [name for name in self.hotkey_manager.hotkeys if name.startswith("broadcast_")]
-        for name in existing:
-            self.hotkey_manager.unregister_hotkey(name)
-
-        # Register new broadcast hotkeys from settings
-        broadcasts = self.settings_manager.get("broadcast_hotkeys", [])
-        if not isinstance(broadcasts, list):
-            broadcasts = []
-
-        registered = 0
-        for i, entry in enumerate(broadcasts):
-            if isinstance(entry, dict) and "trigger" in entry and "key_to_send" in entry:
-                trigger = entry["trigger"]
-                key_to_send = entry["key_to_send"]
-
-                def make_broadcast_callback(key=key_to_send):
-                    return lambda: self._broadcast_key(key)
-
-                name = f"broadcast_{i}_{key_to_send}"
-                if self.hotkey_manager.register_hotkey(name, trigger, make_broadcast_callback()):
-                    registered += 1
-
-        if registered > 0:
-            self.logger.info(f"Registered {registered} broadcast hotkeys")
-
-    def _broadcast_key(self, key: str):
-        """Send a key to all active EVE windows"""
-        if not hasattr(self, "main_tab") or not hasattr(self.main_tab, "window_manager"):
-            self.logger.warning("Cannot broadcast: no window manager")
-            return
-
-        # Convert pynput format to xdotool format
-        # e.g., <f1> -> F1, <ctrl>+<c> -> ctrl+c
-        xdotool_key = self._convert_to_xdotool_key(key)
-
-        # Get all EVE window IDs
-        window_ids = list(self.main_tab.window_manager.preview_frames.keys())
-        if not window_ids:
-            self.logger.debug("No EVE windows to broadcast to")
-            return
-
-        # Broadcast the key
-        count = self.capture_system.broadcast_key(window_ids, xdotool_key)
-        self.logger.info(f"Broadcast '{xdotool_key}' to {count}/{len(window_ids)} windows")
-
-    def _convert_to_xdotool_key(self, pynput_key: str) -> str:
-        """Convert pynput key format to xdotool format"""
-        # Remove angle brackets and convert to xdotool format
-        # <f1> -> F1
-        # <ctrl>+<c> -> ctrl+c
-        # <shift>+<f1> -> shift+F1
-        parts = pynput_key.split("+")
-        converted = []
-        for part in parts:
-            part = part.strip().strip("<>")
-            # Capitalize function keys
-            if part.lower().startswith("f") and part[1:].isdigit():
-                part = part.upper()
-            converted.append(part)
-        return "+".join(converted)
-
     @Slot()
     def _toggle_visibility(self):
         """Toggle main window visibility"""
@@ -624,13 +557,6 @@ class MainWindowV21(QMainWindow):
         self.hotkeys_tab.cycle_forward_edit.recordingStopped.connect(self.hotkey_manager.resume)
         self.hotkeys_tab.cycle_backward_edit.recordingStarted.connect(self.hotkey_manager.pause)
         self.hotkeys_tab.cycle_backward_edit.recordingStopped.connect(self.hotkey_manager.resume)
-
-        # v2.7: Broadcast hotkey recording signals
-        self.hotkeys_tab.broadcast_recording_started.connect(self.hotkey_manager.pause)
-        self.hotkeys_tab.broadcast_recording_stopped.connect(self.hotkey_manager.resume)
-
-        # Re-register broadcast hotkeys when they're saved
-        self.hotkeys_tab.broadcast_hotkeys_changed.connect(self._register_broadcast_hotkeys)
 
     def _create_settings_sync_tab(self):
         """Create Sync tab (EVE settings sync) - formerly 'Settings Sync'"""
