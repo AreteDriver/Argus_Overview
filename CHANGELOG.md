@@ -5,6 +5,19 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.4] - 2026-01-26
+
+### Removed
+- **Broadcast hotkeys** - Removed feature that violated EVE Online EULA (input broadcasting banned since Jan 2015)
+
+### Added
+- **Wayland detection** - Detects pure Wayland sessions and shows warning with workarounds
+- **Security policy** - Added SECURITY.md for vulnerability reporting
+- **Portable tarball** - New build script for portable distribution
+
+### Fixed
+- Unused import lint errors in tests
+
 ## [2.8.1] - 2026-01-12
 
 ### Added
