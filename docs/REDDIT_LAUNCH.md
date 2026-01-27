@@ -37,7 +37,6 @@ Think EVE-O Preview, but native Linux with even more features.
 
 ## Screenshots
 
-<!-- Screenshots needed: capture and add to docs/screenshots/ then update these paths -->
 ![Main Window](https://raw.githubusercontent.com/AreteDriver/Argus_Overview/main/docs/screenshots/main-window.png)
 *Main window with live previews of all EVE clients*
 

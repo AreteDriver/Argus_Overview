@@ -5,6 +5,24 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.5] - 2026-01-27
+
+### Added
+- Config schema validation for characters, teams, and layout presets (#19)
+- Input validation for EVE settings sync imports (#23)
+- Character name sanitization against path traversal (#25)
+- X11 subprocess retry logic with exponential backoff (#21)
+- UniqueConnection flags to prevent duplicate signal connections (#24)
+- Architecture and thread-safety documentation (#26)
+
+### Fixed
+- Memory leak from Qt signal connections never disconnected on close (#18)
+- UI lag from missing debounce on widget rebuild methods (#22)
+
+### Changed
+- Consolidated duplicate alert detection methods into single function (#20)
+- Updated Reddit launch post screenshots (#27)
+
 ## [2.8.4] - 2026-01-26
 
 ### Removed
