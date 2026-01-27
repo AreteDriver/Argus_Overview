@@ -1736,14 +1736,24 @@ class TestGridApplierExtended:
 
         applier = GridApplier()
 
-        with patch("subprocess.run") as mock_run:
+        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
-            applier._move_window("12345", 0, 0, 960, 540)
+            applier._move_window("0x03800003", 0, 0, 960, 540)
 
             assert mock_run.called
             call_args = mock_run.call_args[0][0]
             assert "xdotool" in call_args
+
+    def test_move_window_rejects_invalid_id(self):
+        """Test _move_window rejects invalid window ID."""
+        from argus_overview.ui.main_tab import GridApplier
+
+        applier = GridApplier()
+
+        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
+            applier._move_window("12345", 0, 0, 960, 540)
+            mock_run.assert_not_called()
 
     def test_move_window_position_only(self):
         """Test _move_window_position_only"""
@@ -1751,10 +1761,10 @@ class TestGridApplierExtended:
 
         applier = GridApplier()
 
-        with patch("subprocess.run") as mock_run:
+        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
-            applier._move_window_position_only("12345", 100, 200)
+            applier._move_window_position_only("0x03800003", 100, 200)
 
             assert mock_run.called
             call_args = mock_run.call_args[0][0]
@@ -2637,10 +2647,13 @@ class TestWindowPreviewWidgetActions:
                 mock_msgbox.StandardButton.No = 0
                 mock_msgbox.question.return_value = 1
 
-                with patch("subprocess.run", side_effect=Exception("wmctrl failed")):
+                with patch(
+                    "argus_overview.utils.window_utils.subprocess.run",
+                    side_effect=Exception("wmctrl failed"),
+                ):
                     widget._close_window()
 
-                    widget.logger.error.assert_called()
+                    widget.logger.warning.assert_called()
 
     def test_minimize_window_success(self):
         """Test _minimize_window success"""
@@ -3454,21 +3467,20 @@ class TestGridApplierTimeout:
 
         from argus_overview.ui.main_tab import GridApplier
 
-        with patch.object(GridApplier, "__init__", return_value=None):
-            applier = GridApplier.__new__(GridApplier)
+        applier = GridApplier()
 
-            with patch("subprocess.run") as mock_run:
-                # First call raises timeout, second succeeds
-                mock_run.side_effect = [
-                    subprocess.TimeoutExpired("xdotool", 2),
-                    MagicMock(),  # Fallback windowmove
-                    MagicMock(),  # windowsize with sync
-                ]
+        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
+            # First call raises timeout, second succeeds (retry inside run_x11_subprocess)
+            # then windowsize call succeeds
+            mock_run.side_effect = [
+                subprocess.TimeoutExpired("xdotool", 2),
+                MagicMock(returncode=0),  # Retry of windowmove --sync
+                MagicMock(returncode=0),  # windowsize with sync
+            ]
 
-                applier._move_window("12345", 100, 100, 800, 600)
+            applier._move_window("0x03800003", 100, 100, 800, 600)
 
-                # Should have made 3 calls: timeout + fallback + size
-                assert mock_run.call_count >= 2
+            assert mock_run.call_count >= 2
 
     def test_move_window_size_timeout_fallback(self):
         """Test _move_window size uses fallback on timeout"""
@@ -3476,20 +3488,19 @@ class TestGridApplierTimeout:
 
         from argus_overview.ui.main_tab import GridApplier
 
-        with patch.object(GridApplier, "__init__", return_value=None):
-            applier = GridApplier.__new__(GridApplier)
+        applier = GridApplier()
 
-            with patch("subprocess.run") as mock_run:
-                # Move succeeds, size times out, fallback succeeds
-                mock_run.side_effect = [
-                    MagicMock(),  # windowmove with sync
-                    subprocess.TimeoutExpired("xdotool", 2),
-                    MagicMock(),  # Fallback windowsize
-                ]
+        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
+            # Move succeeds, size times out then retry succeeds
+            mock_run.side_effect = [
+                MagicMock(returncode=0),  # windowmove with sync
+                subprocess.TimeoutExpired("xdotool", 2),
+                MagicMock(returncode=0),  # Retry windowsize
+            ]
 
-                applier._move_window("12345", 100, 100, 800, 600)
+            applier._move_window("0x03800003", 100, 100, 800, 600)
 
-                assert mock_run.call_count >= 2
+            assert mock_run.call_count >= 2
 
     def test_move_window_position_only_timeout(self):
         """Test _move_window_position_only timeout fallback"""
@@ -3497,18 +3508,17 @@ class TestGridApplierTimeout:
 
         from argus_overview.ui.main_tab import GridApplier
 
-        with patch.object(GridApplier, "__init__", return_value=None):
-            applier = GridApplier.__new__(GridApplier)
+        applier = GridApplier()
 
-            with patch("subprocess.run") as mock_run:
-                mock_run.side_effect = [
-                    subprocess.TimeoutExpired("xdotool", 2),
-                    MagicMock(),
-                ]
+        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
+            mock_run.side_effect = [
+                subprocess.TimeoutExpired("xdotool", 2),
+                MagicMock(returncode=0),
+            ]
 
-                applier._move_window_position_only("12345", 100, 100)
+            applier._move_window_position_only("0x03800003", 100, 100)
 
-                assert mock_run.call_count == 2
+            assert mock_run.call_count == 2
 
 
 # =============================================================================

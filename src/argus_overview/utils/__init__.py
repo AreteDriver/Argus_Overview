@@ -15,6 +15,7 @@ from .window_utils import (
     get_focused_window,
     is_valid_window_id,
     move_window,
+    run_x11_subprocess,
 )
 
 __all__ = [
@@ -32,4 +33,5 @@ __all__ = [
     "move_window",
     "activate_window",
     "get_focused_window",
+    "run_x11_subprocess",
 ]

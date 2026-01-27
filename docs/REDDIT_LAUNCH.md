@@ -37,11 +37,15 @@ Think EVE-O Preview, but native Linux with even more features.
 
 ## Screenshots
 
-[Main Window - TODO: Add actual screenshot link]
+<!-- Screenshots needed: capture and add to docs/screenshots/ then update these paths -->
+![Main Window](https://raw.githubusercontent.com/AreteDriver/Argus_Overview/main/docs/screenshots/main-window.png)
+*Main window with live previews of all EVE clients*
 
-[Team Management - TODO: Add actual screenshot link]
+![Team Management](https://raw.githubusercontent.com/AreteDriver/Argus_Overview/main/docs/screenshots/team-management.png)
+*Team management - group characters by activity*
 
-[Visual Alerts - TODO: Add actual screenshot link]
+![Visual Alerts](https://raw.githubusercontent.com/AreteDriver/Argus_Overview/main/docs/screenshots/visual-alerts.png)
+*Visual alerts - red flash detection for combat warnings*
 
 ---
 

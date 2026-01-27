@@ -1,11 +1,33 @@
-"""
-Threaded Window Capture System
-High-performance capture with background threading
+"""Threaded window capture system for X11 windows.
+
+Architecture role:
+    Core capture engine used by the Overview tab to produce live window
+    thumbnails. Sits beneath the UI layer and is owned by MainWindowV21,
+    which starts/stops it during application lifecycle.
+
+Threading model:
+    A pool of daemon worker threads (default 4) consume capture requests
+    from ``capture_queue`` and place results on ``result_queue``.  Both
+    queues are stdlib ``queue.Queue`` (thread-safe).  The ``_stop_event``
+    (``threading.Event``) coordinates graceful shutdown.
+
+    Workers call ``subprocess.run`` to invoke ImageMagick ``import`` and
+    ``wmctrl``/``xdotool`` for window management.  These are blocking I/O
+    calls isolated to worker threads; callers on the Qt main thread use
+    ``capture_window_async`` (non-blocking put) and poll ``get_result``.
+
+Thread-safety guarantees:
+    * ``capture_window_async`` and ``get_result`` are safe to call from
+      any thread (queue operations are atomic).
+    * ``start`` and ``stop`` should be called from a single owner thread
+      (typically the Qt main thread).
+    * ``get_window_list``, ``activate_window``, ``minimize_window``, and
+      ``restore_window`` are stateless subprocess calls, safe from any
+      thread but will block the caller until the subprocess completes.
 """
 
 import io
 import logging
-import re
 import subprocess
 import threading
 import uuid
@@ -14,13 +36,7 @@ from typing import Any, List, Optional, Tuple
 
 from PIL import Image
 
-# X11 window ID pattern: 0x followed by hex digits
-_WINDOW_ID_PATTERN = re.compile(r"^0x[0-9a-fA-F]+$")
-
-
-def _is_valid_window_id(window_id: str) -> bool:
-    """Validate X11 window ID format."""
-    return bool(window_id and isinstance(window_id, str) and _WINDOW_ID_PATTERN.match(window_id))
+from argus_overview.utils.window_utils import is_valid_window_id, run_x11_subprocess
 
 
 class WindowCaptureThreaded:
@@ -81,7 +97,7 @@ class WindowCaptureThreaded:
         Returns:
             request_id to retrieve result later (empty string if invalid window_id)
         """
-        if not _is_valid_window_id(window_id):
+        if not is_valid_window_id(window_id):
             self.logger.warning(f"Invalid window ID format for capture: {window_id}")
             return ""
         request_id = str(uuid.uuid4())
@@ -103,7 +119,7 @@ class WindowCaptureThreaded:
         """Synchronous window capture"""
         try:
             result = subprocess.run(
-                ["import", "-window", window_id, "-silent", "png:-"], capture_output=True, timeout=1
+                ["import", "-window", window_id, "-silent", "png:-"], capture_output=True, timeout=2
             )
 
             if result.returncode == 0 and result.stdout:
@@ -120,63 +136,57 @@ class WindowCaptureThreaded:
         return None
 
     def get_window_list(self) -> List[Tuple[str, str]]:
-        """Get list of all windows"""
+        """Get list of all windows (with retry)"""
         try:
-            result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, timeout=2)
+            result = run_x11_subprocess(["wmctrl", "-l"], timeout=2)
+            stdout = result.stdout.decode("utf-8", errors="replace")
 
             windows = []
-            if result.returncode == 0:
-                for line in result.stdout.strip().split("\n"):
-                    if line:
-                        parts = line.split(None, 3)
-                        if len(parts) >= 4:
-                            window_id = parts[0]
-                            window_title = parts[3]
-                            windows.append((window_id, window_title))
+            for line in stdout.strip().split("\n"):
+                if line:
+                    parts = line.split(None, 3)
+                    if len(parts) >= 4:
+                        window_id = parts[0]
+                        window_title = parts[3]
+                        windows.append((window_id, window_title))
 
             return windows
         except Exception as e:
-            self.logger.error(f"Failed to get window list: {e}")
+            self.logger.warning(f"Failed to get window list: {e}")
             return []
 
     def activate_window(self, window_id: str) -> bool:
-        """Activate/focus a window"""
-        if not _is_valid_window_id(window_id):
+        """Activate/focus a window (with retry)"""
+        if not is_valid_window_id(window_id):
             self.logger.warning(f"Invalid window ID format: {window_id}")
             return False
         try:
-            result = subprocess.run(
-                ["wmctrl", "-i", "-a", window_id], capture_output=True, timeout=1
-            )
-            return result.returncode == 0
+            run_x11_subprocess(["wmctrl", "-i", "-a", window_id], timeout=2)
+            return True
         except Exception as e:
-            self.logger.debug(f"Failed to activate window {window_id}: {e}")
+            self.logger.warning(f"Failed to activate window {window_id}: {e}")
             return False
 
     def minimize_window(self, window_id: str) -> bool:
-        """Minimize a window"""
-        if not _is_valid_window_id(window_id):
+        """Minimize a window (with retry)"""
+        if not is_valid_window_id(window_id):
             self.logger.warning(f"Invalid window ID format: {window_id}")
             return False
         try:
-            result = subprocess.run(
-                ["xdotool", "windowminimize", window_id], capture_output=True, timeout=1
-            )
-            return result.returncode == 0
+            run_x11_subprocess(["xdotool", "windowminimize", window_id], timeout=2)
+            return True
         except Exception as e:
-            self.logger.debug(f"Failed to minimize window {window_id}: {e}")
+            self.logger.warning(f"Failed to minimize window {window_id}: {e}")
             return False
 
     def restore_window(self, window_id: str) -> bool:
-        """Restore a minimized window"""
-        if not _is_valid_window_id(window_id):
+        """Restore a minimized window (with retry)"""
+        if not is_valid_window_id(window_id):
             self.logger.warning(f"Invalid window ID format: {window_id}")
             return False
         try:
-            result = subprocess.run(
-                ["xdotool", "windowactivate", window_id], capture_output=True, timeout=1
-            )
-            return result.returncode == 0
+            run_x11_subprocess(["xdotool", "windowactivate", window_id], timeout=2)
+            return True
         except Exception as e:
-            self.logger.debug(f"Failed to restore window {window_id}: {e}")
+            self.logger.warning(f"Failed to restore window {window_id}: {e}")
             return False

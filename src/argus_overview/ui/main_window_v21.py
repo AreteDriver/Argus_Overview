@@ -1,14 +1,52 @@
-"""
-Main Window v2.2 with Tabbed Interface
-Production implementation with all core modules integrated
-v2.2: Added system tray, auto-discovery, themes, hotkey enhancements
+"""Top-level application window (QMainWindow) with tabbed interface.
+
+Architecture role:
+    Owns and orchestrates every core subsystem: capture engine, character
+    manager, layout manager, alert detector, hotkey manager, auto-discovery,
+    settings, and system tray.  Acts as the signal hub connecting tab widgets
+    to core modules and to each other.
+
+Threading model:
+    The window and all Qt widgets live on the **main (GUI) thread**.
+    Background work is delegated to:
+
+    * ``WindowCaptureThreaded`` — daemon worker threads for screenshot
+      capture (see ``core.window_capture_threaded``).
+    * ``HotkeyManager`` — background listener thread for global hotkeys
+      (callbacks are invoked on the listener thread and must be
+      thread-safe or use ``QMetaObject.invokeMethod`` to bounce to the
+      GUI thread).
+    * ``AutoDiscovery`` — uses a ``QTimer`` on the main thread, so its
+      signals (``new_character_found``, ``character_gone``) are emitted
+      on the main thread and safe to connect directly to slots here.
+
+Key signals (emitted → consumed):
+    * ``MainTab.character_detected(str, str)`` → ``_on_character_detected``
+      — new EVE window matched to a character name.
+    * ``MainTab.layout_applied(str)`` → ``_on_layout_applied``
+      — a layout preset was applied to EVE windows.
+    * ``CharactersTeamsTab.team_selected(object)`` → ``_on_team_selected``
+      — user selected a team in the Roster tab.
+    * ``SettingsTab.settings_changed(str, object)`` → ``_apply_setting``
+      — a setting value changed; routed to the appropriate subsystem.
+    * ``AutoDiscovery.new_character_found(str, str, str)`` →
+      ``_on_new_character_discovered`` — EVE client window appeared.
+    * ``AutoDiscovery.character_gone(str, str)`` → ``_on_character_gone``
+      — EVE client window closed.
+    * ``SystemTray.*_requested`` signals → corresponding ``_slots`` above
+      for tray menu actions.
+
+Lifecycle:
+    ``__init__`` creates all subsystems and starts capture, hotkeys, and
+    auto-discovery.  ``closeEvent`` performs ordered teardown: disconnect
+    signals, stop timers, stop threads, hide tray, persist settings.
 """
 
 import logging
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Slot
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
 
@@ -299,7 +337,7 @@ class MainWindowV21(QMainWindow):
                     subprocess.run(
                         ["xdotool", "windowminimize", last_eve_window],
                         capture_output=True,
-                        timeout=1,
+                        timeout=2,
                     )
                     self.logger.info(f"Auto-minimized previous EVE window: {last_eve_window}")
 
@@ -412,8 +450,14 @@ class MainWindowV21(QMainWindow):
             if window_id not in self.main_tab.window_manager.preview_frames:
                 frame = self.main_tab.window_manager.add_window(window_id, char_name)
                 if frame:
-                    frame.window_activated.connect(self.main_tab._on_window_activated)
-                    frame.window_removed.connect(self.main_tab._on_window_removed)
+                    frame.window_activated.connect(
+                        self.main_tab._on_window_activated,
+                        Qt.ConnectionType.UniqueConnection,
+                    )
+                    frame.window_removed.connect(
+                        self.main_tab._on_window_removed,
+                        Qt.ConnectionType.UniqueConnection,
+                    )
                     self.main_tab.preview_layout.addWidget(frame)
                     self.main_tab._update_status()
 
@@ -550,7 +594,7 @@ class MainWindowV21(QMainWindow):
         self.tabs.addTab(self.hotkeys_tab, "Automation")
 
         # Connect group changes to refresh layout sources in overview tab
-        self.hotkeys_tab.group_changed.connect(lambda: self.main_tab.refresh_layout_groups())
+        self.hotkeys_tab.group_changed.connect(self.main_tab.refresh_layout_groups)
 
         # Pause/resume hotkey listeners during key recording to avoid X11 conflicts
         self.hotkeys_tab.cycle_forward_edit.recordingStarted.connect(self.hotkey_manager.pause)
@@ -581,6 +625,95 @@ class MainWindowV21(QMainWindow):
         """Connect cross-tab signals for integration"""
         # Will be implemented as tabs are completed
         self.logger.debug("Signal connections ready")
+
+    def _disconnect_signals(self):
+        """Disconnect all dynamic signals to allow GC on close"""
+        pairs = [
+            # main_tab signals
+            (
+                self,
+                "main_tab",
+                [
+                    ("character_detected", self._on_character_detected),
+                    ("layout_applied", self._on_layout_applied),
+                ],
+            ),
+            # characters_tab signals
+            (
+                self,
+                "characters_tab",
+                [
+                    ("team_selected", self._on_team_selected),
+                ],
+            ),
+            # settings_tab signals
+            (
+                self,
+                "settings_tab",
+                [
+                    ("settings_changed", self._apply_setting),
+                ],
+            ),
+            # hotkeys_tab signals
+            (
+                self,
+                "hotkeys_tab",
+                [
+                    ("group_changed", self.main_tab.refresh_layout_groups),
+                ],
+            ),
+            # system_tray signals
+            (
+                self,
+                "system_tray",
+                [
+                    ("show_hide_requested", self._toggle_visibility),
+                    ("toggle_thumbnails_requested", self._toggle_thumbnails),
+                    ("minimize_all_requested", self._minimize_all_windows),
+                    ("restore_all_requested", self._restore_all_windows),
+                    ("profile_selected", self._on_profile_selected),
+                    ("settings_requested", self._show_settings),
+                    ("reload_config_requested", self._reload_config),
+                    ("quit_requested", self._quit_application),
+                ],
+            ),
+            # auto_discovery signals
+            (
+                self,
+                "auto_discovery",
+                [
+                    ("new_character_found", self._on_new_character_discovered),
+                    ("character_gone", self._on_character_gone),
+                ],
+            ),
+        ]
+
+        for obj, attr, signal_slot_list in pairs:
+            if not hasattr(obj, attr):
+                continue
+            source = getattr(obj, attr)
+            for signal_name, slot in signal_slot_list:
+                try:
+                    getattr(source, signal_name).disconnect(slot)
+                except (RuntimeError, TypeError):
+                    pass  # Already disconnected or widget destroyed
+
+        # Hotkey recording pause/resume signals
+        if hasattr(self, "hotkeys_tab"):
+            for edit_name in ("cycle_forward_edit", "cycle_backward_edit"):
+                edit = getattr(self.hotkeys_tab, edit_name, None)
+                if edit is None:
+                    continue
+                for sig_name, slot in [
+                    ("recordingStarted", self.hotkey_manager.pause),
+                    ("recordingStopped", self.hotkey_manager.resume),
+                ]:
+                    try:
+                        getattr(edit, sig_name).disconnect(slot)
+                    except (RuntimeError, TypeError):
+                        pass
+
+        self.logger.debug("Signals disconnected")
 
     @Slot(str, object)
     def _apply_setting(self, key: str, value):
@@ -765,6 +898,13 @@ class MainWindowV21(QMainWindow):
 
         # Actually closing the application
         self.logger.info("Shutting down Argus Overview v2.4...")
+
+        # Disconnect signals to break reference cycles
+        self._disconnect_signals()
+
+        # Stop capture timer in main_tab
+        if hasattr(self, "main_tab"):
+            self.main_tab.stop_capture_loop()
 
         # Stop systems
         if hasattr(self, "auto_discovery"):

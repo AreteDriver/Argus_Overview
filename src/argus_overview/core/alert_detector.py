@@ -86,7 +86,7 @@ class AlertDetector:
         small_rgb = image.resize(self.RED_FLASH_SIZE, Image.Resampling.NEAREST)
 
         # Check for red flash (damage indicator) using pre-resized image
-        if self._detect_red_flash_fast(small_rgb):
+        if self._detect_red_flash(small_rgb, pre_resized=True):
             alert_level = AlertLevel.HIGH
             self.logger.info(f"RED FLASH detected in window {window_id}")
 
@@ -115,56 +115,24 @@ class AlertDetector:
     # Size for red flash detection (balance between accuracy and speed)
     RED_FLASH_SIZE = (160, 90)  # 16:9 aspect, ~14K pixels vs 2M pixels
 
-    def _detect_red_flash_fast(self, small_rgb: Image.Image) -> bool:
-        """Detect red flash in pre-resized RGB image
-
-        Args:
-            small_rgb: Pre-resized RGB image (RED_FLASH_SIZE)
-
-        Returns:
-            True if red flash detected
-        """
-        try:
-            # Convert to RGB array (already small)
-            img_array = np.array(small_rgb)
-
-            # Extract color channels
-            r = img_array[:, :, 0].astype(np.int16)
-            g = img_array[:, :, 1].astype(np.int16)
-            b = img_array[:, :, 2].astype(np.int16)
-
-            # Calculate red dominance
-            # Red flash: R > G+B and R > threshold
-            red_dominant = (r > (g + b)) & (r > 200)
-
-            # Calculate percentage of red pixels
-            total_pixels = r.size
-            red_pixels = np.sum(red_dominant)
-            red_percentage = red_pixels / total_pixels
-
-            # Alert if significant portion is red
-            return red_percentage > self.config.red_flash_threshold
-
-        except Exception as e:
-            self.logger.error(f"Red flash detection error: {e}")
-            return False
-
-    def _detect_red_flash(self, image: Image.Image) -> bool:
+    def _detect_red_flash(self, image: Image.Image, pre_resized: bool = False) -> bool:
         """Detect red flash in image (damage indicator)
 
         Args:
             image: Image to analyze
+            pre_resized: If True, skip resize (image already at RED_FLASH_SIZE)
 
         Returns:
             True if red flash detected
         """
         try:
-            # Resize for faster processing - red flash is a global effect
-            # so we don't need full resolution
-            small = image.resize(self.RED_FLASH_SIZE, Image.Resampling.NEAREST)
-
-            # Convert to RGB array
-            img_array = np.array(small.convert("RGB"))
+            if pre_resized:
+                img_array = np.array(image)
+            else:
+                # Resize for faster processing - red flash is a global effect
+                # so we don't need full resolution
+                small = image.resize(self.RED_FLASH_SIZE, Image.Resampling.NEAREST)
+                img_array = np.array(small.convert("RGB"))
 
             # Extract color channels
             r = img_array[:, :, 0].astype(np.int16)

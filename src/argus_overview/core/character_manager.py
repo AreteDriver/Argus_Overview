@@ -5,10 +5,30 @@ Handles EVE character database, account grouping, and activity-based teams
 
 import json
 import logging
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+
+
+def sanitize_character_name(name: str) -> str:
+    """Sanitize a character name to prevent path traversal and injection.
+
+    Removes path separators, null bytes, and other dangerous characters.
+    Returns a safe name or raises ValueError if result is empty.
+    """
+    # Remove path separators and null bytes
+    sanitized = re.sub(r"[/\\:\x00]", "", name)
+    # Remove leading/trailing dots and spaces (prevents .. traversal)
+    sanitized = sanitized.strip(". ")
+    # Limit length
+    sanitized = sanitized[:100]
+
+    if not sanitized:
+        raise ValueError(f"Invalid character name: '{name}' produces empty name after sanitization")
+
+    return sanitized
 
 
 @dataclass
@@ -74,6 +94,45 @@ class CharacterManager:
 
         self._load_data()
 
+    @staticmethod
+    def _validate_character_data(data) -> bool:
+        """Validate character dict has required fields with correct types."""
+        if not isinstance(data, dict):
+            return False
+        if "name" not in data or not isinstance(data["name"], str) or not data["name"]:
+            return False
+        type_checks = {
+            "account": str,
+            "role": str,
+            "notes": str,
+            "is_main": bool,
+        }
+        for key, expected_type in type_checks.items():
+            if key in data and data[key] is not None:
+                if not isinstance(data[key], expected_type):
+                    return False
+        return True
+
+    @staticmethod
+    def _validate_team_data(data) -> bool:
+        """Validate team dict has required fields with correct types."""
+        if not isinstance(data, dict):
+            return False
+        if "name" not in data or not isinstance(data["name"], str) or not data["name"]:
+            return False
+        type_checks = {
+            "description": str,
+            "layout_name": str,
+            "color": str,
+        }
+        for key, expected_type in type_checks.items():
+            if key in data and data[key] is not None:
+                if not isinstance(data[key], expected_type):
+                    return False
+        if "characters" in data and not isinstance(data.get("characters"), list):
+            return False
+        return True
+
     def _load_data(self):
         """Load characters and teams from disk"""
         # Load characters
@@ -81,9 +140,17 @@ class CharacterManager:
             try:
                 with open(self.characters_file) as f:
                     data = json.load(f)
-                    self.characters = {
-                        name: Character.from_dict(char_data) for name, char_data in data.items()
-                    }
+                    if not isinstance(data, dict):
+                        self.logger.warning("Characters file is not a JSON object, using defaults")
+                    else:
+                        for name, char_data in data.items():
+                            if self._validate_character_data(char_data):
+                                self.characters[name] = Character.from_dict(char_data)
+                            else:
+                                self.logger.warning(
+                                    f"Skipping invalid character entry '{name}': "
+                                    "missing or malformed fields"
+                                )
                 self.logger.info(f"Loaded {len(self.characters)} characters")
             except Exception as e:
                 self.logger.error(f"Failed to load characters: {e}")
@@ -93,9 +160,17 @@ class CharacterManager:
             try:
                 with open(self.teams_file) as f:
                     data = json.load(f)
-                    self.teams = {
-                        name: Team.from_dict(team_data) for name, team_data in data.items()
-                    }
+                    if not isinstance(data, dict):
+                        self.logger.warning("Teams file is not a JSON object, using defaults")
+                    else:
+                        for name, team_data in data.items():
+                            if self._validate_team_data(team_data):
+                                self.teams[name] = Team.from_dict(team_data)
+                            else:
+                                self.logger.warning(
+                                    f"Skipping invalid team entry '{name}': "
+                                    "missing or malformed fields"
+                                )
                 self.logger.info(f"Loaded {len(self.teams)} teams")
             except Exception as e:
                 self.logger.error(f"Failed to load teams: {e}")
@@ -122,6 +197,14 @@ class CharacterManager:
     # Character Management
     def add_character(self, character: Character) -> bool:
         """Add a character to the database"""
+        try:
+            sanitized = sanitize_character_name(character.name)
+        except ValueError:
+            self.logger.error(f"Rejected invalid character name: '{character.name}'")
+            return False
+
+        character.name = sanitized
+
         if character.name in self.characters:
             self.logger.warning(f"Character '{character.name}' already exists")
             return False
@@ -292,16 +375,47 @@ class CharacterManager:
             Number of new characters imported
         """
         imported = 0
+        required_attrs = ("character_name", "character_id", "last_seen")
 
         for eve_char in eve_characters:
-            char_name = eve_char.character_name
+            # Validate required attributes exist
+            missing = [attr for attr in required_attrs if not hasattr(eve_char, attr)]
+            if missing:
+                self.logger.warning(
+                    f"Skipping malformed EVE character: missing attributes {missing}"
+                )
+                continue
+
+            try:
+                char_name = sanitize_character_name(eve_char.character_name)
+            except (ValueError, TypeError):
+                self.logger.warning(
+                    f"Skipping EVE character with invalid name: {eve_char.character_name!r}"
+                )
+                continue
+
+            # Validate character_id is present
+            if eve_char.character_id is None:
+                self.logger.warning(f"Skipping EVE character '{char_name}': missing character_id")
+                continue
 
             # Skip if already exists
             if char_name in self.characters:
                 # Update last_seen if we have new data
-                if eve_char.last_seen:
-                    self.characters[char_name].last_seen = eve_char.last_seen.isoformat()
+                try:
+                    if eve_char.last_seen:
+                        self.characters[char_name].last_seen = eve_char.last_seen.isoformat()
+                except AttributeError:
+                    self.logger.warning(f"Invalid last_seen for existing character '{char_name}'")
                 continue
+
+            # Build last_seen safely
+            last_seen_str = None
+            if eve_char.last_seen is not None:
+                try:
+                    last_seen_str = eve_char.last_seen.isoformat()
+                except AttributeError:
+                    self.logger.warning(f"Invalid last_seen for '{char_name}', ignoring timestamp")
 
             # Create new character entry
             character = Character(
@@ -311,7 +425,7 @@ class CharacterManager:
                 notes=f"Imported from EVE. ID: {eve_char.character_id}",
                 is_main=False,
                 window_id=None,
-                last_seen=eve_char.last_seen.isoformat() if eve_char.last_seen else None,
+                last_seen=last_seen_str,
             )
 
             self.characters[char_name] = character

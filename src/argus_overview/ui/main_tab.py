@@ -498,49 +498,51 @@ class GridApplier:
             return False
 
     def _move_window(self, window_id: str, x: int, y: int, w: int, h: int):
-        """Move and resize a window, with fallback for Wine/Proton windows"""
+        """Move and resize a window, with validation, retry, and Wine/Proton fallback"""
         import time
+
+        from argus_overview.utils.window_utils import is_valid_window_id, run_x11_subprocess
+
+        if not is_valid_window_id(window_id):
+            self.logger.warning("Invalid window ID format for move: %s", window_id)
+            return
 
         # Try with --sync first, fallback to no-sync for Wine/Proton windows
         try:
-            subprocess.run(
+            run_x11_subprocess(
                 ["xdotool", "windowmove", "--sync", window_id, str(x), str(y)],
-                capture_output=True,
                 timeout=2,
             )
         except subprocess.TimeoutExpired:
-            # Wine windows don't respond to sync, retry without it
-            subprocess.run(
-                ["xdotool", "windowmove", window_id, str(x), str(y)], capture_output=True, timeout=2
-            )
+            run_x11_subprocess(["xdotool", "windowmove", window_id, str(x), str(y)], timeout=2)
             time.sleep(0.1)  # Brief pause for window to settle
 
         try:
-            subprocess.run(
+            run_x11_subprocess(
                 ["xdotool", "windowsize", "--sync", window_id, str(w), str(h)],
-                capture_output=True,
                 timeout=2,
             )
         except subprocess.TimeoutExpired:
-            subprocess.run(
-                ["xdotool", "windowsize", window_id, str(w), str(h)], capture_output=True, timeout=2
-            )
+            run_x11_subprocess(["xdotool", "windowsize", window_id, str(w), str(h)], timeout=2)
             time.sleep(0.1)
 
     def _move_window_position_only(self, window_id: str, x: int, y: int):
-        """Move a window without resizing (keeps current size)"""
+        """Move a window without resizing, with validation, retry, and Wine/Proton fallback"""
         import time
 
+        from argus_overview.utils.window_utils import is_valid_window_id, run_x11_subprocess
+
+        if not is_valid_window_id(window_id):
+            self.logger.warning("Invalid window ID format for position move: %s", window_id)
+            return
+
         try:
-            subprocess.run(
+            run_x11_subprocess(
                 ["xdotool", "windowmove", "--sync", window_id, str(x), str(y)],
-                capture_output=True,
                 timeout=2,
             )
         except subprocess.TimeoutExpired:
-            subprocess.run(
-                ["xdotool", "windowmove", window_id, str(x), str(y)], capture_output=True, timeout=2
-            )
+            run_x11_subprocess(["xdotool", "windowmove", window_id, str(x), str(y)], timeout=2)
             time.sleep(0.1)
 
 
@@ -981,14 +983,14 @@ class WindowPreviewWidget(QWidget):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
+            from argus_overview.utils.window_utils import run_x11_subprocess
+
             try:
-                subprocess.run(
-                    ["wmctrl", "-i", "-c", self.window_id], capture_output=True, timeout=2
-                )
+                run_x11_subprocess(["wmctrl", "-i", "-c", self.window_id], timeout=2)
                 self.logger.info(f"Closed window: {self.window_id}")
                 self.window_removed.emit(self.window_id)
             except Exception as e:
-                self.logger.error(f"Failed to close window: {e}")
+                self.logger.warning(f"Failed to close window after retries: {e}")
 
     def _minimize_window(self):
         """Minimize the window"""
@@ -1200,6 +1202,11 @@ class MainTab(QWidget):
         )
 
         # v2.3: Layout controls
+        self._refresh_sources_timer = QTimer()
+        self._refresh_sources_timer.setSingleShot(True)
+        self._refresh_sources_timer.setInterval(150)
+        self._refresh_sources_timer.timeout.connect(self._do_refresh_layout_sources)
+
         self.grid_applier = GridApplier()
         self.cycling_groups: Dict[str, List[str]] = {}
         self._load_cycling_groups()
@@ -1460,7 +1467,14 @@ class MainTab(QWidget):
         return section
 
     def _refresh_layout_sources(self):
-        """Refresh available sources (groups and active windows)"""
+        """Schedule debounced layout sources refresh"""
+        if hasattr(self, "_refresh_sources_timer"):
+            self._refresh_sources_timer.start()
+        else:
+            self._do_refresh_layout_sources()
+
+    def _do_refresh_layout_sources(self):
+        """Refresh available sources (groups and active windows) (debounced)"""
         self._load_cycling_groups()
 
         current = (
@@ -1615,8 +1629,12 @@ class MainTab(QWidget):
             frame = self.window_manager.add_window(window_id, char_name)
             if frame:
                 # Connect signals
-                frame.window_activated.connect(self._on_window_activated)
-                frame.window_removed.connect(self._on_window_removed)
+                frame.window_activated.connect(
+                    self._on_window_activated, Qt.ConnectionType.UniqueConnection
+                )
+                frame.window_removed.connect(
+                    self._on_window_removed, Qt.ConnectionType.UniqueConnection
+                )
 
                 # Add to layout
                 self.preview_layout.addWidget(frame)
@@ -1725,8 +1743,12 @@ class MainTab(QWidget):
         # Add to window manager
         frame = self.window_manager.add_window(window_id, char_name)
         if frame:
-            frame.window_activated.connect(self._on_window_activated)
-            frame.window_removed.connect(self._on_window_removed)
+            frame.window_activated.connect(
+                self._on_window_activated, Qt.ConnectionType.UniqueConnection
+            )
+            frame.window_removed.connect(
+                self._on_window_removed, Qt.ConnectionType.UniqueConnection
+            )
             self.preview_layout.addWidget(frame)
             return True
         return False
@@ -1785,7 +1807,7 @@ class MainTab(QWidget):
 
     def _on_window_activated(self, window_id: str):
         """Handle window activation with optional auto-minimize of previous window"""
-        import subprocess
+        from argus_overview.utils.window_utils import run_x11_subprocess
 
         try:
             # Check if auto-minimize is enabled
@@ -1800,10 +1822,11 @@ class MainTab(QWidget):
                 last_window = self.settings_manager.get_last_activated_window()
                 if last_window and last_window != window_id:
                     # Minimize the previous EVE window
-                    subprocess.run(
-                        ["xdotool", "windowminimize", last_window], capture_output=True, timeout=1
-                    )
-                    self.logger.info(f"Auto-minimized previous EVE window: {last_window}")
+                    try:
+                        run_x11_subprocess(["xdotool", "windowminimize", last_window], timeout=2)
+                        self.logger.info(f"Auto-minimized previous EVE window: {last_window}")
+                    except Exception as e:
+                        self.logger.warning(f"Failed to auto-minimize window {last_window}: {e}")
 
             # Track this as the last activated EVE window
             if self.settings_manager:
@@ -1818,7 +1841,20 @@ class MainTab(QWidget):
             self.logger.error(f"Error activating window: {e}")
 
     def _on_window_removed(self, window_id: str):
-        """Handle window removal"""
+        """Handle window removal — disconnect frame signals before deletion"""
+        frame = self.window_manager.preview_frames.get(window_id)
+        if frame:
+            try:
+                frame.window_activated.disconnect(self._on_window_activated)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                frame.window_removed.disconnect(self._on_window_removed)
+            except (RuntimeError, TypeError):
+                pass
+            # Stop per-frame timers
+            frame.flash_timer.stop()
+            frame.session_timer.stop()
         self.window_manager.remove_window(window_id)
         self._update_status()
 
@@ -1861,11 +1897,16 @@ class MainTab(QWidget):
 
             if new_value:
                 # Mode enabled - also minimize inactive windows now
-                result = subprocess.run(
-                    ["xdotool", "getwindowfocus"], capture_output=True, text=True, timeout=1
-                )
-                if result.returncode == 0:
-                    focused_id = result.stdout.strip()
+                from argus_overview.utils.window_utils import run_x11_subprocess
+
+                try:
+                    result = run_x11_subprocess(
+                        ["xdotool", "getwindowfocus"], timeout=2, max_attempts=2
+                    )
+                except Exception:
+                    result = None
+                if result and result.returncode == 0:
+                    focused_id = result.stdout.decode("utf-8", errors="replace").strip()
                     minimized_count = 0
                     for window_id in self.window_manager.preview_frames.keys():
                         if window_id != focused_id:
@@ -1942,6 +1983,15 @@ class MainTab(QWidget):
             self.status_label.setText(
                 f"Capturing {count} window(s) at {self.window_manager.refresh_rate} FPS"
             )
+
+    def stop_capture_loop(self):
+        """Stop capture loop and status timer for clean shutdown"""
+        self.window_manager.stop_capture_loop()
+        self.status_timer.stop()
+        # Stop per-frame timers
+        for frame in self.window_manager.preview_frames.values():
+            frame.flash_timer.stop()
+            frame.session_timer.stop()
 
     def set_previews_enabled(self, enabled: bool):
         """

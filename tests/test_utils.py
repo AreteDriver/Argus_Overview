@@ -138,7 +138,7 @@ class TestWindowUtils:
         """Test get_focused_window returns window ID."""
         from argus_overview.utils.window_utils import get_focused_window
 
-        mock_run.return_value = MagicMock(returncode=0, stdout="58720259\n")
+        mock_run.return_value = MagicMock(returncode=0, stdout=b"58720259\n")
 
         result = get_focused_window()
 
@@ -162,7 +162,7 @@ class TestWindowUtils:
         from argus_overview.utils.window_utils import get_focused_window
 
         # xdotool returns something that can't be converted to int
-        mock_run.return_value = MagicMock(returncode=0, stdout="not_a_number\n")
+        mock_run.return_value = MagicMock(returncode=0, stdout=b"not_a_number\n")
 
         result = get_focused_window()
 
@@ -229,6 +229,111 @@ class TestWindowUtils:
         assert result is False
 
 
+class TestRunX11Subprocess:
+    """Tests for run_x11_subprocess retry helper."""
+
+    @patch("argus_overview.utils.window_utils.subprocess.run")
+    def test_success_on_first_attempt(self, mock_run):
+        """Test successful command on first try."""
+        from argus_overview.utils.window_utils import run_x11_subprocess
+
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = run_x11_subprocess(["xdotool", "getwindowfocus"], max_attempts=3)
+
+        assert result.returncode == 0
+        assert mock_run.call_count == 1
+
+    @patch("argus_overview.utils.window_utils.subprocess.run")
+    def test_retries_on_failure(self, mock_run):
+        """Test retries on transient failure then succeeds."""
+        import subprocess as sp
+
+        from argus_overview.utils.window_utils import run_x11_subprocess
+
+        mock_run.side_effect = [
+            sp.TimeoutExpired("xdotool", 2),
+            MagicMock(returncode=0),
+        ]
+
+        result = run_x11_subprocess(["xdotool", "getwindowfocus"], max_attempts=3, backoff=0.01)
+
+        assert result.returncode == 0
+        assert mock_run.call_count == 2
+
+    @patch("argus_overview.utils.window_utils.subprocess.run")
+    def test_raises_after_all_attempts_exhausted(self, mock_run):
+        """Test raises exception after all retries fail."""
+        import subprocess as sp
+
+        import pytest
+
+        from argus_overview.utils.window_utils import run_x11_subprocess
+
+        mock_run.side_effect = sp.TimeoutExpired("xdotool", 2)
+
+        with pytest.raises(sp.TimeoutExpired):
+            run_x11_subprocess(["xdotool", "getwindowfocus"], max_attempts=2, backoff=0.01)
+
+        assert mock_run.call_count == 2
+
+    @patch("argus_overview.utils.window_utils.subprocess.run")
+    def test_nonzero_returncode_triggers_retry(self, mock_run):
+        """Test non-zero return code is treated as failure when check_returncode=True."""
+        import subprocess as sp
+
+        import pytest
+
+        from argus_overview.utils.window_utils import run_x11_subprocess
+
+        mock_run.return_value = MagicMock(returncode=1, stdout=b"", stderr=b"error")
+
+        with pytest.raises(sp.CalledProcessError):
+            run_x11_subprocess(
+                ["wmctrl", "-l"], max_attempts=2, backoff=0.01, check_returncode=True
+            )
+
+        assert mock_run.call_count == 2
+
+    @patch("argus_overview.utils.window_utils.subprocess.run")
+    def test_nonzero_returncode_ignored_when_unchecked(self, mock_run):
+        """Test non-zero return code passes through when check_returncode=False."""
+        from argus_overview.utils.window_utils import run_x11_subprocess
+
+        mock_run.return_value = MagicMock(returncode=1, stdout=b"", stderr=b"err")
+
+        result = run_x11_subprocess(
+            ["wmctrl", "-l"], max_attempts=2, backoff=0.01, check_returncode=False
+        )
+
+        assert result.returncode == 1
+        assert mock_run.call_count == 1
+
+    @patch("argus_overview.utils.window_utils.subprocess.run")
+    def test_max_attempts_clamped(self, mock_run):
+        """Test max_attempts is clamped between 1 and 5."""
+        import subprocess as sp
+
+        import pytest
+
+        from argus_overview.utils.window_utils import run_x11_subprocess
+
+        mock_run.side_effect = sp.TimeoutExpired("cmd", 1)
+
+        # max_attempts=0 should be clamped to 1
+        with pytest.raises(sp.TimeoutExpired):
+            run_x11_subprocess(["cmd"], max_attempts=0, backoff=0.01)
+        assert mock_run.call_count == 1
+
+        mock_run.reset_mock()
+        mock_run.side_effect = sp.TimeoutExpired("cmd", 1)
+
+        # max_attempts=10 should be clamped to 5
+        with pytest.raises(sp.TimeoutExpired):
+            run_x11_subprocess(["cmd"], max_attempts=10, backoff=0.01)
+        assert mock_run.call_count == 5
+
+
 class TestUtilsExports:
     """Test that utils module exports all expected symbols."""
 
@@ -248,3 +353,4 @@ class TestUtilsExports:
         assert hasattr(utils, "move_window")
         assert hasattr(utils, "activate_window")
         assert hasattr(utils, "get_focused_window")
+        assert hasattr(utils, "run_x11_subprocess")

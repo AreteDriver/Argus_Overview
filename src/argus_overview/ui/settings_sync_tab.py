@@ -421,9 +421,13 @@ class SettingsSyncTab(QWidget):
 
         # Create and start worker
         self.scan_worker = ScanWorker(self.settings_sync)
-        self.scan_worker.scan_progress.connect(self._on_scan_progress)
-        self.scan_worker.scan_complete.connect(self._on_scan_complete)
-        self.scan_worker.scan_error.connect(self._on_scan_error)
+        self.scan_worker.scan_progress.connect(
+            self._on_scan_progress, Qt.ConnectionType.UniqueConnection
+        )
+        self.scan_worker.scan_complete.connect(
+            self._on_scan_complete, Qt.ConnectionType.UniqueConnection
+        )
+        self.scan_worker.scan_error.connect(self._on_scan_error, Qt.ConnectionType.UniqueConnection)
         self.scan_worker.start()
 
     def _on_scan_progress(self, percentage: int, message: str):
@@ -611,9 +615,13 @@ class SettingsSyncTab(QWidget):
         self.sync_worker = SyncWorker(
             self.settings_sync, source_char, target_chars, backup=self.backup_checkbox.isChecked()
         )
-        self.sync_worker.sync_progress.connect(self._on_sync_progress)
-        self.sync_worker.sync_complete.connect(self._on_sync_complete)
-        self.sync_worker.sync_error.connect(self._on_sync_error)
+        self.sync_worker.sync_progress.connect(
+            self._on_sync_progress, Qt.ConnectionType.UniqueConnection
+        )
+        self.sync_worker.sync_complete.connect(
+            self._on_sync_complete, Qt.ConnectionType.UniqueConnection
+        )
+        self.sync_worker.sync_error.connect(self._on_sync_error, Qt.ConnectionType.UniqueConnection)
         self.sync_worker.start()
 
     def _on_sync_progress(self, character_name: str, percentage: int):

@@ -375,14 +375,14 @@ class TestCaptureWindowSync:
 class TestGetWindowList:
     """Tests for get_window_list method"""
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_get_window_list_success(self, mock_subprocess):
         """Test successful window list retrieval"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = """0x12345 0 hostname Window Title 1
+        mock_result.stdout = b"""0x12345 0 hostname Window Title 1
 0x67890 0 hostname Window Title 2
 0xABCDE 0 hostname EVE Online - Character Name"""
         mock_subprocess.return_value = mock_result
@@ -395,14 +395,14 @@ class TestGetWindowList:
         assert windows[1] == ("0x67890", "Window Title 2")
         assert windows[2] == ("0xABCDE", "EVE Online - Character Name")
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_get_window_list_empty(self, mock_subprocess):
         """Test empty window list"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = ""
+        mock_result.stdout = b""
         mock_subprocess.return_value = mock_result
 
         capture = WindowCaptureThreaded()
@@ -410,14 +410,15 @@ class TestGetWindowList:
 
         assert windows == []
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_get_window_list_failure(self, mock_subprocess):
         """Test window list retrieval failure"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_result = MagicMock()
         mock_result.returncode = 1
-        mock_result.stdout = ""
+        mock_result.stdout = b""
+        mock_result.stderr = b"error"
         mock_subprocess.return_value = mock_result
 
         capture = WindowCaptureThreaded()
@@ -425,7 +426,7 @@ class TestGetWindowList:
 
         assert windows == []
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_get_window_list_exception(self, mock_subprocess):
         """Test window list handles exceptions"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -437,14 +438,14 @@ class TestGetWindowList:
 
         assert windows == []
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_get_window_list_uses_wmctrl(self, mock_subprocess):
         """Test that window list uses wmctrl command"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = ""
+        mock_result.stdout = b""
         mock_subprocess.return_value = mock_result
 
         capture = WindowCaptureThreaded()
@@ -454,14 +455,14 @@ class TestGetWindowList:
         cmd = call_args[0][0]
         assert cmd == ["wmctrl", "-l"]
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_get_window_list_handles_short_lines(self, mock_subprocess):
         """Test handling of malformed/short lines"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = """0x12345 0 hostname Full Window Title
+        mock_result.stdout = b"""0x12345 0 hostname Full Window Title
 0x67890 short
 0xABCDE 0 hostname Another Window"""
         mock_subprocess.return_value = mock_result
@@ -476,7 +477,7 @@ class TestGetWindowList:
 class TestActivateWindow:
     """Tests for activate_window method"""
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_activate_window_success(self, mock_subprocess):
         """Test successful window activation"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -490,13 +491,15 @@ class TestActivateWindow:
 
         assert result is True
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_activate_window_failure(self, mock_subprocess):
         """Test window activation failure"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_result = MagicMock()
         mock_result.returncode = 1
+        mock_result.stdout = b""
+        mock_result.stderr = b"error"
         mock_subprocess.return_value = mock_result
 
         capture = WindowCaptureThreaded()
@@ -504,7 +507,7 @@ class TestActivateWindow:
 
         assert result is False
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_activate_window_exception(self, mock_subprocess):
         """Test window activation handles exceptions"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -516,7 +519,7 @@ class TestActivateWindow:
 
         assert result is False
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_activate_window_uses_wmctrl(self, mock_subprocess):
         """Test that activate uses wmctrl command"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -536,7 +539,7 @@ class TestActivateWindow:
 class TestMinimizeWindow:
     """Tests for minimize_window method"""
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_minimize_window_success(self, mock_subprocess):
         """Test successful window minimization"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -550,13 +553,15 @@ class TestMinimizeWindow:
 
         assert result is True
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_minimize_window_failure(self, mock_subprocess):
         """Test window minimization failure"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_result = MagicMock()
         mock_result.returncode = 1
+        mock_result.stdout = b""
+        mock_result.stderr = b"error"
         mock_subprocess.return_value = mock_result
 
         capture = WindowCaptureThreaded()
@@ -564,7 +569,7 @@ class TestMinimizeWindow:
 
         assert result is False
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_minimize_window_exception(self, mock_subprocess):
         """Test window minimization handles exceptions"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -576,7 +581,7 @@ class TestMinimizeWindow:
 
         assert result is False
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_minimize_window_uses_xdotool(self, mock_subprocess):
         """Test that minimize uses xdotool command"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -596,7 +601,7 @@ class TestMinimizeWindow:
 class TestRestoreWindow:
     """Tests for restore_window method"""
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_restore_window_success(self, mock_subprocess):
         """Test successful window restoration"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -610,13 +615,15 @@ class TestRestoreWindow:
 
         assert result is True
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_restore_window_failure(self, mock_subprocess):
         """Test window restoration failure"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 
         mock_result = MagicMock()
         mock_result.returncode = 1
+        mock_result.stdout = b""
+        mock_result.stderr = b"error"
         mock_subprocess.return_value = mock_result
 
         capture = WindowCaptureThreaded()
@@ -624,7 +631,7 @@ class TestRestoreWindow:
 
         assert result is False
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_restore_window_exception(self, mock_subprocess):
         """Test window restoration handles exceptions"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
@@ -636,7 +643,7 @@ class TestRestoreWindow:
 
         assert result is False
 
-    @patch("argus_overview.core.window_capture_threaded.subprocess.run")
+    @patch("argus_overview.utils.window_utils.subprocess.run")
     def test_restore_window_uses_xdotool(self, mock_subprocess):
         """Test that restore uses xdotool command"""
         from argus_overview.core.window_capture_threaded import WindowCaptureThreaded

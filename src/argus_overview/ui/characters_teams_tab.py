@@ -6,7 +6,7 @@ Implements character database, team building with drag-drop, and layout linking
 import logging
 from typing import List, Optional
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -68,11 +68,24 @@ class CharacterTable(QTableWidget):
         # Connect signals
         self.itemSelectionChanged.connect(self._on_selection_changed)
 
+        # Debounce timer for populate_table
+        self._populate_timer = QTimer()
+        self._populate_timer.setSingleShot(True)
+        self._populate_timer.setInterval(150)
+        self._populate_timer.timeout.connect(self._do_populate_table)
+
         # Initial population
         self.populate_table()
 
     def populate_table(self):
-        """Populate table with all characters"""
+        """Schedule debounced table population"""
+        if hasattr(self, "_populate_timer"):
+            self._populate_timer.start()
+        else:
+            self._do_populate_table()
+
+    def _do_populate_table(self):
+        """Populate table with all characters (debounced)"""
         characters = self.character_manager.get_all_characters()
 
         self.setSortingEnabled(False)
@@ -590,6 +603,12 @@ class CharactersTeamsTab(QWidget):
         self.layout_manager = layout_manager
         self.settings_sync = settings_sync  # EVESettingsSync for folder scanning
 
+        # Debounce timer for _refresh_teams
+        self._refresh_teams_timer = QTimer()
+        self._refresh_teams_timer.setSingleShot(True)
+        self._refresh_teams_timer.setInterval(150)
+        self._refresh_teams_timer.timeout.connect(self._do_refresh_teams)
+
         self._setup_ui()
 
         self.logger.info("Characters & Teams tab initialized")
@@ -683,7 +702,14 @@ class CharactersTeamsTab(QWidget):
         return panel
 
     def _refresh_teams(self):
-        """Refresh team dropdown"""
+        """Schedule debounced team dropdown refresh"""
+        if hasattr(self, "_refresh_teams_timer"):
+            self._refresh_teams_timer.start()
+        else:
+            self._do_refresh_teams()
+
+    def _do_refresh_teams(self):
+        """Refresh team dropdown (debounced)"""
         self.team_combo.blockSignals(True)
         current = self.team_combo.currentText()
 

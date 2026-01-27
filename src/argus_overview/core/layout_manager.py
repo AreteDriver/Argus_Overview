@@ -105,12 +105,45 @@ class LayoutManager:
         self.presets: Dict[str, LayoutPreset] = {}
         self._load_presets()
 
+    @staticmethod
+    def _validate_preset_data(data) -> bool:
+        """Validate preset dict has required fields with correct types."""
+        if not isinstance(data, dict):
+            return False
+        if "name" not in data or not isinstance(data["name"], str) or not data["name"]:
+            return False
+        type_checks = {
+            "description": str,
+            "grid_pattern": str,
+            "refresh_rate": int,
+        }
+        for key, expected_type in type_checks.items():
+            if key in data and data[key] is not None:
+                if not isinstance(data[key], expected_type):
+                    return False
+        if "windows" in data and not isinstance(data.get("windows"), list):
+            return False
+        # Validate each window entry
+        for win in data.get("windows", []):
+            if not isinstance(win, dict):
+                return False
+            for req_field in ("window_id", "x", "y", "width", "height"):
+                if req_field not in win:
+                    return False
+        return True
+
     def _load_presets(self):
         """Load all layout presets"""
         for preset_file in self.layouts_dir.glob("*.json"):
             try:
                 with open(preset_file) as f:
                     data = json.load(f)
+                    if not self._validate_preset_data(data):
+                        self.logger.warning(
+                            f"Skipping invalid preset file '{preset_file.name}': "
+                            "missing or malformed fields"
+                        )
+                        continue
                     preset = LayoutPreset.from_dict(data)
                     self.presets[preset.name] = preset
             except Exception as e:

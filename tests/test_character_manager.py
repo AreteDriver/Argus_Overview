@@ -20,6 +20,7 @@ from argus_overview.core.character_manager import (
     Character,
     CharacterManager,
     Team,
+    sanitize_character_name,
 )
 
 
@@ -760,3 +761,223 @@ class TestDataPersistence:
             assert m2.characters["Persistent"].role == "Tank"
             assert "SavedTeam" in m2.teams
             assert "Persistent" in m2.teams["SavedTeam"].characters
+
+
+class TestSanitizeCharacterName:
+    """Tests for character name sanitization"""
+
+    def test_normal_name_unchanged(self):
+        """Normal EVE character names pass through unchanged"""
+        assert sanitize_character_name("MainPilot") == "MainPilot"
+        assert sanitize_character_name("Pilot With Spaces") == "Pilot With Spaces"
+
+    def test_path_traversal_stripped(self):
+        """Path traversal sequences are neutralized"""
+        assert sanitize_character_name("../../../etc/passwd") == "etcpasswd"
+
+    def test_backslash_traversal_stripped(self):
+        """Windows-style path traversal stripped"""
+        assert sanitize_character_name("..\\..\\Windows\\System32") == "WindowsSystem32"
+
+    def test_null_bytes_stripped(self):
+        """Null bytes are removed"""
+        assert sanitize_character_name("Pilot\x00Evil") == "PilotEvil"
+
+    def test_colon_stripped(self):
+        """Colons removed (Windows drive letters)"""
+        assert sanitize_character_name("C:evil") == "Cevil"
+
+    def test_leading_dots_stripped(self):
+        """Leading dots stripped to prevent hidden files"""
+        assert sanitize_character_name("...hidden") == "hidden"
+
+    def test_empty_after_sanitize_raises(self):
+        """Names that reduce to empty string raise ValueError"""
+        with pytest.raises(ValueError):
+            sanitize_character_name("../../../")
+
+    def test_only_dots_raises(self):
+        """Name of only dots raises ValueError"""
+        with pytest.raises(ValueError):
+            sanitize_character_name("...")
+
+    def test_null_only_raises(self):
+        """Name of only null bytes raises ValueError"""
+        with pytest.raises(ValueError):
+            sanitize_character_name("\x00\x00\x00")
+
+    def test_length_limited(self):
+        """Names are truncated to 100 characters"""
+        long_name = "A" * 200
+        assert len(sanitize_character_name(long_name)) == 100
+
+    def test_slashes_only_raises(self):
+        """Name of only slashes raises ValueError"""
+        with pytest.raises(ValueError):
+            sanitize_character_name("///")
+
+
+class TestAdversarialCharacterNames:
+    """Tests that adversarial names are rejected at manager level"""
+
+    @pytest.fixture
+    def manager(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield CharacterManager(config_dir=Path(tmpdir))
+
+    def test_add_traversal_name_rejected(self, manager):
+        """Adding character with path traversal name is rejected"""
+        char = Character(name="../../../etc/passwd")
+        result = manager.add_character(char)
+        # Should succeed but with sanitized name
+        assert result is True
+        assert "../" not in list(manager.characters.keys())[0]
+
+    def test_add_empty_after_sanitize_rejected(self, manager):
+        """Adding character whose name sanitizes to empty is rejected"""
+        char = Character(name="../../..")
+        result = manager.add_character(char)
+        assert result is False
+
+    def test_add_null_byte_name_rejected(self, manager):
+        """Null bytes in character names are stripped"""
+        char = Character(name="Pilot\x00Evil")
+        result = manager.add_character(char)
+        assert result is True
+        assert "Pilot\x00Evil" not in manager.characters
+        assert "PilotEvil" in manager.characters
+
+    def test_import_adversarial_eve_name(self, manager):
+        """Import from EVE sync sanitizes adversarial names"""
+        from datetime import datetime
+        from unittest.mock import MagicMock
+
+        eve_char = MagicMock()
+        eve_char.character_name = "../../../etc/passwd"
+        eve_char.character_id = 12345678
+        eve_char.last_seen = datetime(2025, 1, 1)
+
+        imported = manager.import_from_eve_sync([eve_char])
+        assert imported == 1
+        assert "../" not in list(manager.characters.keys())[0]
+
+    def test_import_empty_name_skipped(self, manager):
+        """Import skips characters with names that sanitize to empty"""
+        from unittest.mock import MagicMock
+
+        eve_char = MagicMock()
+        eve_char.character_name = "///..."
+        eve_char.character_id = 99999
+        eve_char.last_seen = None
+
+        imported = manager.import_from_eve_sync([eve_char])
+        assert imported == 0
+
+
+class TestMalformedEveSyncData:
+    """Tests for malformed EVE sync data in import_from_eve_sync (issue #23)"""
+
+    @pytest.fixture
+    def manager(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            yield CharacterManager(config_dir=Path(tmpdir))
+
+    def test_missing_character_name_attr(self, manager):
+        """Skips objects missing character_name attribute"""
+        obj = type("Obj", (), {"character_id": 123, "last_seen": None})()
+        imported = manager.import_from_eve_sync([obj])
+        assert imported == 0
+        assert len(manager.characters) == 0
+
+    def test_missing_character_id_attr(self, manager):
+        """Skips objects missing character_id attribute"""
+        obj = type("Obj", (), {"character_name": "Pilot", "last_seen": None})()
+        imported = manager.import_from_eve_sync([obj])
+        assert imported == 0
+
+    def test_missing_last_seen_attr(self, manager):
+        """Skips objects missing last_seen attribute"""
+        obj = type("Obj", (), {"character_name": "Pilot", "character_id": 123})()
+        imported = manager.import_from_eve_sync([obj])
+        assert imported == 0
+
+    def test_missing_all_attrs(self, manager):
+        """Skips plain objects with no expected attributes"""
+        imported = manager.import_from_eve_sync([object()])
+        assert imported == 0
+        assert len(manager.characters) == 0
+
+    def test_none_character_id(self, manager):
+        """Skips entries where character_id is None"""
+        from unittest.mock import MagicMock
+
+        eve_char = MagicMock()
+        eve_char.character_name = "ValidName"
+        eve_char.character_id = None
+        eve_char.last_seen = None
+
+        imported = manager.import_from_eve_sync([eve_char])
+        assert imported == 0
+
+    def test_non_string_character_name(self, manager):
+        """Skips entries where character_name is not a string"""
+        obj = type("Obj", (), {"character_name": 12345, "character_id": 1, "last_seen": None})()
+        imported = manager.import_from_eve_sync([obj])
+        assert imported == 0
+
+    def test_empty_string_character_name(self, manager):
+        """Skips entries where character_name is empty"""
+        obj = type("Obj", (), {"character_name": "", "character_id": 1, "last_seen": None})()
+        imported = manager.import_from_eve_sync([obj])
+        assert imported == 0
+
+    def test_last_seen_not_datetime(self, manager):
+        """Handles last_seen that is not a datetime (no isoformat)"""
+        obj = type(
+            "Obj",
+            (),
+            {
+                "character_name": "Pilot",
+                "character_id": 123,
+                "last_seen": "not-a-datetime",
+            },
+        )()
+        imported = manager.import_from_eve_sync([obj])
+        assert imported == 1
+        char = manager.characters["Pilot"]
+        assert char.last_seen is None  # Fell back gracefully
+
+    def test_last_seen_not_datetime_existing_char(self, manager):
+        """Handles invalid last_seen when updating existing character"""
+        manager.add_character(Character(name="Pilot", last_seen=None))
+
+        obj = type(
+            "Obj",
+            (),
+            {
+                "character_name": "Pilot",
+                "character_id": 123,
+                "last_seen": "not-a-datetime",
+            },
+        )()
+        # Should not crash
+        imported = manager.import_from_eve_sync([obj])
+        assert imported == 0
+        assert manager.characters["Pilot"].last_seen is None
+
+    def test_mixed_valid_and_invalid(self, manager):
+        """Valid entries import even when mixed with invalid ones"""
+        from datetime import datetime
+        from unittest.mock import MagicMock
+
+        bad1 = object()  # No attrs
+        bad2 = type("Obj", (), {"character_name": "", "character_id": 1, "last_seen": None})()
+
+        good = MagicMock()
+        good.character_name = "GoodPilot"
+        good.character_id = 42
+        good.last_seen = datetime(2025, 6, 1)
+
+        imported = manager.import_from_eve_sync([bad1, bad2, good])
+        assert imported == 1
+        assert "GoodPilot" in manager.characters
