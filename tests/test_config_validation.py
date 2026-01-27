@@ -13,8 +13,6 @@ import json
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from argus_overview.core.character_manager import CharacterManager
 from argus_overview.core.layout_manager import LayoutManager
 
