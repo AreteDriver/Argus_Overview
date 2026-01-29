@@ -33,7 +33,6 @@ class SystemTray(QObject):
     # Signals - emitted when tray menu actions are triggered
     show_hide_requested = Signal()
     toggle_thumbnails_requested = Signal()
-    toggle_alerts_requested = Signal()
     minimize_all_requested = Signal()
     restore_all_requested = Signal()
     profile_selected = Signal(str)  # profile_name
@@ -135,7 +134,6 @@ class SystemTray(QObject):
         handlers = {
             "show_hide": self.show_hide_requested.emit,
             "toggle_thumbnails": self.toggle_thumbnails_requested.emit,
-            "toggle_alerts_tray": self.toggle_alerts_requested.emit,
             "minimize_all": self.minimize_all_requested.emit,
             "restore_all": self.restore_all_requested.emit,
             "settings": self.settings_requested.emit,

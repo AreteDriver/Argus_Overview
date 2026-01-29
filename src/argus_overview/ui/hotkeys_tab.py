@@ -291,29 +291,6 @@ class HotkeysTab(QWidget):
 
         layout.addWidget(members_group)
 
-        # Visual Alerts section
-        alerts_group = QGroupBox("Visual Alerts")
-        alerts_layout = QHBoxLayout()
-        alerts_group.setLayout(alerts_layout)
-
-        alerts_label = QLabel("Toggle visual alerts (damage detection, screen changes):")
-        alerts_layout.addWidget(alerts_label)
-        alerts_layout.addStretch()
-
-        # Toggle alerts button (from registry)
-        self.toggle_alerts_btn = toolbar_builder.create_button(
-            "toggle_visual_alerts", self._toggle_visual_alerts
-        )
-        if self.toggle_alerts_btn:
-            self.toggle_alerts_btn.setCheckable(True)
-            # Initialize state from settings
-            alerts_enabled = self.settings_manager.get("alerts.enabled", True)
-            self.toggle_alerts_btn.setChecked(alerts_enabled)
-            self._update_alerts_button_text(alerts_enabled)
-            alerts_layout.addWidget(self.toggle_alerts_btn)
-
-        layout.addWidget(alerts_group)
-
         # Hotkey assignment section
         hotkey_group = QGroupBox("Cycling Hotkeys")
         hotkey_layout = QFormLayout()
@@ -575,42 +552,3 @@ class HotkeysTab(QWidget):
     def refresh_characters(self):
         """Refresh character list (called when characters change)"""
         self._populate_character_list()
-
-    def _toggle_visual_alerts(self):
-        """Toggle visual alerts on/off"""
-        current_state = self.settings_manager.get("alerts.enabled", True)
-        new_state = not current_state
-
-        self.settings_manager.set("alerts.enabled", new_state, auto_save=True)
-        self._update_alerts_button_text(new_state)
-
-        if hasattr(self, "toggle_alerts_btn"):
-            self.toggle_alerts_btn.setChecked(new_state)
-
-        self.logger.info(f"Visual alerts {'enabled' if new_state else 'disabled'}")
-
-    def _update_alerts_button_text(self, enabled: bool):
-        """Update the toggle alerts button text based on state"""
-        if hasattr(self, "toggle_alerts_btn") and self.toggle_alerts_btn:
-            if enabled:
-                self.toggle_alerts_btn.setText("Alerts: ON")
-                self.toggle_alerts_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #2d5a27;
-                        color: white;
-                        padding: 5px 15px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover { background-color: #3d7a37; }
-                """)
-            else:
-                self.toggle_alerts_btn.setText("Alerts: OFF")
-                self.toggle_alerts_btn.setStyleSheet("""
-                    QPushButton {
-                        background-color: #5a2727;
-                        color: white;
-                        padding: 5px 15px;
-                        font-weight: bold;
-                    }
-                    QPushButton:hover { background-color: #7a3737; }
-                """)

@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QSlider,
     QSpinBox,
     QSplitter,
     QStackedWidget,
@@ -227,7 +226,6 @@ class PerformancePanel(QWidget):
         self.low_power_check.setToolTip(
             "LOW POWER MODE\n"
             "• Sets FPS to 5\n"
-            "• Disables alert detection\n"
             "• Reduces CPU/GPU load significantly\n\n"
             "Use when running multiple EVE clients."
         )
@@ -311,107 +309,6 @@ class PerformancePanel(QWidget):
         """Handle low power mode toggle - emits setting change"""
         enabled = self.low_power_check.isChecked()
         self.setting_changed.emit("performance.low_power_mode", enabled)
-
-
-class AlertsPanel(QWidget):
-    """Alert settings"""
-
-    setting_changed = Signal(str, object)
-
-    def __init__(self, settings_manager):
-        super().__init__()
-        self.settings_manager = settings_manager
-        self._setup_ui()
-
-    def _setup_ui(self):
-        layout = QVBoxLayout()
-
-        # Enable alerts
-        self.alerts_check = QCheckBox("Enable alerts")
-        self.alerts_check.setChecked(self.settings_manager.get("alerts.enabled", True))
-        self.alerts_check.stateChanged.connect(
-            lambda: self.setting_changed.emit("alerts.enabled", self.alerts_check.isChecked())
-        )
-        layout.addWidget(self.alerts_check)
-
-        # Red flash alerts
-        red_flash_group = QGroupBox("Red Flash Detection")
-        red_flash_layout = QFormLayout()
-
-        self.red_flash_threshold = QSlider(Qt.Orientation.Horizontal)
-        self.red_flash_threshold.setRange(0, 100)
-        self.red_flash_threshold.setValue(
-            int(self.settings_manager.get("alerts.red_flash.threshold", 0.7) * 100)
-        )
-        self.red_flash_threshold.valueChanged.connect(
-            lambda v: self.setting_changed.emit("alerts.red_flash.threshold", v / 100.0)
-        )
-        red_flash_layout.addRow("Threshold:", self.red_flash_threshold)
-
-        self.red_flash_visual = QCheckBox()
-        self.red_flash_visual.setChecked(
-            self.settings_manager.get("alerts.red_flash.visual_border", True)
-        )
-        self.red_flash_visual.stateChanged.connect(
-            lambda: self.setting_changed.emit(
-                "alerts.red_flash.visual_border", self.red_flash_visual.isChecked()
-            )
-        )
-        red_flash_layout.addRow("Visual border:", self.red_flash_visual)
-
-        self.red_flash_sound = QCheckBox()
-        self.red_flash_sound.setChecked(
-            self.settings_manager.get("alerts.red_flash.sound_alert", False)
-        )
-        self.red_flash_sound.stateChanged.connect(
-            lambda: self.setting_changed.emit(
-                "alerts.red_flash.sound_alert", self.red_flash_sound.isChecked()
-            )
-        )
-        red_flash_layout.addRow("Sound alert:", self.red_flash_sound)
-
-        self.red_flash_cooldown = QSpinBox()
-        self.red_flash_cooldown.setRange(1, 60)
-        self.red_flash_cooldown.setValue(self.settings_manager.get("alerts.red_flash.cooldown", 5))
-        self.red_flash_cooldown.setSuffix(" sec")
-        self.red_flash_cooldown.valueChanged.connect(
-            lambda v: self.setting_changed.emit("alerts.red_flash.cooldown", v)
-        )
-        red_flash_layout.addRow("Cooldown:", self.red_flash_cooldown)
-
-        red_flash_group.setLayout(red_flash_layout)
-        layout.addWidget(red_flash_group)
-
-        # Screen change alerts
-        screen_change_group = QGroupBox("Screen Change Detection")
-        screen_change_layout = QFormLayout()
-
-        self.screen_change_threshold = QSlider(Qt.Orientation.Horizontal)
-        self.screen_change_threshold.setRange(0, 100)
-        self.screen_change_threshold.setValue(
-            int(self.settings_manager.get("alerts.screen_change.threshold", 0.3) * 100)
-        )
-        self.screen_change_threshold.valueChanged.connect(
-            lambda v: self.setting_changed.emit("alerts.screen_change.threshold", v / 100.0)
-        )
-        screen_change_layout.addRow("Threshold:", self.screen_change_threshold)
-
-        self.screen_change_visual = QCheckBox()
-        self.screen_change_visual.setChecked(
-            self.settings_manager.get("alerts.screen_change.visual_border", True)
-        )
-        self.screen_change_visual.stateChanged.connect(
-            lambda: self.setting_changed.emit(
-                "alerts.screen_change.visual_border", self.screen_change_visual.isChecked()
-            )
-        )
-        screen_change_layout.addRow("Visual border:", self.screen_change_visual)
-
-        screen_change_group.setLayout(screen_change_layout)
-        layout.addWidget(screen_change_group)
-
-        layout.addStretch()
-        self.setLayout(layout)
 
 
 class HotkeysPanel(QWidget):
@@ -698,11 +595,10 @@ class SettingsTab(QWidget):
 
     settings_changed = Signal(str, object)  # key, value
 
-    def __init__(self, settings_manager, hotkey_manager, alert_detector):
+    def __init__(self, settings_manager, hotkey_manager):
         super().__init__()
         self.settings_manager = settings_manager
         self.hotkey_manager = hotkey_manager
-        self.alert_detector = alert_detector
         self.logger = logging.getLogger(__name__)
 
         self._setup_ui()
@@ -729,10 +625,6 @@ class SettingsTab(QWidget):
         self.performance_panel = PerformancePanel(self.settings_manager)
         self.performance_panel.setting_changed.connect(self._on_setting_changed)
         self.panel_stack.addWidget(self.performance_panel)
-
-        self.alerts_panel = AlertsPanel(self.settings_manager)
-        self.alerts_panel.setting_changed.connect(self._on_setting_changed)
-        self.panel_stack.addWidget(self.alerts_panel)
 
         self.hotkeys_panel = HotkeysPanel(self.settings_manager, self.hotkey_manager)
         self.hotkeys_panel.setting_changed.connect(self._on_setting_changed)
@@ -769,7 +661,7 @@ class SettingsTab(QWidget):
         self.category_tree = QTreeWidget()
         self.category_tree.setHeaderHidden(True)
 
-        categories = ["General", "Performance", "Alerts", "Hotkeys", "Appearance", "Advanced"]
+        categories = ["General", "Performance", "Hotkeys", "Appearance", "Advanced"]
 
         for category in categories:
             item = QTreeWidgetItem([category])
@@ -792,10 +684,9 @@ class SettingsTab(QWidget):
             categories = {
                 "General": 0,
                 "Performance": 1,
-                "Alerts": 2,
-                "Hotkeys": 3,
-                "Appearance": 4,
-                "Advanced": 5,
+                "Hotkeys": 2,
+                "Appearance": 3,
+                "Advanced": 4,
             }
             category = current.text(0)
             if category in categories:

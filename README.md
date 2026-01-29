@@ -90,7 +90,7 @@ This release focuses on **performance optimization and layout management** for r
 ### ✅ **NEW in v2.6:**
 
 #### 1. **Low Power Mode** ⭐⭐⭐⭐⭐
-- Reduces FPS to 5 and disables alerts
+- Reduces FPS to 5
 - Perfect for running with EVE clients open
 - Minimizes GPU/CPU usage while maintaining functionality
 
@@ -217,11 +217,6 @@ This release focused on **usability, automation, and polish** with 14 new featur
 - Activity-based teams
 - Auto-assignment when characters log in
 
-#### Visual Activity Alerts ⭐⭐⭐⭐
-- Red flash detection (damage/combat alerts!)
-- Screen change monitoring
-- Visual border flashing
-
 #### Multi-Monitor Support ⭐⭐⭐⭐
 - Auto-detect all monitors
 - Per-monitor layouts
@@ -341,7 +336,6 @@ cd Argus_Overview
 - ✅ Layout presets with quick-switch
 - ✅ Auto-grid tiling (6+ patterns)
 - ✅ Character & team management
-- ✅ Visual activity alerts
 - ✅ Multi-monitor support
 - ✅ EVE settings synchronization
 
@@ -354,17 +348,15 @@ cd Argus_Overview
 1. Create "Mining Team" with Orca + 3 miners
 2. Arrange in 2x2 grid
 3. Save as "Mining Layout"
-4. Enable visual alerts for danger
-5. Minimize inactive miners to save GPU
+4. Minimize inactive miners to save GPU
 ```
 
-### PvP Fleet  
+### PvP Fleet
 ```
 1. Create "PvP Team" with FC + Logi + DPS
 2. Use Main+Sides layout (FC center, others on side)
 3. Link to "PvP Layout"
-4. Enable red flash alerts for all
-5. Quick-switch with Ctrl+Tab
+4. Quick-switch with Ctrl+Tab
 ```
 
 ### Multi-Account Trading
@@ -457,9 +449,6 @@ Argus Overview will detect pure Wayland sessions at startup and display a warnin
 
 **Characters not found for settings sync?**
 → Add custom EVE installation path in Settings Sync tab
-
-**Alerts not triggering?**
-→ Adjust sensitivity thresholds in Settings
 
 **Windows not auto-arranging?**
 → Ensure character names match EVE window titles

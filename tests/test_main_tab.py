@@ -645,79 +645,6 @@ class TestWindowPreviewWidget:
 
             assert result == "idle"
 
-    def test_set_alert(self):
-        """Test set_alert method"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.window_id = "12345"
-            widget.alert_level = None
-            widget.alert_flash_counter = 0
-            widget.flash_timer = MagicMock()
-            widget.flash_timer.isActive.return_value = False
-            widget.logger = MagicMock()
-
-            widget.set_alert(AlertLevel.HIGH)
-
-            assert widget.alert_level == AlertLevel.HIGH
-            assert widget.alert_flash_counter == 30
-            widget.flash_timer.start.assert_called_once_with(100)
-
-    def test_set_alert_timer_already_active(self):
-        """Test set_alert when timer already running"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.window_id = "12345"
-            widget.alert_level = AlertLevel.LOW
-            widget.alert_flash_counter = 10
-            widget.flash_timer = MagicMock()
-            widget.flash_timer.isActive.return_value = True
-            widget.logger = MagicMock()
-
-            widget.set_alert(AlertLevel.HIGH)
-
-            assert widget.alert_level == AlertLevel.HIGH
-            assert widget.alert_flash_counter == 30
-            widget.flash_timer.start.assert_not_called()
-
-    def test_flash_tick_decrement(self):
-        """Test _flash_tick decrements counter"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_flash_counter = 10
-            widget.alert_level = MagicMock()
-            widget.flash_timer = MagicMock()
-            widget.update = MagicMock()
-
-            widget._flash_tick()
-
-            assert widget.alert_flash_counter == 9
-            widget.update.assert_called_once()
-
-    def test_flash_tick_stops_at_zero(self):
-        """Test _flash_tick stops timer at zero"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_flash_counter = 1
-            widget.alert_level = MagicMock()
-            widget.flash_timer = MagicMock()
-            widget.update = MagicMock()
-
-            widget._flash_tick()
-
-            assert widget.alert_flash_counter == 0
-            assert widget.alert_level is None
-            widget.flash_timer.stop.assert_called_once()
-
     def test_update_session_timer_disabled(self):
         """Test _update_session_timer when disabled"""
         from argus_overview.ui.main_tab import WindowPreviewWidget
@@ -1054,7 +981,6 @@ class TestWindowManager:
             manager.preview_frames = {}
             manager.logger = MagicMock()
             manager.capture_system = MagicMock()
-            manager.alert_detector = MagicMock()
             manager.settings_manager = None
 
             with patch("argus_overview.ui.main_tab.WindowPreviewWidget") as mock_widget:
@@ -1089,13 +1015,11 @@ class TestWindowManager:
             mock_frame = MagicMock()
             manager.preview_frames = {"12345": mock_frame}
             manager.logger = MagicMock()
-            manager.alert_detector = MagicMock()
 
             manager.remove_window("12345")
 
             assert "12345" not in manager.preview_frames
             mock_frame.deleteLater.assert_called_once()
-            manager.alert_detector.unregister_callback.assert_called_once_with("12345")
 
     def test_remove_window_not_exists(self):
         """Test remove_window with non-existent window"""
@@ -1104,7 +1028,6 @@ class TestWindowManager:
         with patch.object(WindowManager, "__init__", return_value=None):
             manager = WindowManager.__new__(WindowManager)
             manager.preview_frames = {}
-            manager.alert_detector = MagicMock()
 
             # Should not raise
             manager.remove_window("99999")
@@ -1655,27 +1578,6 @@ class TestArrangementGridDragDrop:
 class TestWindowPreviewWidgetPaint:
     """Tests for WindowPreviewWidget paint and context menu"""
 
-    def test_alert_level_enum_exists(self):
-        """Test AlertLevel enum is importable"""
-        from argus_overview.core.alert_detector import AlertLevel
-
-        assert hasattr(AlertLevel, "LOW")
-        assert hasattr(AlertLevel, "MEDIUM")
-        assert hasattr(AlertLevel, "HIGH")
-
-    def test_widget_has_alert_attributes(self):
-        """Test WindowPreviewWidget has alert-related attributes"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_level = AlertLevel.LOW
-            widget._flash_visible = False
-
-            assert widget.alert_level == AlertLevel.LOW
-            assert widget._flash_visible is False
-
     def test_widget_has_context_menu_method(self):
         """Test WindowPreviewWidget has contextMenuEvent method"""
         from argus_overview.ui.main_tab import WindowPreviewWidget
@@ -1687,12 +1589,6 @@ class TestWindowPreviewWidgetPaint:
         from argus_overview.ui.main_tab import WindowPreviewWidget
 
         assert hasattr(WindowPreviewWidget, "paintEvent")
-
-    def test_widget_has_set_alert_method(self):
-        """Test WindowPreviewWidget has set_alert method"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        assert hasattr(WindowPreviewWidget, "set_alert")
 
 
 # =============================================================================
@@ -1909,8 +1805,6 @@ class TestWindowManagerProcessResults:
             mock_image = Image.new("RGB", (100, 100))
             manager.capture_system = MagicMock()
             manager.capture_system.get_result.side_effect = [("req-1", "0x123", mock_image), None]
-            manager.alert_detector = MagicMock()
-            manager.alert_detector.analyze_frame.return_value = None
 
             manager._process_capture_results()
 
@@ -1929,31 +1823,6 @@ class TestWindowManagerProcessResults:
             manager.capture_system.get_result.return_value = None
 
             manager._process_capture_results()  # Should not raise
-
-    def test_process_capture_results_sets_alert(self):
-        """Test _process_capture_results sets alert on frame"""
-        from PIL import Image
-
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowManager
-
-        with patch.object(WindowManager, "__init__", return_value=None):
-            manager = WindowManager.__new__(WindowManager)
-            manager.logger = MagicMock()
-            manager.pending_requests = {"req-1": "0x123"}
-
-            mock_frame = MagicMock()
-            manager.preview_frames = {"0x123": mock_frame}
-
-            mock_image = Image.new("RGB", (100, 100))
-            manager.capture_system = MagicMock()
-            manager.capture_system.get_result.side_effect = [("req-1", "0x123", mock_image), None]
-            manager.alert_detector = MagicMock()
-            manager.alert_detector.analyze_frame.return_value = AlertLevel.HIGH
-
-            manager._process_capture_results()
-
-            mock_frame.set_alert.assert_called_once_with(AlertLevel.HIGH)
 
 
 # =============================================================================
@@ -2347,36 +2216,6 @@ class TestGridApplierApplyArrangement:
 class TestWindowPreviewWidgetPaintEvent:
     """Tests for WindowPreviewWidget paintEvent-related attributes"""
 
-    def test_paint_attributes_high_alert(self):
-        """Test widget attributes for HIGH alert paint"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_level = AlertLevel.HIGH
-            widget.alert_flash_counter = 10
-            widget._show_activity_indicator = False
-            widget._positions_locked = False
-
-            # Verify paint attributes are set correctly
-            assert widget.alert_level == AlertLevel.HIGH
-            assert widget.alert_flash_counter > 0
-            assert widget._show_activity_indicator is False
-
-    def test_paint_attributes_medium_alert(self):
-        """Test widget attributes for MEDIUM alert paint"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_level = AlertLevel.MEDIUM
-            widget.alert_flash_counter = 10
-
-            assert widget.alert_level == AlertLevel.MEDIUM
-            assert widget.alert_flash_counter > 0
-
     def test_paint_attributes_activity_indicator(self):
         """Test widget attributes for activity indicator"""
         from argus_overview.ui.main_tab import WindowPreviewWidget
@@ -2730,12 +2569,11 @@ class TestWindowManagerInit:
 
         mock_char_mgr = MagicMock()
         mock_capture = MagicMock()
-        mock_alert = MagicMock()
         mock_settings = MagicMock()
         mock_settings.get.return_value = 15  # Custom FPS
 
         with patch("argus_overview.ui.main_tab.QTimer"):
-            manager = WindowManager(mock_char_mgr, mock_capture, mock_alert, mock_settings)
+            manager = WindowManager(mock_char_mgr, mock_capture, mock_settings)
 
             assert manager.refresh_rate == 15
             mock_settings.get.assert_called()
@@ -2746,10 +2584,9 @@ class TestWindowManagerInit:
 
         mock_char_mgr = MagicMock()
         mock_capture = MagicMock()
-        mock_alert = MagicMock()
 
         with patch("argus_overview.ui.main_tab.QTimer"):
-            manager = WindowManager(mock_char_mgr, mock_capture, mock_alert, None)
+            manager = WindowManager(mock_char_mgr, mock_capture, None)
 
             assert manager.refresh_rate == 5  # Default
 
@@ -3765,7 +3602,6 @@ class TestWindowPreviewWidgetInit:
             widget.window_id = "12345"
             widget.character_name = "TestChar"
             widget.current_pixmap = None
-            widget.alert_level = None
             widget.zoom_factor = 0.3
             widget.custom_label = None
             widget.is_focused = False
@@ -3829,79 +3665,6 @@ class TestWindowPreviewWidgetInit:
 
 class TestWindowPreviewWidgetMethods:
     """Tests for WindowPreviewWidget methods coverage"""
-
-    def test_set_alert_starts_flash(self):
-        """Test set_alert sets alert level and starts timer"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.logger = MagicMock()
-            widget.window_id = "12345"
-            widget.alert_level = None
-            widget.alert_flash_counter = 0
-            widget.flash_timer = MagicMock()
-            widget.flash_timer.isActive.return_value = False
-
-            # Create mock AlertLevel
-            mock_level = MagicMock()
-            widget.set_alert(mock_level)
-
-            assert widget.alert_level == mock_level
-            assert widget.alert_flash_counter == 30
-            widget.flash_timer.start.assert_called_with(100)
-
-    def test_set_alert_timer_already_active(self):
-        """Test set_alert doesn't restart active timer"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.logger = MagicMock()
-            widget.window_id = "12345"
-            widget.alert_level = None
-            widget.alert_flash_counter = 0
-            widget.flash_timer = MagicMock()
-            widget.flash_timer.isActive.return_value = True
-
-            mock_level = MagicMock()
-            widget.set_alert(mock_level)
-
-            # Timer should not be started again
-            widget.flash_timer.start.assert_not_called()
-
-    def test_flash_tick_decrements_counter(self):
-        """Test _flash_tick decrements counter"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_flash_counter = 10
-            widget.alert_level = MagicMock()
-            widget.flash_timer = MagicMock()
-            widget.update = MagicMock()
-
-            widget._flash_tick()
-
-            assert widget.alert_flash_counter == 9
-            widget.update.assert_called_once()
-
-    def test_flash_tick_stops_at_zero(self):
-        """Test _flash_tick stops timer at zero"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_flash_counter = 1
-            widget.alert_level = MagicMock()
-            widget.flash_timer = MagicMock()
-            widget.update = MagicMock()
-
-            widget._flash_tick()
-
-            assert widget.alert_flash_counter == 0
-            assert widget.alert_level is None
-            widget.flash_timer.stop.assert_called_once()
 
     def test_update_session_timer_not_shown(self):
         """Test _update_session_timer returns early if not shown"""
@@ -4093,7 +3856,6 @@ class TestMainTabInit:
             tab.logger = MagicMock()
             tab.capture_system = MagicMock()
             tab.character_manager = MagicMock()
-            tab.alert_detector = MagicMock()
             tab.settings_manager = None
             tab._thumbnails_visible = True
             tab._positions_locked = False
@@ -4896,41 +4658,6 @@ class TestWindowPreviewWidgetMethods2:
             # Should not raise
             widget._load_settings()
 
-    def test_set_alert(self):
-        """Test set_alert starts flash timer"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.logger = MagicMock()
-            widget.window_id = "12345"
-            widget.flash_timer = MagicMock()
-            widget.flash_timer.isActive.return_value = False
-
-            mock_level = MagicMock()
-            widget.set_alert(mock_level)
-
-            assert widget.alert_level == mock_level
-            assert widget.alert_flash_counter == 30
-            widget.flash_timer.start.assert_called_with(100)
-
-    def test_set_alert_timer_already_active(self):
-        """Test set_alert when timer already active"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.logger = MagicMock()
-            widget.window_id = "12345"
-            widget.flash_timer = MagicMock()
-            widget.flash_timer.isActive.return_value = True
-
-            mock_level = MagicMock()
-            widget.set_alert(mock_level)
-
-            # Should not start timer again
-            widget.flash_timer.start.assert_not_called()
-
 
 # =============================================================================
 # MainTab Additional Method Tests
@@ -5170,41 +4897,6 @@ class TestMainTabApplyLayout:
 # =============================================================================
 # WindowPreviewWidget Additional Method Tests
 # =============================================================================
-
-
-class TestWindowPreviewWidgetFlashTick:
-    """Tests for WindowPreviewWidget _flash_tick"""
-
-    def test_flash_tick_decrement(self):
-        """Test _flash_tick decrements counter"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_flash_counter = 10
-            widget.flash_timer = MagicMock()
-            widget.update = MagicMock()
-
-            widget._flash_tick()
-
-            assert widget.alert_flash_counter == 9
-            widget.update.assert_called_once()
-
-    def test_flash_tick_stops_at_zero(self):
-        """Test _flash_tick stops timer at zero"""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
-
-        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
-            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
-            widget.alert_flash_counter = 1
-            widget.flash_timer = MagicMock()
-            widget.update = MagicMock()
-
-            widget._flash_tick()
-
-            assert widget.alert_flash_counter == 0
-            assert widget.alert_level is None
-            widget.flash_timer.stop.assert_called_once()
 
 
 class TestWindowPreviewWidgetSessionTimer:
@@ -5928,51 +5620,6 @@ class TestArrangementGridAddCharacter:
             assert len(grid.tiles) == 1
 
 
-class TestWindowManagerAlertCallback:
-    """Tests for WindowManager alert callback registration"""
-
-    def test_alert_callback_sets_alert_on_frame(self):
-        """Test alert callback sets alert on frame when window exists"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowManager
-
-        with patch.object(WindowManager, "__init__", return_value=None):
-            wm = WindowManager.__new__(WindowManager)
-            wm.logger = MagicMock()
-            wm.preview_frames = {}
-
-            mock_frame = MagicMock()
-            wm.preview_frames["0x123"] = mock_frame
-
-            # Simulate the callback that would be registered
-            def alert_callback(level: AlertLevel):
-                if "0x123" in wm.preview_frames:
-                    wm.preview_frames["0x123"].set_alert(level)
-
-            alert_callback(AlertLevel.HIGH)
-
-            mock_frame.set_alert.assert_called_once_with(AlertLevel.HIGH)
-
-    def test_alert_callback_ignores_removed_window(self):
-        """Test alert callback ignores removed windows"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowManager
-
-        with patch.object(WindowManager, "__init__", return_value=None):
-            wm = WindowManager.__new__(WindowManager)
-            wm.logger = MagicMock()
-            wm.preview_frames = {}
-
-            # Simulate the callback when window was removed
-            def alert_callback(level: AlertLevel):
-                if "0x123" in wm.preview_frames:
-                    wm.preview_frames["0x123"].set_alert(level)
-
-            # Window not in preview_frames - callback should not raise
-            alert_callback(AlertLevel.HIGH)
-            # No assertion needed - just verifying no exception
-
-
 class TestWindowManagerCaptureCycleException:
     """Tests for WindowManager _capture_cycle exception handling"""
 
@@ -6019,8 +5666,6 @@ class TestWindowPreviewWidgetInit:
             widget.window_id = "0x12345"
             widget.character_name = "TestChar"
             widget.current_pixmap = None
-            widget.alert_level = None
-            widget.alert_flash_counter = 0
             widget.zoom_factor = 0.3
 
             assert widget.window_id == "0x12345"
@@ -6098,7 +5743,6 @@ class TestWindowManagerAddWindow:
             manager = WindowManager.__new__(WindowManager)
             manager.preview_frames = {}
             manager.capture_system = MagicMock()
-            manager.alert_detector = MagicMock()
             manager.settings_manager = MagicMock()
             manager.logger = MagicMock()
 
@@ -6121,7 +5765,6 @@ class TestWindowManagerRemoveWindow:
             manager = WindowManager.__new__(WindowManager)
             mock_frame = MagicMock()
             manager.preview_frames = {"0x12345": mock_frame}
-            manager.alert_detector = MagicMock()
             manager.logger = MagicMock()
 
             manager.remove_window("0x12345")
@@ -6136,7 +5779,6 @@ class TestWindowManagerRemoveWindow:
         with patch.object(WindowManager, "__init__", return_value=None):
             manager = WindowManager.__new__(WindowManager)
             manager.preview_frames = {}
-            manager.alert_detector = MagicMock()
             manager.logger = MagicMock()
 
             # Should not raise
@@ -6187,13 +5829,11 @@ class TestWindowManagerProcessResults:
             manager.pending_requests = {"req1": "0x12345"}
             manager._pending_lock = threading.Lock()
             manager.capture_system = MagicMock()
-            manager.alert_detector = MagicMock()
             manager.logger = MagicMock()
 
             # Mock getting one result then None
             mock_image = MagicMock()
             manager.capture_system.get_result.side_effect = [("req1", "0x12345", mock_image), None]
-            manager.alert_detector.analyze_frame.return_value = None
 
             manager._process_capture_results()
 
@@ -6217,7 +5857,6 @@ class TestMainTabInit:
             tab.logger = MagicMock()
             tab.capture_system = MagicMock()
             tab.character_manager = MagicMock()
-            tab.alert_detector = MagicMock()
             tab.settings_manager = MagicMock()
             tab.settings_manager.get.return_value = False
             tab._thumbnails_visible = True
@@ -6603,14 +6242,12 @@ class TestWindowPreviewWidgetRealInit:
         assert widget.character_name == "TestChar"
         assert widget.capture_system == mock_capture
         assert widget.current_pixmap is None
-        assert widget.alert_level is None
         assert widget.zoom_factor == 0.3
         assert widget.custom_label is None
         assert widget.is_focused is False
         assert widget.image_label is not None
         assert widget.info_label is not None
         assert widget.timer_label is not None
-        assert widget.flash_timer is not None
         assert widget.opacity_effect is not None
 
     def test_real_init_with_settings_manager(self, qapp):
@@ -6661,63 +6298,6 @@ class TestWindowPreviewWidgetPaintEventReal:
         # Create a paint event
         event = QPaintEvent(widget.rect())
         widget.paintEvent(event)  # Should not crash
-
-    def test_paint_event_with_alert(self, qapp):
-        """Test paintEvent with alert level"""
-        from PySide6.QtGui import QPaintEvent
-
-        from argus_overview.ui.main_tab import AlertLevel, WindowPreviewWidget
-
-        mock_capture = MagicMock()
-        widget = WindowPreviewWidget(
-            window_id="12345",
-            character_name="TestChar",
-            capture_system=mock_capture,
-        )
-        widget.alert_level = AlertLevel.HIGH
-        widget.alert_flash_counter = 5
-        widget._show_activity_indicator = False
-
-        event = QPaintEvent(widget.rect())
-        widget.paintEvent(event)  # Should draw red border
-
-    def test_paint_event_medium_alert(self, qapp):
-        """Test paintEvent with medium alert"""
-        from PySide6.QtGui import QPaintEvent
-
-        from argus_overview.ui.main_tab import AlertLevel, WindowPreviewWidget
-
-        mock_capture = MagicMock()
-        widget = WindowPreviewWidget(
-            window_id="12345",
-            character_name="TestChar",
-            capture_system=mock_capture,
-        )
-        widget.alert_level = AlertLevel.MEDIUM
-        widget.alert_flash_counter = 5
-        widget._show_activity_indicator = False
-
-        event = QPaintEvent(widget.rect())
-        widget.paintEvent(event)  # Should draw yellow border
-
-    def test_paint_event_low_alert(self, qapp):
-        """Test paintEvent with low alert"""
-        from PySide6.QtGui import QPaintEvent
-
-        from argus_overview.ui.main_tab import AlertLevel, WindowPreviewWidget
-
-        mock_capture = MagicMock()
-        widget = WindowPreviewWidget(
-            window_id="12345",
-            character_name="TestChar",
-            capture_system=mock_capture,
-        )
-        widget.alert_level = AlertLevel.LOW
-        widget.alert_flash_counter = 5
-        widget._show_activity_indicator = False
-
-        event = QPaintEvent(widget.rect())
-        widget.paintEvent(event)  # Should draw green border
 
     def test_paint_event_with_activity_indicator_focused(self, qapp):
         """Test paintEvent draws activity indicator when focused"""
@@ -8256,72 +7836,6 @@ class TestOneClickImportAllFail:
                 tab.status_label.setText.assert_called_with("No new EVE windows found")
 
 
-class TestProcessCaptureResultsAlert:
-    """Tests for _process_capture_results alert detection"""
-
-    def test_process_capture_results_sets_alert(self):
-        """Test _process_capture_results sets alert level on frame"""
-        import threading
-
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowManager
-
-        with patch.object(WindowManager, "__init__", return_value=None):
-            wm = WindowManager.__new__(WindowManager)
-            wm.logger = MagicMock()
-            wm._pending_lock = threading.Lock()
-            wm.pending_requests = {"req1": "0x123"}
-            wm.capture_system = MagicMock()
-
-            # Mock capture result as tuple (request_id, window_id, image)
-            mock_image = MagicMock()
-            # Return result once, then None to exit loop
-            wm.capture_system.get_result.side_effect = [("req1", "0x123", mock_image), None]
-
-            # Mock preview frame
-            mock_frame = MagicMock()
-            wm.preview_frames = {"0x123": mock_frame}
-
-            # Mock alert detector returning an alert
-            wm.alert_detector = MagicMock()
-            wm.alert_detector.analyze_frame.return_value = AlertLevel.HIGH
-
-            wm._process_capture_results()
-
-            # Should set alert on frame
-            mock_frame.set_alert.assert_called_with(AlertLevel.HIGH)
-
-    def test_process_capture_results_handles_exception(self):
-        """Test _process_capture_results handles exception during processing"""
-        import threading
-
-        from argus_overview.ui.main_tab import WindowManager
-
-        with patch.object(WindowManager, "__init__", return_value=None):
-            wm = WindowManager.__new__(WindowManager)
-            wm.logger = MagicMock()
-            wm._pending_lock = threading.Lock()
-            wm.pending_requests = {"req1": "0x123"}
-            wm.capture_system = MagicMock()
-
-            # Mock capture result as tuple
-            mock_image = MagicMock()
-            wm.capture_system.get_result.side_effect = [("req1", "0x123", mock_image), None]
-
-            # Mock preview frame that raises exception
-            mock_frame = MagicMock()
-            mock_frame.update_frame.side_effect = Exception("Frame error")
-            wm.preview_frames = {"0x123": mock_frame}
-
-            wm.alert_detector = MagicMock()
-
-            wm._process_capture_results()
-
-            # Should log error
-            wm.logger.error.assert_called_once()
-            assert "Failed to process frame" in str(wm.logger.error.call_args)
-
-
 class TestFlowLayoutRowWrap:
     """Tests for FlowLayout row wrapping"""
 
@@ -8409,66 +7923,3 @@ class TestWindowPreviewWidgetActivityState:
             result = widget.get_activity_state()
 
             assert result == "focused"
-
-
-class TestWindowManagerAddWindowAlertCallback:
-    """Tests for WindowManager add_window alert callback"""
-
-    def test_add_window_registers_alert_callback(self):
-        """Test add_window registers callback with alert_detector"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowManager
-
-        with patch.object(WindowManager, "__init__", return_value=None):
-            wm = WindowManager.__new__(WindowManager)
-            wm.logger = MagicMock()
-            wm.preview_frames = {}
-            wm.capture_system = MagicMock()
-            wm.alert_detector = MagicMock()
-            wm.settings_manager = MagicMock()
-
-            # Mock WindowPreviewWidget creation
-            mock_frame = MagicMock()
-            with patch("argus_overview.ui.main_tab.WindowPreviewWidget", return_value=mock_frame):
-                wm.add_window("0x123", "TestChar")
-
-                # Verify alert_detector.register_callback was called
-                wm.alert_detector.register_callback.assert_called_once()
-                call_args = wm.alert_detector.register_callback.call_args
-                assert call_args[0][0] == "0x123"  # window_id
-
-                # Get the callback and test it
-                callback = call_args[0][1]
-
-                # Call the callback and verify it sets alert on frame
-                callback(AlertLevel.HIGH)
-                mock_frame.set_alert.assert_called_with(AlertLevel.HIGH)
-
-    def test_alert_callback_ignores_removed_window(self):
-        """Test alert callback does nothing if window was removed"""
-        from argus_overview.core.alert_detector import AlertLevel
-        from argus_overview.ui.main_tab import WindowManager
-
-        with patch.object(WindowManager, "__init__", return_value=None):
-            wm = WindowManager.__new__(WindowManager)
-            wm.logger = MagicMock()
-            wm.preview_frames = {}
-            wm.capture_system = MagicMock()
-            wm.alert_detector = MagicMock()
-            wm.settings_manager = MagicMock()
-
-            mock_frame = MagicMock()
-            with patch("argus_overview.ui.main_tab.WindowPreviewWidget", return_value=mock_frame):
-                wm.add_window("0x123", "TestChar")
-
-                # Get the callback
-                callback = wm.alert_detector.register_callback.call_args[0][1]
-
-                # Remove window from preview_frames
-                wm.preview_frames.clear()
-
-                # Call callback - should not raise and not call set_alert
-                callback(AlertLevel.HIGH)
-                # set_alert was called once during add_window test, but not after clear
-                # Actually, set_alert is only called by the callback, so:
-                mock_frame.set_alert.assert_not_called()

@@ -50,8 +50,6 @@ from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
 
-from argus_overview.core.alert_detector import AlertDetector
-
 # Import core modules
 from argus_overview.core.character_manager import CharacterManager
 from argus_overview.core.discovery import AutoDiscovery
@@ -82,7 +80,6 @@ class MainWindowV21(QMainWindow):
         self.logger.info("Initializing core modules...")
         self.character_manager = CharacterManager()
         self.layout_manager = LayoutManager()
-        self.alert_detector = AlertDetector()
         self.hotkey_manager = HotkeyManager()
         self.settings_sync = EVESettingsSync()
         self.settings_manager = SettingsManager()
@@ -161,7 +158,6 @@ class MainWindowV21(QMainWindow):
         # Connect tray signals (all actions sourced from ActionRegistry)
         self.system_tray.show_hide_requested.connect(self._toggle_visibility)
         self.system_tray.toggle_thumbnails_requested.connect(self._toggle_thumbnails)
-        self.system_tray.toggle_alerts_requested.connect(self._toggle_visual_alerts)
         self.system_tray.minimize_all_requested.connect(self._minimize_all_windows)
         self.system_tray.restore_all_requested.connect(self._restore_all_windows)
         self.system_tray.profile_selected.connect(self._on_profile_selected)
@@ -199,12 +195,6 @@ class MainWindowV21(QMainWindow):
         # Toggle lock
         lock_combo = self.settings_manager.get("hotkeys.toggle_lock", "<ctrl>+<shift>+l")
         self.hotkey_manager.register_hotkey("toggle_lock", lock_combo, self._toggle_lock)
-
-        # Toggle visual alerts
-        toggle_alerts_combo = self.settings_manager.get("hotkeys.toggle_alerts", "<ctrl>+<alt>+a")
-        self.hotkey_manager.register_hotkey(
-            "toggle_alerts", toggle_alerts_combo, self._toggle_visual_alerts
-        )
 
         # Register per-character hotkeys
         char_hotkeys = self.settings_manager.get("character_hotkeys", {})
@@ -251,32 +241,6 @@ class MainWindowV21(QMainWindow):
         """Toggle position lock"""
         if hasattr(self, "main_tab") and hasattr(self.main_tab, "lock_btn"):
             self.main_tab.lock_btn.click()
-
-    @Slot()
-    def _toggle_visual_alerts(self):
-        """Toggle visual alerts on/off"""
-        current_state = self.settings_manager.get("alerts.enabled", True)
-        new_state = not current_state
-
-        # Update settings
-        self.settings_manager.set("alerts.enabled", new_state, auto_save=True)
-
-        # Apply to alert detector
-        self._apply_initial_settings()
-
-        # Update hotkeys tab button if it exists
-        if hasattr(self, "hotkeys_tab") and hasattr(self.hotkeys_tab, "_update_alerts_button_text"):
-            self.hotkeys_tab._update_alerts_button_text(new_state)
-            if hasattr(self.hotkeys_tab, "toggle_alerts_btn"):
-                self.hotkeys_tab.toggle_alerts_btn.setChecked(new_state)
-
-        # Show notification
-        status = "enabled" if new_state else "disabled"
-        self.logger.info(f"Visual alerts {status}")
-        if hasattr(self, "system_tray"):
-            self.system_tray.show_notification(
-                "Visual Alerts", f"Alerts {status}"
-            )
 
     def _get_cycling_group_members(self) -> list:
         """Get members of the current cycling group"""
@@ -572,19 +536,6 @@ class MainWindowV21(QMainWindow):
         workers = self.settings_manager.get("performance.capture_workers", 4)
         self.capture_system.max_workers = workers
 
-        # Apply alert settings
-        from argus_overview.core.alert_detector import AlertConfig
-
-        alert_config = AlertConfig(
-            enabled=self.settings_manager.get("alerts.enabled", True),
-            red_flash_threshold=self.settings_manager.get("alerts.red_flash.threshold", 0.7),
-            change_threshold=self.settings_manager.get("alerts.screen_change.threshold", 0.3),
-            sound_enabled=self.settings_manager.get("alerts.red_flash.sound_alert", False),
-            visual_border=self.settings_manager.get("alerts.red_flash.visual_border", True),
-            alert_cooldown=self.settings_manager.get("alerts.red_flash.cooldown", 5),
-        )
-        self.alert_detector.set_config(alert_config)
-
         self.logger.info("Initial settings applied")
 
     def _create_main_tab(self):
@@ -594,7 +545,6 @@ class MainWindowV21(QMainWindow):
         self.main_tab = MainTab(
             self.capture_system,
             self.character_manager,
-            self.alert_detector,
             settings_manager=self.settings_manager,
         )
         self.tabs.addTab(self.main_tab, "Overview")
@@ -646,9 +596,7 @@ class MainWindowV21(QMainWindow):
         """Create Settings tab (application settings)"""
         from argus_overview.ui.settings_tab import SettingsTab
 
-        self.settings_tab = SettingsTab(
-            self.settings_manager, self.hotkey_manager, self.alert_detector
-        )
+        self.settings_tab = SettingsTab(self.settings_manager, self.hotkey_manager)
         self.tabs.addTab(self.settings_tab, "Settings")
 
         # Connect signals
@@ -776,10 +724,6 @@ class MainWindowV21(QMainWindow):
                 if hasattr(self, "main_tab"):
                     self.main_tab.set_previews_enabled(not value)
 
-        elif key.startswith("alerts"):
-            # Update alert detector config
-            self._apply_initial_settings()
-
         elif key.startswith("hotkeys"):
             # Update hotkey manager
             # Will be implemented with hotkey functionality
@@ -788,20 +732,19 @@ class MainWindowV21(QMainWindow):
     def _apply_low_power_mode(self, enabled: bool):
         """
         Apply low power mode settings.
-        When enabled: FPS=5, alerts disabled.
+        When enabled: FPS=5.
         When disabled: restore previous settings.
 
         Args:
             enabled: True to enable low power mode
         """
         if enabled:
-            self.logger.info("Enabling Low Power Mode (FPS=5, alerts off)")
+            self.logger.info("Enabling Low Power Mode (FPS=5)")
 
             # Store previous values for restoration
             if not hasattr(self, "_low_power_previous"):
                 self._low_power_previous = {
                     "fps": self.settings_manager.get("performance.default_refresh_rate", 30),
-                    "alerts": self.settings_manager.get("alerts.enabled", True),
                 }
 
             # Set FPS to 5
@@ -813,12 +756,8 @@ class MainWindowV21(QMainWindow):
                     self.main_tab.refresh_rate_spin.setValue(5)
                     self.main_tab.refresh_rate_spin.blockSignals(False)
 
-            # Disable alerts
-            self.settings_manager.set("alerts.enabled", False)
-            self._apply_initial_settings()
-
             # Update status bar
-            self.statusBar().showMessage("⚡ Low Power Mode active (FPS=5, alerts off)", 5000)
+            self.statusBar().showMessage("⚡ Low Power Mode active (FPS=5)", 5000)
 
         else:
             self.logger.info("Disabling Low Power Mode (restoring previous settings)")
@@ -834,10 +773,6 @@ class MainWindowV21(QMainWindow):
                         self.main_tab.refresh_rate_spin.blockSignals(True)
                         self.main_tab.refresh_rate_spin.setValue(prev["fps"])
                         self.main_tab.refresh_rate_spin.blockSignals(False)
-
-                # Restore alerts
-                self.settings_manager.set("alerts.enabled", prev["alerts"])
-                self._apply_initial_settings()
 
                 del self._low_power_previous
 
