@@ -254,7 +254,7 @@ class TestSettingsTab:
         mock_settings_manager.get.return_value = {}
 
         mock_hotkey_manager = MagicMock()
-        
+
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
                 tab = SettingsTab(mock_settings_manager, mock_hotkey_manager)
@@ -273,13 +273,11 @@ class TestSettingsTab:
         mock_settings_manager.get.return_value = {}
 
         mock_hotkey_manager = MagicMock()
-        
+
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
                 with patch.object(SettingsTab, "settings_changed", MagicMock()):
-                    tab = SettingsTab(
-                        mock_settings_manager, mock_hotkey_manager
-                    )
+                    tab = SettingsTab(mock_settings_manager, mock_hotkey_manager)
 
                     tab._on_setting_changed("test.key", "test_value")
 
@@ -296,7 +294,7 @@ class TestSettingsTab:
         mock_settings_manager.get.return_value = {}
 
         mock_hotkey_manager = MagicMock()
-        
+
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
                 tab = SettingsTab(mock_settings_manager, mock_hotkey_manager)
@@ -324,7 +322,7 @@ class TestSettingsTab:
         mock_settings_manager.get.return_value = {}
 
         mock_hotkey_manager = MagicMock()
-        
+
         # Simulate user clicking Yes - use StandardButton.Yes
         mock_msgbox.StandardButton = QMessageBox.StandardButton
         mock_msgbox.question.return_value = QMessageBox.StandardButton.Yes
@@ -1046,7 +1044,7 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        
+
         with patch.object(SettingsTab, "__init__", return_value=None):
             tab = SettingsTab.__new__(SettingsTab)
             tab.settings_manager = mock_settings
@@ -1068,7 +1066,7 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        
+
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
                 tab = SettingsTab(mock_settings, mock_hotkey_mgr)
@@ -1089,7 +1087,7 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        
+
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
                 tab = SettingsTab(mock_settings, mock_hotkey_mgr)
@@ -1116,7 +1114,7 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        
+
         mock_msgbox.StandardButton = QMessageBox.StandardButton
         mock_msgbox.question.return_value = QMessageBox.StandardButton.No
 
@@ -1138,7 +1136,7 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        
+
         with patch.object(SettingsTab, "_setup_ui"):
             tab = SettingsTab(mock_settings, mock_hotkey_mgr)
 
