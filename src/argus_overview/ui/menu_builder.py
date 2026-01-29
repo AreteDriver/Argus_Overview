@@ -105,11 +105,13 @@ class MenuBuilder:
         handlers = handlers or {}
         profiles = profiles or []
 
-        # Order: show_hide, toggle_thumbnails, separator, minimize_all, restore_all,
-        #        separator, profiles, separator, settings, reload_config, separator, quit
+        # Order: show_hide, toggle_thumbnails, toggle_alerts_tray, separator,
+        #        minimize_all, restore_all, separator, profiles, separator,
+        #        settings, reload_config, separator, quit
         action_order = [
             "show_hide",
             "toggle_thumbnails",
+            "toggle_alerts_tray",
             None,  # separator
             "minimize_all",
             "restore_all",
