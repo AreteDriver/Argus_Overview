@@ -5,6 +5,18 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.9.0] - 2026-01-29
+
+### Added
+- **Intel Channel Parser** - New Intel tab that monitors EVE chat logs for intel reports
+  - Detects null-sec system names (HED-GP, 1DQ1-A, etc.)
+  - Recognizes 100+ EVE ship types including capitals
+  - Parses hostile counts (+5, x10, gang of 20, etc.)
+  - Threat level assessment (clear, info, warning, danger, critical)
+  - Configurable alert thresholds and cooldowns
+  - Multiple intel channel support (Alliance, Intel, etc.)
+  - Auto-detection of EVE log directory (native and Proton)
+
 ## [2.8.6] - 2026-01-29
 
 ### Removed

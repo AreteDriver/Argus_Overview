@@ -1,4 +1,4 @@
-# Argus Overview v2.8
+# Argus Overview v2.9
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
@@ -54,7 +54,25 @@ Your support helps keep this project maintained and improving! o7
 
 ---
 
-## 🌟 **v2.8 - CCP Fair Play Compliance**
+## 🌟 **v2.9 - Intel Channel Parser**
+
+Monitor your intel channels and stay safe in null-sec!
+
+### New in v2.9:
+- **Intel Tab** - New tab for monitoring EVE chat logs
+- **System Detection** - Recognizes null-sec system names (HED-GP, 1DQ1-A, etc.)
+- **Ship Recognition** - Identifies 100+ EVE ship types including capitals
+- **Hostile Counts** - Parses counts (+5, x10, gang of 20, etc.)
+- **Threat Assessment** - Five levels from clear to critical
+- **Configurable Alerts** - Set thresholds and cooldowns
+- **Auto Log Detection** - Finds EVE logs in native and Proton installs
+
+---
+
+## Previous Releases
+
+<details>
+<summary><strong>v2.8 CCP Fair Play Compliance</strong></summary>
 
 This release ensures **full compliance with CCP's EULA and Fair Play Policy**.
 
@@ -63,9 +81,7 @@ This release ensures **full compliance with CCP's EULA and Fair Play Policy**.
 - **Tab Rename** - "Automation" tab renamed to "Cycle Control" for clarity
 - **Documentation Updates** - All docs updated for consistency
 
----
-
-## Previous Releases
+</details>
 
 <details>
 <summary><strong>v2.7 Performance Edition</strong></summary>
