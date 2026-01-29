@@ -618,13 +618,13 @@ class MainWindowV21(QMainWindow):
         self.characters_tab.team_selected.connect(self._on_team_selected)
 
     def _create_hotkeys_tab(self):
-        """Create Automation tab (hotkeys & cycling) - formerly 'Hotkeys & Cycling'"""
+        """Create Cycle Control tab (hotkeys, cycling, alerts)"""
         from argus_overview.ui.hotkeys_tab import HotkeysTab
 
         self.hotkeys_tab = HotkeysTab(
             self.character_manager, self.settings_manager, main_tab=self.main_tab
         )
-        self.tabs.addTab(self.hotkeys_tab, "Automation")
+        self.tabs.addTab(self.hotkeys_tab, "Cycle Control")
 
         # Connect group changes to refresh layout sources in overview tab
         self.hotkeys_tab.group_changed.connect(self.main_tab.refresh_layout_groups)
