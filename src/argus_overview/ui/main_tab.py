@@ -1784,7 +1784,6 @@ class MainTab(QWidget):
             except (RuntimeError, TypeError):
                 pass
             # Stop per-frame timers
-            frame.flash_timer.stop()
             frame.session_timer.stop()
         self.window_manager.remove_window(window_id)
         self._update_status()
@@ -1921,7 +1920,6 @@ class MainTab(QWidget):
         self.status_timer.stop()
         # Stop per-frame timers
         for frame in self.window_manager.preview_frames.values():
-            frame.flash_timer.stop()
             frame.session_timer.stop()
 
     def set_previews_enabled(self, enabled: bool):
