@@ -19,7 +19,7 @@ Window preview management with grid layouts and auto-arrange.
 Character management with roles, status, and team organization.
 ![Roster](docs/screenshot-roster.png)
 
-### Automation Tab
+### Cycle Control Tab
 Cycling groups with hotkey recording.
 ![Automation](docs/screenshot-automation.png)
 
