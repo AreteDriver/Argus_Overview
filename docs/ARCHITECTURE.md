@@ -226,7 +226,7 @@ All UI actions are centralized in the ActionRegistry to prevent duplication.
 │  │ OVERVIEW_TOOLBAR:  import_windows, lock_positions, ...       │ │
 │  │ ROSTER_TOOLBAR:    add_character, new_team, ...              │ │
 │  │ LAYOUTS_TOOLBAR:   apply_layout, auto_arrange, ...           │ │
-│  │ AUTOMATION_TOOLBAR: new_group, save_hotkeys, ...             │ │
+│  │ CYCLE_CONTROL_TOOLBAR: new_group, save_hotkeys, ...          │ │
 │  │ SYNC_TOOLBAR:      scan_eve_settings, sync_settings, ...     │ │
 │  │ SETTINGS_PANEL:    reset_all_settings, export/import, ...    │ │
 │  └─────────────────────────────────────────────────────────────┘ │

@@ -364,7 +364,7 @@ class MainWindowV21(QMainWindow):
         self.raise_()
         self.tabs.setCurrentIndex(
             4
-        )  # Settings tab (Overview=0, Roster=1, Automation=2, Sync=3, Settings=4)
+        )  # Settings tab (Overview=0, Cycle Control=1, Roster=2, Sync=3, Settings=4)
 
     @Slot()
     def _reload_config(self):

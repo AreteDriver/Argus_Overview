@@ -93,7 +93,7 @@ class TestPrimaryHome:
         assert PrimaryHome.OVERVIEW_TOOLBAR
         assert PrimaryHome.ROSTER_TOOLBAR
         assert PrimaryHome.LAYOUTS_TOOLBAR
-        assert PrimaryHome.AUTOMATION_TOOLBAR
+        assert PrimaryHome.CYCLE_CONTROL_TOOLBAR
         assert PrimaryHome.SYNC_TOOLBAR
         assert PrimaryHome.SETTINGS_PANEL
 
@@ -130,7 +130,7 @@ class TestHomeTiers:
             PrimaryHome.OVERVIEW_TOOLBAR,
             PrimaryHome.ROSTER_TOOLBAR,
             PrimaryHome.LAYOUTS_TOOLBAR,
-            PrimaryHome.AUTOMATION_TOOLBAR,
+            PrimaryHome.CYCLE_CONTROL_TOOLBAR,
             PrimaryHome.SYNC_TOOLBAR,
             PrimaryHome.SETTINGS_PANEL,
         ]

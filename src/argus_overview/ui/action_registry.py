@@ -40,7 +40,7 @@ class PrimaryHome(Enum):
     OVERVIEW_TOOLBAR = "overview_toolbar"
     ROSTER_TOOLBAR = "roster_toolbar"
     LAYOUTS_TOOLBAR = "layouts_toolbar"
-    AUTOMATION_TOOLBAR = "automation_toolbar"
+    CYCLE_CONTROL_TOOLBAR = "cycle_control_toolbar"
     SYNC_TOOLBAR = "sync_toolbar"
     SETTINGS_PANEL = "settings_panel"  # Settings tab is special - uses panels not toolbar
     HELP_MENU = "help_menu"
@@ -60,7 +60,7 @@ HOME_TIERS = {
     PrimaryHome.OVERVIEW_TOOLBAR: 2,
     PrimaryHome.ROSTER_TOOLBAR: 2,
     PrimaryHome.LAYOUTS_TOOLBAR: 2,
-    PrimaryHome.AUTOMATION_TOOLBAR: 2,
+    PrimaryHome.CYCLE_CONTROL_TOOLBAR: 2,
     PrimaryHome.SYNC_TOOLBAR: 2,
     PrimaryHome.SETTINGS_PANEL: 2,
     PrimaryHome.WINDOW_CONTEXT: 3,
@@ -415,18 +415,18 @@ class ActionRegistry:
                 label="Refresh Groups",
                 scope=ActionScope.TAB,
                 primary_home=PrimaryHome.LAYOUTS_TOOLBAR,
-                tooltip="Reload cycling groups from Automation tab",
+                tooltip="Reload cycling groups from Cycle Control tab",
                 handler_name="_refresh_groups",
             )
         )
 
-        # --- Automation Tab (Hotkeys + Cycling) ---
+        # --- Cycle Control Tab (Hotkeys + Cycling) ---
         self.register(
             ActionSpec(
                 id="new_group",
                 label="New Group",
                 scope=ActionScope.TAB,
-                primary_home=PrimaryHome.AUTOMATION_TOOLBAR,
+                primary_home=PrimaryHome.CYCLE_CONTROL_TOOLBAR,
                 tooltip="Create new cycling group",
                 handler_name="_create_new_group",
             )
@@ -437,7 +437,7 @@ class ActionRegistry:
                 id="load_active_windows",
                 label="Load Active Windows",
                 scope=ActionScope.TAB,
-                primary_home=PrimaryHome.AUTOMATION_TOOLBAR,
+                primary_home=PrimaryHome.CYCLE_CONTROL_TOOLBAR,
                 tooltip="Load all currently active EVE windows into this group",
                 handler_name="_load_active_windows",
             )
@@ -448,7 +448,7 @@ class ActionRegistry:
                 id="save_hotkeys",
                 label="Save Hotkeys",
                 scope=ActionScope.TAB,
-                primary_home=PrimaryHome.AUTOMATION_TOOLBAR,
+                primary_home=PrimaryHome.CYCLE_CONTROL_TOOLBAR,
                 tooltip="Save hotkey settings",
                 handler_name="_save_hotkeys",
             )
