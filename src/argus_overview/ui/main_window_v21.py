@@ -126,6 +126,7 @@ class MainWindowV21(QMainWindow):
         self._create_main_tab()
         self._create_hotkeys_tab()
         self._create_characters_tab()
+        self._create_intel_tab()
         self._create_settings_sync_tab()
         self._create_settings_tab()
 
@@ -585,6 +586,53 @@ class MainWindowV21(QMainWindow):
         self.hotkeys_tab.cycle_backward_edit.recordingStarted.connect(self.hotkey_manager.pause)
         self.hotkeys_tab.cycle_backward_edit.recordingStopped.connect(self.hotkey_manager.resume)
 
+    def _create_intel_tab(self):
+        """Create Intel tab (chat log monitoring and alerts)"""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        self.intel_tab = IntelTab(self.settings_manager)
+        self.tabs.addTab(self.intel_tab, "Intel")
+
+        # Connect alert signals to main window for visual feedback
+        self.intel_tab.alert_triggered.connect(self._on_intel_alert)
+        self.intel_tab.intel_received.connect(self._on_intel_received)
+
+        # Connect alert dispatcher border flash to main tab
+        alert_dispatcher = self.intel_tab.get_alert_dispatcher()
+        alert_dispatcher.border_flash_requested.connect(self._flash_preview_borders)
+
+        self.logger.info("Intel tab created")
+
+    @Slot(str, int)
+    def _flash_preview_borders(self, color: str, duration_ms: int):
+        """Flash all preview window borders with the given color."""
+        if hasattr(self, "main_tab") and hasattr(self.main_tab, "window_manager"):
+            for frame in self.main_tab.window_manager.preview_frames.values():
+                if hasattr(frame, "flash_border"):
+                    frame.flash_border(color, duration_ms)
+
+    @Slot(object, object)
+    def _on_intel_alert(self, report, alert_type):
+        """Handle intel alert from intel tab."""
+        from argus_overview.intel.parser import IntelReport
+
+        if not isinstance(report, IntelReport):
+            return
+
+        # Show tray notification for critical alerts
+        if report.threat_level.value == "critical":
+            if hasattr(self, "system_tray"):
+                self.system_tray.show_notification(
+                    f"CRITICAL: {report.system or 'Unknown'}",
+                    f"{report.hostile_count or '?'} hostiles - {', '.join(report.ship_types[:2]) or 'unknown ships'}",
+                )
+
+    @Slot(object)
+    def _on_intel_received(self, report):
+        """Handle intel received from intel tab."""
+        # Could update status bar or other UI elements
+        pass
+
     def _create_settings_sync_tab(self):
         """Create Sync tab (EVE settings sync) - formerly 'Settings Sync'"""
         from argus_overview.ui.settings_sync_tab import SettingsSyncTab
@@ -665,6 +713,15 @@ class MainWindowV21(QMainWindow):
                 [
                     ("new_character_found", self._on_new_character_discovered),
                     ("character_gone", self._on_character_gone),
+                ],
+            ),
+            # intel_tab signals
+            (
+                self,
+                "intel_tab",
+                [
+                    ("alert_triggered", self._on_intel_alert),
+                    ("intel_received", self._on_intel_received),
                 ],
             ),
         ]
@@ -873,6 +930,10 @@ class MainWindowV21(QMainWindow):
         # Stop capture timer in main_tab
         if hasattr(self, "main_tab"):
             self.main_tab.stop_capture_loop()
+
+        # Stop intel monitoring
+        if hasattr(self, "intel_tab"):
+            self.intel_tab.stop()
 
         # Stop systems
         if hasattr(self, "auto_discovery"):

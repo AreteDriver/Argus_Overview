@@ -82,6 +82,19 @@ class SettingsManager:
             "config_directory": "~/.config/argus-overview",
             "enable_debug": False,
         },
+        "intel": {
+            "channels": ["Alliance", "Intel"],  # Default intel channels to monitor
+            "alerts_enabled": True,
+            "visual_border": True,
+            "visual_overlay": True,
+            "audio_enabled": True,
+            "system_notification": False,
+            "min_threat_level": "warning",  # info, warning, danger, critical
+            "jumps_threshold": 5,  # Only alert if hostile within N jumps
+            "cooldown_seconds": 5,  # Minimum time between alerts for same system
+            "current_system": "",  # Player's current system for jump calculations
+            "custom_log_path": "",  # Custom path to EVE chat logs
+        },
     }
 
     def __init__(self, config_dir: Optional[Path] = None):
