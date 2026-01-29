@@ -1117,9 +1117,7 @@ class MainTab(QWidget):
     thumbnails_toggled = Signal(bool)  # visible
     layout_applied = Signal(str)  # pattern name
 
-    def __init__(
-        self, capture_system, character_manager, settings_manager=None, parent=None
-    ):
+    def __init__(self, capture_system, character_manager, settings_manager=None, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.capture_system = capture_system
@@ -1147,9 +1145,7 @@ class MainTab(QWidget):
         self._load_cycling_groups()
 
         # Create window manager
-        self.window_manager = WindowManager(
-            character_manager, capture_system, settings_manager
-        )
+        self.window_manager = WindowManager(character_manager, capture_system, settings_manager)
 
         self._setup_ui()
 

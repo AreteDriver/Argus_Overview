@@ -596,9 +596,7 @@ class MainWindowV21(QMainWindow):
         """Create Settings tab (application settings)"""
         from argus_overview.ui.settings_tab import SettingsTab
 
-        self.settings_tab = SettingsTab(
-            self.settings_manager, self.hotkey_manager
-        )
+        self.settings_tab = SettingsTab(self.settings_manager, self.hotkey_manager)
         self.tabs.addTab(self.settings_tab, "Settings")
 
         # Connect signals
