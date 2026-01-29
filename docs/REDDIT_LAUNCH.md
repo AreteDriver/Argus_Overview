@@ -19,7 +19,7 @@ Think EVE-O Preview, but native Linux with even more features.
 - Global Hotkeys - Per-character hotkeys (Ctrl+1 = Main, Ctrl+2 = Scout, etc.)
 - Auto-Tiling - 6 grid patterns for instant window arrangement
 - Team Management - Group characters by activity (Mining, PvP, Market)
-- Visual Alerts - Red flash detection for combat/damage warnings
+- Low Power Mode - Reduce resource usage when AFK
 - Settings Sync - Copy keybinds/overview from main to all alts in seconds
 - Layout Presets - Save and restore window arrangements
 
@@ -43,8 +43,8 @@ Think EVE-O Preview, but native Linux with even more features.
 ![Team Management](https://raw.githubusercontent.com/AreteDriver/Argus_Overview/main/docs/screenshots/team-management.png)
 *Team management - group characters by activity*
 
-![Visual Alerts](https://raw.githubusercontent.com/AreteDriver/Argus_Overview/main/docs/screenshots/visual-alerts.png)
-*Visual alerts - red flash detection for combat warnings*
+![Cycle Control](https://raw.githubusercontent.com/AreteDriver/Argus_Overview/main/docs/screenshot-cycle-control.png)
+*Cycle Control - hotkey management and window cycling*
 
 ---
 
@@ -111,7 +111,7 @@ If you run EVE through Lutris, Steam Proton, or native Wine, this tool works gre
 | Team Management | No | Yes |
 | EVE Settings Sync | No | Yes |
 | Grid Patterns | Basic | 6+ patterns |
-| Visual Alerts | Basic | Advanced |
+| Low Power Mode | No | Yes |
 | Hover Effects | No | Yes |
 | Session Timers | No | Yes |
 | Themes | No | 3 themes |

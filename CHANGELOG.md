@@ -165,7 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DEV_NOTES.md** - Developer documentation for action tier rules
 
 ### Changed
-- **Tab Renames** - Main→Overview, Characters & Teams→Roster, Hotkeys & Cycling→Automation, Settings Sync→Sync
+- **Tab Renames** - Main→Overview, Characters & Teams→Roster, Hotkeys & Cycling→Cycle Control, Settings Sync→Sync
 - All menus now built from ActionRegistry (no hard-coded duplicates)
 - Tray menu includes Minimize All / Restore All actions
 - Consistent button styling via ToolbarBuilder (PRIMARY, SUCCESS, DANGER)

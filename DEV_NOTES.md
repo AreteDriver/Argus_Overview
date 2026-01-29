@@ -25,7 +25,7 @@ but must not create duplicate clickable UI elements.
 | Overview | Window preview management, capture | `OVERVIEW_TOOLBAR` |
 | Roster | Characters & teams management | `ROSTER_TOOLBAR` |
 | Layouts | Window arrangement patterns | `LAYOUTS_TOOLBAR` |
-| Automation | Hotkeys, cycling groups, alerts | `AUTOMATION_TOOLBAR` |
+| Cycle Control | Hotkeys, cycling groups | `CYCLE_CONTROL_TOOLBAR` |
 | Sync | EVE settings synchronization | `SYNC_TOOLBAR` |
 | Settings | Application configuration | `SETTINGS_PANEL` |
 
@@ -73,7 +73,7 @@ class PrimaryHome(Enum):
     OVERVIEW_TOOLBAR = "overview_toolbar"
     ROSTER_TOOLBAR = "roster_toolbar"
     LAYOUTS_TOOLBAR = "layouts_toolbar"
-    AUTOMATION_TOOLBAR = "automation_toolbar"
+    CYCLE_CONTROL_TOOLBAR = "cycle_control_toolbar"
     SYNC_TOOLBAR = "sync_toolbar"
     SETTINGS_PANEL = "settings_panel"
 
@@ -134,9 +134,9 @@ The audit exits with code 0 if passed, 1 if failed.
 | `new_team` | New Team | Roster | - |
 | `apply_layout` | Apply Layout | Layouts | - |
 | `auto_arrange` | Auto-Arrange | Layouts | - |
-| `new_group` | New Group | Automation | - |
-| `load_active_windows` | Load Active Windows | Automation | - |
-| `save_hotkeys` | Save Hotkeys | Automation | - |
+| `new_group` | New Group | Cycle Control | - |
+| `load_active_windows` | Load Active Windows | Cycle Control | - |
+| `save_hotkeys` | Save Hotkeys | Cycle Control | - |
 | `scan_eve_settings` | Scan for EVE Settings | Sync | - |
 | `preview_sync` | Preview Sync | Sync | - |
 | `sync_settings` | Sync Settings | Sync | - |
@@ -165,14 +165,14 @@ The audit exits with code 0 if passed, 1 if failed.
 **Tab Renames:**
 - Main → Overview
 - Characters & Teams → Roster
-- Hotkeys & Cycling → Automation
+- Hotkeys & Cycling → Cycle Control
 - Settings Sync → Sync
 
 **Removed Redundancies:**
 - Removed duplicate "Settings" button that just navigated to Settings tab
   (kept in tray for when app is minimized)
 - Consolidated window management actions in Overview toolbar
-- Moved hotkey editing from Settings tab to Automation tab
+- Moved hotkey editing from Settings tab to Cycle Control tab
 
 **New Features:**
 - Minimize All / Restore All in tray menu

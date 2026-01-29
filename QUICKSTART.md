@@ -93,11 +93,6 @@ Log in to your EVE characters as normal.
 - Auto-assignment when logging in
 - Link teams to layouts
 
-### Visual Activity Alerts
-- Red flash detection (combat!)
-- Screen change monitoring
-- Border flashing on alerts
-
 ### Multi-Monitor Support
 - Auto-detect all monitors
 - Per-monitor layouts
@@ -140,7 +135,7 @@ Log in to your EVE characters as normal.
 - Create one layout per activity
 - Link teams to layouts
 - Sync settings from MAIN to all alts once
-- Enable alerts for safety
+- Use Low Power mode when AFK
 
 ### Performance
 - Lower refresh rate = less CPU
@@ -161,15 +156,13 @@ Log in to your EVE characters as normal.
 1. Create "Mining Team" (Orca + 3 miners)
 2. Use 2x2 grid layout
 3. Save as "Mining Layout"
-4. Enable visual alerts
-5. Minimize inactive to save GPU
+4. Minimize inactive to save GPU
 
 ### PvP Operations
 1. Create "PvP Team" (FC + Logi + Scouts)
 2. Use Main + Sides layout (FC big, others small)
 3. Link to team
-4. Red flash alerts on all
-5. Quick Ctrl+Tab cycling
+4. Quick Ctrl+Tab cycling
 
 ### Market Trading
 1. Sync overview settings from main to all traders
@@ -183,9 +176,6 @@ Log in to your EVE characters as normal.
 
 **Characters not found for sync?**
 → Add custom EVE path in Settings Sync tab
-
-**Alerts not triggering?**
-→ Adjust sensitivity in Settings tab
 
 **Windows not auto-arranging?**
 → Check character names match EVE window titles

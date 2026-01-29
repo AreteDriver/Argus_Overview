@@ -76,7 +76,7 @@ argus-overview/
 │       ├── core/                        # Core modules
 │       │   ├── character_manager.py     # Character & team system
 │       │   ├── layout_manager.py        # Layout presets & grids
-│       │   ├── alert_detector.py        # Visual alerts
+│       │   ├── position.py              # Window positioning
 │       │   ├── eve_settings_sync.py     # Settings synchronization
 │       │   ├── window_capture_threaded.py # Threaded capture
 │       │   ├── hotkey_manager.py        # Global hotkeys
@@ -90,7 +90,7 @@ argus-overview/
 │       │   ├── layouts_tab.py           # Layouts tab
 │       │   ├── settings_sync_tab.py     # Sync tab
 │       │   ├── settings_tab.py          # Settings tab
-│       │   ├── hotkeys_tab.py           # Hotkeys tab
+│       │   ├── hotkeys_tab.py           # Cycle Control tab
 │       │   ├── about_dialog.py          # About dialog
 │       │   ├── tray.py                  # System tray
 │       │   ├── themes.py                # Theme management

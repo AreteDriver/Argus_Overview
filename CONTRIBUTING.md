@@ -47,7 +47,7 @@ Argus_Overview/
 │       ├── core/                  # Business logic
 │       │   ├── character_manager.py
 │       │   ├── layout_manager.py
-│       │   ├── alert_detector.py
+│       │   ├── position.py
 │       │   └── ...
 │       ├── ui/                    # UI components
 │       │   ├── main_window_v21.py

@@ -11,7 +11,7 @@ Complete reference for all features in Argus Overview v2.8.
 3. [Overview Tab](#overview-tab)
 4. [Characters & Teams Tab](#characters--teams-tab)
 5. [Layouts Tab](#layouts-tab)
-6. [Automation Tab](#automation-tab)
+6. [Cycle Control Tab](#cycle-control-tab)
 7. [Settings Sync Tab](#settings-sync-tab)
 8. [Settings Tab](#settings-tab)
 9. [System Tray](#system-tray)
@@ -58,7 +58,7 @@ Argus Overview uses a tabbed interface:
 | **Overview** | Live window previews, capture settings |
 | **Characters & Teams** | Character database, team management |
 | **Layouts** | Window arrangement presets |
-| **Automation** | Hotkeys, cycling groups, alerts |
+| **Cycle Control** | Hotkeys, cycling groups |
 | **Settings Sync** | EVE settings synchronization |
 | **Settings** | Application configuration |
 
@@ -81,7 +81,7 @@ The Overview tab is your main workspace for managing EVE window previews.
 | **Import All** | Scan and add all EVE windows |
 | **Refresh** | Re-scan window list |
 | **Lock** | Toggle position lock (Ctrl+Shift+L) |
-| **Low Power** | Reduce FPS to 5, disable alerts |
+| **Low Power** | Reduce FPS to 5 for power saving |
 | **Disable Previews** | Stop capture entirely |
 
 ### Preview Filter
@@ -94,7 +94,7 @@ Each preview shows:
 - **Character name** or custom label
 - **Activity indicator**: Green (focused), Yellow (recent), Gray (idle)
 - **Session timer** (optional): How long the character has been active
-- **Alert border**: Flashes when activity detected
+- **Status border**: Shows window state
 
 ### Preview Controls
 
@@ -203,9 +203,9 @@ One-click arrangements:
 
 ---
 
-## Automation Tab
+## Cycle Control Tab
 
-Configure hotkeys and alerts.
+Configure hotkeys and window cycling.
 
 ### Global Hotkeys
 
@@ -220,23 +220,12 @@ Configure hotkeys and alerts.
 - Example: Ctrl+1 → "Main Character"
 - Configure in the character hotkey list
 
-### Visual Alerts
+### Cycling Groups
 
-Get notified of combat or activity:
-
-**Alert Types:**
-- **Red Flash**: Damage/combat detected (high priority)
-- **Screen Change**: Significant visual change (medium priority)
-
-**Alert Settings:**
-- **Sensitivity**: Adjust detection threshold
-- **Flash Duration**: How long border flashes
-- **Sound**: Optional audio alert
-
-**Alert Indicators:**
-- Preview border flashes orange/red
-- Activity dot turns yellow/red
-- Optional system notification
+Create custom cycling groups:
+- Group specific characters together
+- Cycle through only group members
+- Useful for separating fleets/activities
 
 ---
 
@@ -336,7 +325,6 @@ The orange "V" icon provides quick access:
 
 The tray shows notifications for:
 - New characters detected
-- Alert triggers
 - Sync completion
 
 ---
@@ -364,7 +352,7 @@ The tray shows notifications for:
 
 ### Configurable
 
-Per-character hotkeys and cycling groups are user-configurable in the Automation tab.
+Per-character hotkeys and cycling groups are user-configurable in the Cycle Control tab.
 
 ---
 
@@ -398,16 +386,6 @@ Edit `settings.json` while running, then use **Tray → Reload Config** to apply
 2. Click "Add Custom Path"
 3. Navigate to your EVE settings folder
 4. Steam path: `~/.local/share/Steam/steamapps/compatdata/8500/pfx/drive_c/users/steamuser/AppData/Local/CCP/EVE/`
-
-### Alerts not triggering
-
-**Cause**: Sensitivity too low or alerts disabled
-
-**Fix**:
-1. Open Automation tab
-2. Increase alert sensitivity
-3. Ensure alerts are enabled per-character
-4. Check Low Power Mode is off (disables alerts)
 
 ### High CPU usage
 

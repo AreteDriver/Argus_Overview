@@ -21,7 +21,7 @@ Character management with roles, status, and team organization.
 
 ### Cycle Control Tab
 Cycling groups with hotkey recording.
-![Automation](docs/screenshot-automation.png)
+![Cycle Control](docs/screenshot-cycle-control.png)
 
 ### Sync Tab
 EVE settings synchronization between characters.
@@ -54,9 +54,23 @@ Your support helps keep this project maintained and improving! o7
 
 ---
 
-## 🌟 **v2.7 Performance Edition**
+## 🌟 **v2.8 - CCP Fair Play Compliance**
 
-This release focuses on **performance optimization and security hardening**!
+This release ensures **full compliance with CCP's EULA and Fair Play Policy**.
+
+### Changes in v2.8:
+- **Removed Visual Alerts** - Red flash detection feature removed for EULA compliance
+- **Tab Rename** - "Automation" tab renamed to "Cycle Control" for clarity
+- **Documentation Updates** - All docs updated for consistency
+
+---
+
+## Previous Releases
+
+<details>
+<summary><strong>v2.7 Performance Edition</strong></summary>
+
+This release focused on **performance optimization and security hardening**.
 
 ### ✅ **NEW in v2.7:**
 
@@ -81,9 +95,10 @@ This release focuses on **performance optimization and security hardening**!
 - Path traversal prevention in layout manager
 - Narrowed exception handlers to specific types
 
----
+</details>
 
-## 🌟 **v2.6 Performance & Layout Edition**
+<details>
+<summary><strong>v2.6 Performance & Layout Edition</strong></summary>
 
 This release focuses on **performance optimization and layout management** for running multiple EVE clients smoothly!
 
@@ -114,9 +129,10 @@ This release focuses on **performance optimization and layout management** for r
 - Supports F13/F14 for G13 integration
 - No more manual text entry
 
----
+</details>
 
-## 🌟 **v2.2 Ultimate Edition - Major UX Overhaul!**
+<details>
+<summary><strong>v2.2 Ultimate Edition - Major UX Overhaul</strong></summary>
 
 This release focused on **usability, automation, and polish** with 14 new features!
 
@@ -226,6 +242,8 @@ This release focused on **usability, automation, and polish** with 14 new featur
 - Copy keybindings between characters
 - Sync UI layouts, overview settings
 - Batch sync to entire team
+
+</details>
 
 ---
 

@@ -13,7 +13,7 @@ Technical architecture documentation for developers and contributors.
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                        UI Layer (PySide6/Qt)                     │   │
 │  │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │   │
-│  │  │ Overview │ │  Roster  │ │ Layouts  │ │Automation│ ...        │   │
+│  │  │ Overview │ │  Roster  │ │ Layouts  │ │  Cycle   │ ...        │   │
 │  │  │   Tab    │ │   Tab    │ │   Tab    │ │   Tab    │           │   │
 │  │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘           │   │
 │  │       │            │            │            │                  │   │
@@ -29,7 +29,7 @@ Technical architecture documentation for developers and contributors.
 │  │  │  Capture   │  │   Manager       │  │     Manager       │    │   │
 │  │  └────────────┘  └─────────────────┘  └───────────────────┘    │   │
 │  │  ┌────────────┐  ┌─────────────────┐  ┌───────────────────┐    │   │
-│  │  │   Alert    │  │   Hotkey        │  │   EVE Settings    │    │   │
+│  │  │  Config    │  │   Hotkey        │  │   EVE Settings    │    │   │
 │  │  │  Detector  │  │   Manager       │  │      Sync         │    │   │
 │  │  └────────────┘  └─────────────────┘  └───────────────────┘    │   │
 │  │  ┌────────────┐  ┌─────────────────┐                           │   │
@@ -58,7 +58,7 @@ src/
 └── eve_overview_pro/
     ├── __init__.py
     ├── core/                        # Business logic (no Qt dependencies)
-    │   ├── alert_detector.py        # Red flash / activity detection
+    │   ├── position.py              # Window position utilities
     │   ├── character_manager.py     # Character & team database
     │   ├── config_watcher.py        # Hot-reload configuration
     │   ├── discovery.py             # Auto-discover EVE windows
@@ -74,7 +74,7 @@ src/
     │   ├── main_tab.py              # Overview/preview tab
     │   ├── characters_teams_tab.py  # Roster management tab
     │   ├── layouts_tab.py           # Layout presets tab
-    │   ├── hotkeys_tab.py           # Automation tab
+    │   ├── hotkeys_tab.py           # Cycle Control tab
     │   ├── settings_sync_tab.py     # EVE sync tab
     │   ├── settings_tab.py          # Application settings tab
     │   ├── menu_builder.py          # Menu construction
@@ -128,48 +128,8 @@ The capture system runs in a background thread to prevent UI blocking.
 **Performance Features:**
 - Configurable FPS (1-60)
 - Frame caching to reduce redundant captures
-- Low power mode (5 FPS, alerts disabled)
+- Low power mode (5 FPS for power saving)
 - Complete disable option for hotkey-only usage
-
-### Alert Detection System
-
-Detects visual changes in EVE windows (combat, damage).
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                      AlertDetector                           │
-├─────────────────────────────────────────────────────────────┤
-│  Input: Captured Frame (PIL Image)                          │
-│                                                              │
-│  ┌─────────────────┐    ┌─────────────────┐                │
-│  │ Red Channel     │    │ Previous Frame  │                │
-│  │ Analysis        │    │ Comparison      │                │
-│  │                 │    │                 │                │
-│  │ - Extract red   │    │ - Frame diff    │                │
-│  │ - Threshold     │    │ - Change %      │                │
-│  │ - Count pixels  │    │ - Motion detect │                │
-│  └────────┬────────┘    └────────┬────────┘                │
-│           │                      │                          │
-│           └──────────┬───────────┘                          │
-│                      │                                      │
-│           ┌──────────▼──────────┐                          │
-│           │  AlertLevel         │                          │
-│           │  - NONE             │                          │
-│           │  - LOW (activity)   │                          │
-│           │  - HIGH (combat)    │                          │
-│           └──────────┬──────────┘                          │
-│                      │                                      │
-│           ┌──────────▼──────────┐                          │
-│           │  Callback Dispatch  │──────► UI Border Flash   │
-│           └─────────────────────┘                          │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Algorithm:**
-1. Extract red channel from frame
-2. Count pixels above threshold (damage indicators)
-3. Compare against previous frame for motion
-4. Return `AlertLevel` enum (NONE, LOW, HIGH)
 
 ### Character & Team Management
 
@@ -296,7 +256,7 @@ All UI actions are centralized in the ActionRegistry to prevent duplication.
 │  └───────────────────────────────────────────────────────────┘ │
 │  ┌───────────────────────────────────────────────────────────┐ │
 │  │  Tab Bar                                                   │ │
-│  │  [Overview] [Roster] [Layouts] [Automation] [Sync] [Settings]│
+│  │  [Overview] [Roster] [Layouts] [Cycle Control] [Sync] [Settings]│
 │  └───────────────────────────────────────────────────────────┘ │
 │  ┌───────────────────────────────────────────────────────────┐ │
 │  │  Tab Content (QStackedWidget)                              │ │
@@ -396,7 +356,7 @@ User clicks preview
 │  ┌────────────────────────────────────────────────────────────┐│
 │  │ - Window screenshot capture                                 ││
 │  │ - Image processing (resize, convert)                        ││
-│  │ - Alert detection analysis                                  ││
+│  │ - Window state analysis                                     ││
 │  │ - Frame caching                                             ││
 │  │                                                              ││
 │  │ Communication: Qt signals (frame_ready, alert_detected)     ││

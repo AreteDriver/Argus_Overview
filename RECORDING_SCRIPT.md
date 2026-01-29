@@ -53,19 +53,7 @@
 
 ---
 
-### 0:45-0:60 | Alert Detection Demo (15s)
-**Action:**
-1. **Camera back to Argus Overview main window**
-2. Show all 4 preview frames updating at 30 FPS
-3. **In one EVE client:** Trigger damage/combat (warp to belt, shoot rock, take damage)
-4. **Watch preview frame:** Red border flashes around the window
-5. Visual alert clearly visible - shows which client needs attention
-
-**Key Visual:** Real-time 30 FPS capture, red flash alert detection working
-
----
-
-### 0:60-0:75 | Character & Team Management (15s)
+### 0:45-0:60 | Character & Team Management (15s)
 **Action:**
 1. Switch to **"Characters & Teams"** tab
 2. Show character table with 4 characters listed
