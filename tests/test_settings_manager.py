@@ -734,6 +734,7 @@ class TestValidate:
             assert result is True
             assert manager.settings["performance"]["capture_workers"] == 4
 
+
 class TestExceptionHandling:
     """Tests for exception handling paths"""
 

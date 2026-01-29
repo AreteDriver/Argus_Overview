@@ -6,7 +6,7 @@ Main entry point with professional UI and all features
 v2.4 Features:
 - ActionRegistry: Single source of truth for all UI actions
 - Centralized menu/toolbar building from registry
-- Tab renames: Overview, Roster, Automation, Sync
+- Tab renames: Overview, Cycle Control, Roster, Sync
 - ToolbarBuilder and ContextMenuBuilder classes
 - CLI audit tool for redundancy checking
 
