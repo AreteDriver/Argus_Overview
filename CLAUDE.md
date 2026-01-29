@@ -4,7 +4,7 @@
 Professional multi-boxing tool for EVE Online on Linux. Window preview management, team organization, layout presets, and settings synchronization.
 
 **Stack**: Python, PySide6 (Qt), python-xlib
-**Version**: 2.6.x
+**Version**: 2.8.x
 **Platforms**: Linux (native), Windows (separate repo)
 
 ---
@@ -17,7 +17,7 @@ src/argus_overview/
 ├── ui/                  # PySide6 widgets and windows
 │   ├── action_registry.py  # Single source of truth for all UI actions
 │   ├── main_window.py
-│   └── tabs/            # Overview, Roster, Layouts, Automation, Sync, Settings
+│   └── tabs/            # Overview, Roster, Layouts, Cycle Control, Sync, Settings
 ├── core/                # Business logic
 ├── capture/             # Window capture (X11/Wayland)
 └── config/              # Settings persistence
@@ -69,7 +69,7 @@ python -m argus_overview.ui.action_registry
 | Overview | Window preview, capture | OVERVIEW_TOOLBAR |
 | Roster | Characters & teams | ROSTER_TOOLBAR |
 | Layouts | Window arrangement patterns | LAYOUTS_TOOLBAR |
-| Automation | Hotkeys, cycling, alerts | AUTOMATION_TOOLBAR |
+| Cycle Control | Hotkeys, cycling | CYCLE_CONTROL_TOOLBAR |
 | Sync | EVE settings sync | SYNC_TOOLBAR |
 | Settings | App configuration | SETTINGS_PANEL |
 
