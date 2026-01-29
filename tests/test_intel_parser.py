@@ -11,7 +11,6 @@ Tests cover:
 - Edge cases and malformed input
 """
 
-import pytest
 from datetime import datetime
 
 from argus_overview.intel.parser import IntelParser, IntelReport, ThreatLevel

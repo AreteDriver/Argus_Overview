@@ -7,10 +7,8 @@ Tests cover:
 - Log file path detection
 """
 
-import pytest
-from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 from argus_overview.intel.log_watcher import ChatLogWatcher, ChatMessage
 
@@ -149,7 +147,7 @@ class TestWatcherLifecycle:
 
     def test_start_without_log_dir(self):
         """Should not start if log directory not found"""
-        with patch.object(self.watcher, 'find_log_directory', return_value=None):
+        with patch.object(self.watcher, "find_log_directory", return_value=None):
             self.watcher.start()
             # Should emit error but not crash
             assert self.watcher.is_running() is False
@@ -169,8 +167,8 @@ class TestLogDirectoryDetection:
 
     def test_find_log_directory_none_found(self):
         """Should return None when no log directories exist"""
-        with patch('pathlib.Path.exists', return_value=False):
-            result = self.watcher.find_log_directory()
+        with patch("pathlib.Path.exists", return_value=False):
+            _result = self.watcher.find_log_directory()
             # May or may not be None depending on actual filesystem
             # Just verify no exception is raised
 
@@ -182,11 +180,11 @@ class TestLogDirectoryDetection:
 
     def test_set_log_directory_valid(self):
         """Should set valid log directory"""
-        with patch('pathlib.Path.exists', return_value=True):
-            with patch('pathlib.Path.is_dir', return_value=True):
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.is_dir", return_value=True):
                 path = Path("/valid/logs")
                 # Mock the exists and is_dir methods
-                with patch.object(Path, 'exists', return_value=True):
-                    with patch.object(Path, 'is_dir', return_value=True):
+                with patch.object(Path, "exists", return_value=True):
+                    with patch.object(Path, "is_dir", return_value=True):
                         self.watcher.set_log_directory(path)
                         # Verify it was set (may be mocked)
