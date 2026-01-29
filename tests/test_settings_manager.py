@@ -100,16 +100,6 @@ class TestDefaultSettings:
         assert "opacity_on_hover" in thumbs
         assert "default_width" in thumbs
 
-    def test_default_settings_has_alerts(self):
-        """Test that DEFAULT_SETTINGS has alerts section"""
-        from argus_overview.ui.settings_manager import SettingsManager
-
-        assert "alerts" in SettingsManager.DEFAULT_SETTINGS
-        alerts = SettingsManager.DEFAULT_SETTINGS["alerts"]
-        assert "enabled" in alerts
-        assert "red_flash" in alerts
-        assert "threshold" in alerts["red_flash"]
-
     def test_default_settings_has_hotkeys(self):
         """Test that DEFAULT_SETTINGS has hotkeys section"""
         from argus_overview.ui.settings_manager import SettingsManager
@@ -317,9 +307,9 @@ class TestGetSetting:
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = SettingsManager(config_dir=Path(tmpdir))
 
-            value = manager.get("alerts.red_flash.threshold")
+            value = manager.get("thumbnails.opacity_on_hover")
 
-            assert value == 0.7  # Default value
+            assert value == 0.3  # Default value
 
     def test_get_nonexistent_key_returns_default(self):
         """Test that get returns default for nonexistent key"""
@@ -390,10 +380,10 @@ class TestSetSetting:
         with tempfile.TemporaryDirectory() as tmpdir:
             manager = SettingsManager(config_dir=Path(tmpdir))
 
-            result = manager.set("alerts.red_flash.threshold", 0.9)
+            result = manager.set("thumbnails.opacity_on_hover", 0.5)
 
             assert result is True
-            assert manager.settings["alerts"]["red_flash"]["threshold"] == 0.9
+            assert manager.settings["thumbnails"]["opacity_on_hover"] == 0.5
 
     def test_set_creates_intermediate_keys(self):
         """Test that set creates intermediate keys if needed"""
@@ -744,20 +734,6 @@ class TestValidate:
             assert result is True
             assert manager.settings["performance"]["capture_workers"] == 4
 
-    def test_validate_fixes_invalid_threshold(self):
-        """Test validate fixes invalid alert threshold"""
-        from argus_overview.ui.settings_manager import SettingsManager
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = SettingsManager(config_dir=Path(tmpdir))
-            manager.settings["alerts"]["red_flash"]["threshold"] = 1.5
-
-            result = manager.validate()
-
-            assert result is True
-            assert manager.settings["alerts"]["red_flash"]["threshold"] == 0.7
-
-
 class TestExceptionHandling:
     """Tests for exception handling paths"""
 
@@ -798,19 +774,6 @@ class TestExceptionHandling:
                 result = manager.import_config(import_path)
 
             assert result is False
-
-    def test_validate_fixes_invalid_screen_change_threshold(self):
-        """Test validate fixes screen_change threshold outside 0-1 range"""
-        from argus_overview.ui.settings_manager import SettingsManager
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            manager = SettingsManager(config_dir=Path(tmpdir))
-            manager.settings["alerts"]["screen_change"]["threshold"] = 1.5
-
-            result = manager.validate()
-
-            assert result is True
-            assert manager.settings["alerts"]["screen_change"]["threshold"] == 0.3
 
     def test_validate_handles_exception(self):
         """Test validate returns False on exception"""

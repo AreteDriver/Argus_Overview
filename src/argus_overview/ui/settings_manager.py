@@ -14,7 +14,7 @@ from typing import Any, Dict, Optional
 class SettingsManager:
     """
     Manages application settings with JSON persistence.
-    Supports nested keys (e.g., "alerts.red_flash.threshold")
+    Supports nested keys (e.g., "performance.capture_workers")
     """
 
     DEFAULT_SETTINGS = {
@@ -48,16 +48,6 @@ class SettingsManager:
             "default_width": 280,
             "default_height": 200,
         },
-        "alerts": {
-            "enabled": True,
-            "red_flash": {
-                "threshold": 0.7,
-                "visual_border": True,
-                "sound_alert": False,
-                "cooldown": 5,  # seconds
-            },
-            "screen_change": {"threshold": 0.3, "visual_border": True, "sound_alert": False},
-        },
         "hotkeys": {
             "activate_window_1": "<ctrl>+<alt>+1",
             "activate_window_2": "<ctrl>+<alt>+2",
@@ -73,7 +63,6 @@ class SettingsManager:
             "refresh_all": "<ctrl>+<alt>+f5",
             "next_layout": "<ctrl>+<alt>+]",
             "previous_layout": "<ctrl>+<alt>+[",
-            "toggle_alerts": "<ctrl>+<alt>+a",
             "toggle_always_on_top": "<ctrl>+<alt>+t",
             "toggle_thumbnails": "<ctrl>+<shift>+t",
             "toggle_lock": "<ctrl>+<shift>+l",
@@ -181,7 +170,7 @@ class SettingsManager:
         Get setting value by nested key
 
         Args:
-            key: Setting key (e.g., "alerts.red_flash.threshold")
+            key: Setting key (e.g., "thumbnails.opacity_on_hover")
             default: Default value if key not found
 
         Returns:
@@ -203,7 +192,7 @@ class SettingsManager:
         Set setting value by nested key
 
         Args:
-            key: Setting key (e.g., "alerts.red_flash.threshold")
+            key: Setting key (e.g., "thumbnails.opacity_on_hover")
             value: Value to set
             auto_save: Save settings immediately (default: True)
 
@@ -354,21 +343,6 @@ class SettingsManager:
             if not (1 <= workers <= 16):
                 self.logger.warning(f"Invalid worker count: {workers}, resetting to 4")
                 self.set("performance.capture_workers", 4)
-
-            # Check thresholds are 0-1
-            red_flash_threshold = self.get("alerts.red_flash.threshold", 0.7)
-            if not (0.0 <= red_flash_threshold <= 1.0):
-                self.logger.warning(
-                    f"Invalid red flash threshold: {red_flash_threshold}, resetting to 0.7"
-                )
-                self.set("alerts.red_flash.threshold", 0.7)
-
-            screen_change_threshold = self.get("alerts.screen_change.threshold", 0.3)
-            if not (0.0 <= screen_change_threshold <= 1.0):
-                self.logger.warning(
-                    f"Invalid screen change threshold: {screen_change_threshold}, resetting to 0.3"
-                )
-                self.set("alerts.screen_change.threshold", 0.3)
 
             return True
 

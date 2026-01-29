@@ -280,15 +280,13 @@ class TestSettingsTab:
         mock_settings_manager.get.return_value = {}
 
         mock_hotkey_manager = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
-                tab = SettingsTab(mock_settings_manager, mock_hotkey_manager, mock_alert_detector)
+                tab = SettingsTab(mock_settings_manager, mock_hotkey_manager)
 
                 assert tab.settings_manager is mock_settings_manager
                 assert tab.hotkey_manager is mock_hotkey_manager
-                assert tab.alert_detector is mock_alert_detector
 
     @patch("argus_overview.ui.settings_tab.QWidget.__init__")
     def test_on_setting_changed(self, mock_widget):
@@ -301,13 +299,12 @@ class TestSettingsTab:
         mock_settings_manager.get.return_value = {}
 
         mock_hotkey_manager = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
                 with patch.object(SettingsTab, "settings_changed", MagicMock()):
                     tab = SettingsTab(
-                        mock_settings_manager, mock_hotkey_manager, mock_alert_detector
+                        mock_settings_manager, mock_hotkey_manager
                     )
 
                     tab._on_setting_changed("test.key", "test_value")
@@ -325,11 +322,10 @@ class TestSettingsTab:
         mock_settings_manager.get.return_value = {}
 
         mock_hotkey_manager = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
-                tab = SettingsTab(mock_settings_manager, mock_hotkey_manager, mock_alert_detector)
+                tab = SettingsTab(mock_settings_manager, mock_hotkey_manager)
                 tab.panel_stack = MagicMock()
 
                 # Mock tree item
@@ -354,15 +350,14 @@ class TestSettingsTab:
         mock_settings_manager.get.return_value = {}
 
         mock_hotkey_manager = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         # Simulate user clicking Yes - use StandardButton.Yes
         mock_msgbox.StandardButton = QMessageBox.StandardButton
         mock_msgbox.question.return_value = QMessageBox.StandardButton.Yes
 
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
-                tab = SettingsTab(mock_settings_manager, mock_hotkey_manager, mock_alert_detector)
+                tab = SettingsTab(mock_settings_manager, mock_hotkey_manager)
 
                 tab._reset_all()
 
@@ -1056,7 +1051,6 @@ class TestSettingsTabSetupUI:
     @patch("argus_overview.ui.settings_tab.QStackedWidget")
     @patch("argus_overview.ui.settings_tab.GeneralPanel")
     @patch("argus_overview.ui.settings_tab.PerformancePanel")
-    @patch("argus_overview.ui.settings_tab.AlertsPanel")
     @patch("argus_overview.ui.settings_tab.HotkeysPanel")
     @patch("argus_overview.ui.settings_tab.AppearancePanel")
     @patch("argus_overview.ui.settings_tab.AdvancedPanel")
@@ -1065,7 +1059,6 @@ class TestSettingsTabSetupUI:
         mock_adv,
         mock_app,
         mock_hk,
-        mock_alert,
         mock_perf,
         mock_gen,
         mock_stack,
@@ -1081,16 +1074,14 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        mock_alert_detector = MagicMock()
 
         with patch.object(SettingsTab, "_create_category_tree", return_value=MagicMock()):
             with patch.object(SettingsTab, "setLayout"):
                 with patch.object(SettingsTab, "_load_settings"):
-                    SettingsTab(mock_settings, mock_hotkey_mgr, mock_alert_detector)
+                    SettingsTab(mock_settings, mock_hotkey_mgr)
 
                     assert mock_gen.called
                     assert mock_perf.called
-                    assert mock_alert.called
                     assert mock_hk.called
                     assert mock_app.called
                     assert mock_adv.called
@@ -1111,13 +1102,11 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         with patch.object(SettingsTab, "__init__", return_value=None):
             tab = SettingsTab.__new__(SettingsTab)
             tab.settings_manager = mock_settings
             tab.hotkey_manager = mock_hotkey_mgr
-            tab.alert_detector = mock_alert_detector
 
             tab._create_category_tree()
 
@@ -1134,11 +1123,10 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
-                tab = SettingsTab(mock_settings, mock_hotkey_mgr, mock_alert_detector)
+                tab = SettingsTab(mock_settings, mock_hotkey_mgr)
                 tab.panel_stack = MagicMock()
 
                 tab._on_category_changed(None, None)
@@ -1156,11 +1144,10 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
-                tab = SettingsTab(mock_settings, mock_hotkey_mgr, mock_alert_detector)
+                tab = SettingsTab(mock_settings, mock_hotkey_mgr)
                 tab.panel_stack = MagicMock()
 
                 mock_item = MagicMock()
@@ -1184,14 +1171,13 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         mock_msgbox.StandardButton = QMessageBox.StandardButton
         mock_msgbox.question.return_value = QMessageBox.StandardButton.No
 
         with patch.object(SettingsTab, "_setup_ui"):
             with patch.object(SettingsTab, "_load_settings"):
-                tab = SettingsTab(mock_settings, mock_hotkey_mgr, mock_alert_detector)
+                tab = SettingsTab(mock_settings, mock_hotkey_mgr)
 
                 tab._reset_all()
 
@@ -1207,10 +1193,9 @@ class TestSettingsTabSetupUI:
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}
         mock_hotkey_mgr = MagicMock()
-        mock_alert_detector = MagicMock()
-
+        
         with patch.object(SettingsTab, "_setup_ui"):
-            tab = SettingsTab(mock_settings, mock_hotkey_mgr, mock_alert_detector)
+            tab = SettingsTab(mock_settings, mock_hotkey_mgr)
 
             # Just verify it doesn't raise
             tab._load_settings()

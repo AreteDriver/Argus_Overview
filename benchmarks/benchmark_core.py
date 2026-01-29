@@ -5,7 +5,6 @@ Performance benchmarks for Argus Overview core components.
 Run with: python benchmarks/benchmark_core.py
 
 Tests performance-critical paths:
-- Alert detection (frame analysis)
 - Image conversion (PIL to QImage)
 - wmctrl caching
 - Window capture processing
@@ -63,33 +62,6 @@ def print_results(name: str, results: dict):
     print(f"  Median:     {results['median_ms']:.4f} ms")
     print(f"  Std Dev:    {results['stdev_ms']:.4f} ms")
     print(f"  Throughput: {1000 / results['mean_ms']:.1f} ops/sec")
-
-
-def benchmark_alert_detection():
-    """Benchmark alert detection frame analysis."""
-    from PIL import Image
-
-    from argus_overview.core.alert_detector import AlertDetector
-
-    detector = AlertDetector()
-
-    # Create test images of different types
-    normal_image = Image.new("RGB", (1920, 1080), color=(30, 30, 40))
-    red_image = Image.new("RGB", (1920, 1080), color=(200, 50, 50))
-
-    # Benchmark normal frame analysis
-    def analyze_normal():
-        detector.analyze_frame("test_window", normal_image)
-
-    results = benchmark(analyze_normal, iterations=500)
-    print_results("Alert Detection - Normal Frame", results)
-
-    # Benchmark frame with alert colors
-    def analyze_red():
-        detector.analyze_frame("test_window_2", red_image)
-
-    results = benchmark(analyze_red, iterations=500)
-    print_results("Alert Detection - Red Frame", results)
 
 
 def benchmark_pil_to_qimage():
@@ -256,7 +228,6 @@ def main():
         benchmark_window_id_validation()
         benchmark_wmctrl_cache()
         benchmark_pil_to_qimage()
-        benchmark_alert_detection()
         benchmark_capture_queue()
         benchmark_screen_geometry()
 
@@ -273,7 +244,6 @@ def main():
 
     # Performance targets
     print("\n📊 Performance Targets:")
-    print("  - Alert detection: < 1ms per frame")
     print("  - PIL->QImage (320x240): < 0.5ms")
     print("  - wmctrl cache hit: < 0.01ms")
     print("  - Window ID validation: < 0.001ms")

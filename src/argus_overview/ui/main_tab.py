@@ -1,6 +1,6 @@
 """
 Main Tab - Window Preview Management System
-Implements 30 FPS capture loop with window previews, alerts, and interactions
+Implements 30 FPS capture loop with window previews and interactions
 v2.2: Added one-click import, hover effects, activity indicators, session timers
 v2.3: Merged layouts functionality - group-based window arrangement
 """
@@ -45,7 +45,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from argus_overview.core.alert_detector import AlertLevel
 from argus_overview.core.discovery import scan_eve_windows
 from argus_overview.ui.action_registry import PrimaryHome
 from argus_overview.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
@@ -600,7 +599,7 @@ def pil_to_qimage(pil_image: Image.Image) -> QImage:
 
 class WindowPreviewWidget(QWidget):
     """
-    Individual window preview with alerts and interactions
+    Individual window preview with interactions
     v2.2: Added hover effects, activity indicator, session timer, custom labels
     """
 
@@ -625,8 +624,6 @@ class WindowPreviewWidget(QWidget):
 
         # State
         self.current_pixmap: Optional[QPixmap] = None
-        self.alert_level: Optional[AlertLevel] = None
-        self.alert_flash_counter = 0
         self.zoom_factor = 0.3  # 30% scale
 
         # v2.2 State
@@ -675,10 +672,6 @@ class WindowPreviewWidget(QWidget):
         self.timer_label.setStyleSheet("color: #888; font-size: 9px;")
         self.timer_label.setVisible(self._show_session_timer)
         layout.addWidget(self.timer_label)
-
-        # Alert flash timer
-        self.flash_timer = QTimer()
-        self.flash_timer.timeout.connect(self._flash_tick)
 
         # Session timer update (every minute)
         self.session_timer = QTimer()
@@ -750,29 +743,6 @@ class WindowPreviewWidget(QWidget):
 
         except Exception as e:
             self.logger.error(f"Failed to update frame for {self.window_id}: {e}")
-
-    def set_alert(self, level: AlertLevel):
-        """
-        Set alert and start border flash
-
-        Args:
-            level: AlertLevel enum
-        """
-        self.alert_level = level
-        self.alert_flash_counter = 30  # 3 seconds at 10 Hz
-        if not self.flash_timer.isActive():
-            self.flash_timer.start(100)  # 100ms = 10 Hz flash
-
-        self.logger.debug(f"Alert set for {self.window_id}: {level}")
-
-    def _flash_tick(self):
-        """Flash timer tick"""
-        self.alert_flash_counter -= 1
-        if self.alert_flash_counter <= 0:
-            self.flash_timer.stop()
-            self.alert_level = None
-
-        self.update()  # Trigger repaint
 
     def _update_session_timer(self):
         """Update the session timer display"""
@@ -855,27 +825,11 @@ class WindowPreviewWidget(QWidget):
         super().leaveEvent(event)
 
     def paintEvent(self, event):
-        """Custom paint for alert border and activity indicator"""
+        """Custom paint for activity indicator"""
         super().paintEvent(event)
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # Draw alert border if active
-        if self.alert_level and self.alert_flash_counter > 0:
-            # Choose color based on alert level
-            if self.alert_level == AlertLevel.HIGH:
-                color = QColor(255, 0, 0, 200)  # Red
-            elif self.alert_level == AlertLevel.MEDIUM:
-                color = QColor(255, 255, 0, 200)  # Yellow
-            else:
-                color = QColor(0, 255, 0, 200)  # Green
-
-            # Draw thick border
-            pen = QPen(color)
-            pen.setWidth(4)
-            painter.setPen(pen)
-            painter.drawRect(2, 2, self.width() - 4, self.height() - 4)
 
         # Draw activity indicator (v2.2)
         if self._show_activity_indicator:
@@ -1015,11 +969,10 @@ class WindowManager:
     v2.2: Added settings_manager support for thumbnail settings
     """
 
-    def __init__(self, character_manager, capture_system, alert_detector, settings_manager=None):
+    def __init__(self, character_manager, capture_system, settings_manager=None):
         self.logger = logging.getLogger(__name__)
         self.character_manager = character_manager
         self.capture_system = capture_system
-        self.alert_detector = alert_detector
         self.settings_manager = settings_manager
 
         # State
@@ -1082,13 +1035,6 @@ class WindowManager:
         )
         self.preview_frames[window_id] = frame
 
-        # Register alert callback
-        def alert_callback(level: AlertLevel):
-            if window_id in self.preview_frames:
-                self.preview_frames[window_id].set_alert(level)
-
-        self.alert_detector.register_callback(window_id, alert_callback)
-
         self.logger.info(f"Added window {window_id} ({character_name}) to preview")
         return frame
 
@@ -1100,9 +1046,6 @@ class WindowManager:
             window_id: X11 window ID
         """
         if window_id in self.preview_frames:
-            # Unregister alert callback
-            self.alert_detector.unregister_callback(window_id)
-
             # Remove from dict
             frame = self.preview_frames.pop(window_id)
             frame.deleteLater()
@@ -1148,13 +1091,6 @@ class WindowManager:
             if window_id in self.preview_frames:
                 try:
                     self.preview_frames[window_id].update_frame(image)
-
-                    # Analyze for alerts
-                    if image:
-                        alert_level = self.alert_detector.analyze_frame(window_id, image)
-                        if alert_level:
-                            self.preview_frames[window_id].set_alert(alert_level)
-
                 except Exception as e:
                     self.logger.error(f"Failed to process frame for {window_id}: {e}")
 
@@ -1182,13 +1118,12 @@ class MainTab(QWidget):
     layout_applied = Signal(str)  # pattern name
 
     def __init__(
-        self, capture_system, character_manager, alert_detector, settings_manager=None, parent=None
+        self, capture_system, character_manager, settings_manager=None, parent=None
     ):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.capture_system = capture_system
         self.character_manager = character_manager
-        self.alert_detector = alert_detector
         self.settings_manager = settings_manager
 
         # v2.2 State
@@ -1213,7 +1148,7 @@ class MainTab(QWidget):
 
         # Create window manager
         self.window_manager = WindowManager(
-            character_manager, capture_system, alert_detector, settings_manager
+            character_manager, capture_system, settings_manager
         )
 
         self._setup_ui()

@@ -468,15 +468,6 @@ class TestApplySetting:
         window.logger.info.assert_called()
         window.logger.warning.assert_called()
 
-    def test_apply_setting_alerts(self):
-        """Test applying alerts setting triggers config update"""
-        window = create_mock_window()
-        window._apply_initial_settings = MagicMock()
-
-        window._apply_setting("alerts.enabled", True)
-
-        window._apply_initial_settings.assert_called_once()
-
 
 # Test character detected
 class TestOnCharacterDetected:
@@ -1019,17 +1010,11 @@ class TestApplyInitialSettings:
         window.settings_manager.get.return_value = 4  # Default return for all gets
 
         window.capture_system = MagicMock()
-        window.alert_detector = MagicMock()
 
-        # Patch AlertConfig where it's imported (in alert_detector module)
-        with patch("argus_overview.core.alert_detector.AlertConfig"):
-            MainWindowV21._apply_initial_settings(window)
+        MainWindowV21._apply_initial_settings(window)
 
         # Should update capture_system.max_workers
         assert window.capture_system.max_workers == 4
-
-        # Should set alert config
-        window.alert_detector.set_config.assert_called_once()
 
 
 # Test _connect_signals
@@ -1513,7 +1498,6 @@ class TestCreateMainTab:
         window.logger = MagicMock()
         window.capture_system = MagicMock()
         window.character_manager = MagicMock()
-        window.alert_detector = MagicMock()
         window.settings_manager = MagicMock()
         window.tabs = MagicMock()
 
@@ -1632,7 +1616,6 @@ class TestCreateSettingsTab:
         window.logger = MagicMock()
         window.settings_manager = MagicMock()
         window.hotkey_manager = MagicMock()
-        window.alert_detector = MagicMock()
         window.tabs = MagicMock()
 
         mock_tab = MagicMock()
@@ -1668,8 +1651,6 @@ class TestApplyLowPowerMode:
         window.main_tab.window_manager.set_refresh_rate.assert_called_with(5)
         # Should update spinner
         window.main_tab.refresh_rate_spin.setValue.assert_called_with(5)
-        # Should disable alerts
-        window.settings_manager.set.assert_called()
         # Should show status message
         window.statusBar().showMessage.assert_called()
 
@@ -1683,7 +1664,7 @@ class TestApplyLowPowerMode:
         window.statusBar = MagicMock(return_value=MagicMock())
 
         # Simulate that low power mode was previously enabled
-        window._low_power_previous = {"fps": 30, "alerts": True}
+        window._low_power_previous = {"fps": 30}
 
         window._apply_low_power_mode(False)
 
@@ -1691,8 +1672,6 @@ class TestApplyLowPowerMode:
         window.main_tab.window_manager.set_refresh_rate.assert_called_with(30)
         # Should update spinner
         window.main_tab.refresh_rate_spin.setValue.assert_called_with(30)
-        # Should restore alerts
-        window.settings_manager.set.assert_called()
         # Should show status message
         window.statusBar().showMessage.assert_called()
 
@@ -1705,7 +1684,6 @@ class TestApplyLowPowerMode:
         window.settings_manager = MagicMock()
         window.settings_manager.get.side_effect = lambda k, d=None: {
             "performance.default_refresh_rate": 45,
-            "alerts.enabled": True,
         }.get(k, d)
         window.statusBar = MagicMock(return_value=MagicMock())
 
@@ -1714,7 +1692,6 @@ class TestApplyLowPowerMode:
         # Should have stored previous values
         assert hasattr(window, "_low_power_previous")
         assert window._low_power_previous["fps"] == 45
-        assert window._low_power_previous["alerts"] is True
 
     def test_disable_low_power_mode_without_previous(self):
         """Test disabling when no previous settings stored"""

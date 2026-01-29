@@ -5,6 +5,14 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.6] - 2026-01-29
+
+### Removed
+- **Visual Alerts (Red Flash Detection)** - Removed feature for CCP EULA/Fair Play compliance. The red flash detection system that monitored EVE windows for combat/damage indicators has been completely removed.
+
+### Added
+- **CCP EULA / Fair Play Compliance Note** - Argus Overview is designed to operate strictly within CCP's third-party software policies. It does not broadcast inputs, automate gameplay, execute macros, inject into the EVE client, or read/interpret game memory or state. It only displays live window previews, switches focus between clients, and manages window positioning/layouts.
+
 ## [2.8.5] - 2026-01-27
 
 ### Added
@@ -20,7 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UI lag from missing debounce on widget rebuild methods (#22)
 
 ### Changed
-- Consolidated duplicate alert detection methods into single function (#20)
 - Updated Reddit launch post screenshots (#27)
 
 ## [2.8.4] - 2026-01-26
@@ -72,12 +79,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Security
 - Added Bandit security scanner to dev dependencies and CI
 - Configured pyproject.toml with appropriate skips for X11 tool usage
-
-### Performance
-- **Alert detection 400x faster** - Optimized red flash detection from 42ms to 0.1ms per frame
-  - Downsample images before analysis (160x90 vs 1920x1080)
-  - Single resize operation shared between red flash and screen change detection
-  - Now well under 1ms target, enabling higher frame rates
 
 ### Testing
 - Added tests for v2.7 features (preview filter, keyboard control)
@@ -206,7 +207,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Layout Presets** - Save and restore complete window arrangements
 - **Auto-Tiling** - 6 professional grid patterns (2x2, 3x1, 1x3, 4x1, Main+Sides, Cascade)
 - **Team & Character Management** - Group characters by activity with offline tracking
-- **Visual Activity Alerts** - Red flash detection for combat/damage warnings
 - **Multi-Monitor Support** - Per-monitor layouts and window spreading
 - **EVE Settings Sync** - Copy keybindings, UI, and overview between characters
 
