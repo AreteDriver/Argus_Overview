@@ -177,6 +177,18 @@ class ActionRegistry:
 
         self.register(
             ActionSpec(
+                id="toggle_alerts_tray",
+                label="Visual Alerts",
+                scope=ActionScope.GLOBAL,
+                primary_home=PrimaryHome.TRAY_MENU,
+                tooltip="Toggle visual alerts on/off",
+                handler_name="_toggle_visual_alerts",
+                checkable=True,
+            )
+        )
+
+        self.register(
+            ActionSpec(
                 id="settings",
                 label="Settings",
                 scope=ActionScope.GLOBAL,
@@ -421,6 +433,19 @@ class ActionRegistry:
         )
 
         # --- Automation Tab (Hotkeys + Alerts) ---
+        self.register(
+            ActionSpec(
+                id="toggle_visual_alerts",
+                label="Toggle Alerts",
+                scope=ActionScope.TAB,
+                primary_home=PrimaryHome.AUTOMATION_TOOLBAR,
+                tooltip="Toggle visual alerts on/off (Ctrl+Alt+A)",
+                shortcut="<ctrl>+<alt>+a",
+                handler_name="_toggle_visual_alerts",
+                checkable=True,
+            )
+        )
+
         self.register(
             ActionSpec(
                 id="new_group",

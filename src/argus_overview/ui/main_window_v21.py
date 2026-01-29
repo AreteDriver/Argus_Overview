@@ -161,6 +161,7 @@ class MainWindowV21(QMainWindow):
         # Connect tray signals (all actions sourced from ActionRegistry)
         self.system_tray.show_hide_requested.connect(self._toggle_visibility)
         self.system_tray.toggle_thumbnails_requested.connect(self._toggle_thumbnails)
+        self.system_tray.toggle_alerts_requested.connect(self._toggle_visual_alerts)
         self.system_tray.minimize_all_requested.connect(self._minimize_all_windows)
         self.system_tray.restore_all_requested.connect(self._restore_all_windows)
         self.system_tray.profile_selected.connect(self._on_profile_selected)
@@ -198,6 +199,12 @@ class MainWindowV21(QMainWindow):
         # Toggle lock
         lock_combo = self.settings_manager.get("hotkeys.toggle_lock", "<ctrl>+<shift>+l")
         self.hotkey_manager.register_hotkey("toggle_lock", lock_combo, self._toggle_lock)
+
+        # Toggle visual alerts
+        toggle_alerts_combo = self.settings_manager.get("hotkeys.toggle_alerts", "<ctrl>+<alt>+a")
+        self.hotkey_manager.register_hotkey(
+            "toggle_alerts", toggle_alerts_combo, self._toggle_visual_alerts
+        )
 
         # Register per-character hotkeys
         char_hotkeys = self.settings_manager.get("character_hotkeys", {})
@@ -244,6 +251,32 @@ class MainWindowV21(QMainWindow):
         """Toggle position lock"""
         if hasattr(self, "main_tab") and hasattr(self.main_tab, "lock_btn"):
             self.main_tab.lock_btn.click()
+
+    @Slot()
+    def _toggle_visual_alerts(self):
+        """Toggle visual alerts on/off"""
+        current_state = self.settings_manager.get("alerts.enabled", True)
+        new_state = not current_state
+
+        # Update settings
+        self.settings_manager.set("alerts.enabled", new_state, auto_save=True)
+
+        # Apply to alert detector
+        self._apply_initial_settings()
+
+        # Update hotkeys tab button if it exists
+        if hasattr(self, "hotkeys_tab") and hasattr(self.hotkeys_tab, "_update_alerts_button_text"):
+            self.hotkeys_tab._update_alerts_button_text(new_state)
+            if hasattr(self.hotkeys_tab, "toggle_alerts_btn"):
+                self.hotkeys_tab.toggle_alerts_btn.setChecked(new_state)
+
+        # Show notification
+        status = "enabled" if new_state else "disabled"
+        self.logger.info(f"Visual alerts {status}")
+        if hasattr(self, "system_tray"):
+            self.system_tray.show_notification(
+                "Visual Alerts", f"Alerts {status}"
+            )
 
     def _get_cycling_group_members(self) -> list:
         """Get members of the current cycling group"""
@@ -585,13 +618,13 @@ class MainWindowV21(QMainWindow):
         self.characters_tab.team_selected.connect(self._on_team_selected)
 
     def _create_hotkeys_tab(self):
-        """Create Automation tab (hotkeys & cycling) - formerly 'Hotkeys & Cycling'"""
+        """Create Cycle Control tab (hotkeys, cycling, alerts)"""
         from argus_overview.ui.hotkeys_tab import HotkeysTab
 
         self.hotkeys_tab = HotkeysTab(
             self.character_manager, self.settings_manager, main_tab=self.main_tab
         )
-        self.tabs.addTab(self.hotkeys_tab, "Automation")
+        self.tabs.addTab(self.hotkeys_tab, "Cycle Control")
 
         # Connect group changes to refresh layout sources in overview tab
         self.hotkeys_tab.group_changed.connect(self.main_tab.refresh_layout_groups)
