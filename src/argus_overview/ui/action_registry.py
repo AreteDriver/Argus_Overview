@@ -42,6 +42,7 @@ class PrimaryHome(Enum):
     LAYOUTS_TOOLBAR = "layouts_toolbar"
     CYCLE_CONTROL_TOOLBAR = "cycle_control_toolbar"
     SYNC_TOOLBAR = "sync_toolbar"
+    INTEL_TOOLBAR = "intel_toolbar"
     SETTINGS_PANEL = "settings_panel"  # Settings tab is special - uses panels not toolbar
     HELP_MENU = "help_menu"
 
@@ -63,6 +64,7 @@ HOME_TIERS = {
     PrimaryHome.LAYOUTS_TOOLBAR: 2,
     PrimaryHome.CYCLE_CONTROL_TOOLBAR: 2,
     PrimaryHome.SYNC_TOOLBAR: 2,
+    PrimaryHome.INTEL_TOOLBAR: 2,
     PrimaryHome.SETTINGS_PANEL: 2,
     PrimaryHome.WINDOW_CONTEXT: 3,
     PrimaryHome.CHARACTER_CONTEXT: 3,
