@@ -41,6 +41,7 @@ class PrimaryHome(Enum):
     ROSTER_TOOLBAR = "roster_toolbar"
     LAYOUTS_TOOLBAR = "layouts_toolbar"
     AUTOMATION_TOOLBAR = "automation_toolbar"
+    INTEL_TOOLBAR = "intel_toolbar"  # Intel tab toolbar
     SYNC_TOOLBAR = "sync_toolbar"
     SETTINGS_PANEL = "settings_panel"  # Settings tab is special - uses panels not toolbar
     HELP_MENU = "help_menu"
@@ -50,6 +51,7 @@ class PrimaryHome(Enum):
     CHARACTER_CONTEXT = "character_context"
     TEAM_CONTEXT = "team_context"
     GROUP_CONTEXT = "group_context"
+    INTEL_CONTEXT = "intel_context"  # Intel entry context menu
 
 
 # Mapping of homes to their tier for redundancy checking
@@ -61,12 +63,14 @@ HOME_TIERS = {
     PrimaryHome.ROSTER_TOOLBAR: 2,
     PrimaryHome.LAYOUTS_TOOLBAR: 2,
     PrimaryHome.AUTOMATION_TOOLBAR: 2,
+    PrimaryHome.INTEL_TOOLBAR: 2,
     PrimaryHome.SYNC_TOOLBAR: 2,
     PrimaryHome.SETTINGS_PANEL: 2,
     PrimaryHome.WINDOW_CONTEXT: 3,
     PrimaryHome.CHARACTER_CONTEXT: 3,
     PrimaryHome.TEAM_CONTEXT: 3,
     PrimaryHome.GROUP_CONTEXT: 3,
+    PrimaryHome.INTEL_CONTEXT: 3,
 }
 
 
@@ -485,6 +489,96 @@ class ActionRegistry:
                 primary_home=PrimaryHome.SYNC_TOOLBAR,
                 tooltip="Sync settings from source to targets",
                 handler_name="_sync_settings",
+            )
+        )
+
+        # --- Intel Tab ---
+        self.register(
+            ActionSpec(
+                id="start_intel_monitoring",
+                label="Start Monitoring",
+                scope=ActionScope.TAB,
+                primary_home=PrimaryHome.INTEL_TOOLBAR,
+                tooltip="Start monitoring intel channels",
+                handler_name="_start_monitoring",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="stop_intel_monitoring",
+                label="Stop Monitoring",
+                scope=ActionScope.TAB,
+                primary_home=PrimaryHome.INTEL_TOOLBAR,
+                tooltip="Stop monitoring intel channels",
+                handler_name="_stop_monitoring",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="add_intel_channel",
+                label="Add Channel",
+                scope=ActionScope.TAB,
+                primary_home=PrimaryHome.INTEL_TOOLBAR,
+                tooltip="Add an intel channel to monitor",
+                handler_name="_add_channel",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="clear_intel_log",
+                label="Clear Log",
+                scope=ActionScope.TAB,
+                primary_home=PrimaryHome.INTEL_TOOLBAR,
+                tooltip="Clear the intel log display",
+                handler_name="_clear_log",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="test_intel_alert",
+                label="Test Alert",
+                scope=ActionScope.TAB,
+                primary_home=PrimaryHome.INTEL_TOOLBAR,
+                tooltip="Trigger a test alert",
+                handler_name="_test_alert",
+            )
+        )
+
+        # Intel Context Menu (right-click on intel entries)
+        self.register(
+            ActionSpec(
+                id="copy_intel_system",
+                label="Copy System Name",
+                scope=ActionScope.OBJECT,
+                primary_home=PrimaryHome.INTEL_CONTEXT,
+                tooltip="Copy system name to clipboard",
+                handler_name="_copy_system",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="copy_intel_message",
+                label="Copy Message",
+                scope=ActionScope.OBJECT,
+                primary_home=PrimaryHome.INTEL_CONTEXT,
+                tooltip="Copy full intel message to clipboard",
+                handler_name="_copy_message",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="delete_intel_entry",
+                label="Delete Entry",
+                scope=ActionScope.OBJECT,
+                primary_home=PrimaryHome.INTEL_CONTEXT,
+                tooltip="Delete this intel entry",
+                handler_name="_delete_entry",
             )
         )
 
