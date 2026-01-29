@@ -122,32 +122,6 @@ class TestPerformancePanel:
             panel.setting_changed.emit.assert_called_once_with("performance.low_power_mode", True)
 
 
-# Test AlertsPanel
-class TestAlertsPanel:
-    """Tests for AlertsPanel"""
-
-    @patch("argus_overview.ui.settings_tab.QWidget.__init__")
-    def test_init(self, mock_widget):
-        """Test AlertsPanel initialization"""
-        mock_widget.return_value = None
-
-        from argus_overview.ui.settings_tab import AlertsPanel
-
-        mock_settings_manager = MagicMock()
-        mock_settings_manager.get.return_value = True
-
-        with patch.object(AlertsPanel, "_setup_ui"):
-            panel = AlertsPanel(mock_settings_manager)
-
-            assert panel.settings_manager is mock_settings_manager
-
-    def test_signal_exists(self):
-        """Test AlertsPanel has setting_changed signal"""
-        from argus_overview.ui.settings_tab import AlertsPanel
-
-        assert hasattr(AlertsPanel, "setting_changed")
-
-
 # Test HotkeysPanel
 class TestHotkeysPanel:
     """Tests for HotkeysPanel"""
@@ -557,36 +531,6 @@ class TestPerformancePanelSetupUI:
             assert mock_group.called
             assert mock_spin.called
             assert mock_combo.called
-
-
-class TestAlertsPanelSetupUI:
-    """Tests for AlertsPanel _setup_ui"""
-
-    @patch("argus_overview.ui.settings_tab.QWidget.__init__")
-    @patch("argus_overview.ui.settings_tab.QVBoxLayout")
-    @patch("argus_overview.ui.settings_tab.QGroupBox")
-    @patch("argus_overview.ui.settings_tab.QFormLayout")
-    @patch("argus_overview.ui.settings_tab.QCheckBox")
-    @patch("argus_overview.ui.settings_tab.QSlider")
-    @patch("argus_overview.ui.settings_tab.QSpinBox")
-    def test_setup_ui_creates_widgets(
-        self, mock_spin, mock_slider, mock_check, mock_form, mock_group, mock_layout, mock_widget
-    ):
-        """Test _setup_ui creates all expected widgets"""
-        mock_widget.return_value = None
-
-        from argus_overview.ui.settings_tab import AlertsPanel
-
-        mock_settings = MagicMock()
-        mock_settings.get.return_value = True
-
-        with patch.object(AlertsPanel, "setLayout"):
-            AlertsPanel(mock_settings)
-
-            assert mock_layout.called
-            assert mock_group.called
-            assert mock_check.called
-            assert mock_slider.called
 
 
 class TestHotkeysPanelInteraction:
@@ -1110,8 +1054,9 @@ class TestSettingsTabSetupUI:
 
             tab._create_category_tree()
 
-            # Should create 6 tree items (General, Performance, Alerts, Hotkeys, Appearance, Advanced)
-            assert mock_item.call_count >= 6
+            # Should create 5 tree items (General, Performance, Hotkeys, Appearance, Advanced)
+            # Note: Alerts panel was removed for CCP EULA compliance
+            assert mock_item.call_count >= 5
 
     @patch("argus_overview.ui.settings_tab.QWidget.__init__")
     def test_on_category_changed_none(self, mock_widget):
