@@ -26,7 +26,7 @@ Professional multi-boxing tool for EVE Online on Windows.
 
 ### Option 1: Download Release
 
-1. Download `Argus-Overview-v2.4-Windows.zip` from [Releases](https://github.com/AreteDriver/Argus_Overview/releases)
+1. Download `Argus-Overview-Windows.zip` from [Releases](https://github.com/AreteDriver/Argus_Overview/releases)
 2. Extract and run the executable
 3. That's it! No installation needed.
 
