@@ -25,12 +25,17 @@ v2.2 Features:
 - Single instance enforcement
 """
 
-import fcntl
 import logging
 import os
 import sys
 from pathlib import Path
 from typing import Optional, TextIO
+
+# Platform-specific imports for single-instance locking
+if sys.platform == "win32":
+    import msvcrt
+else:
+    import fcntl
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
@@ -46,13 +51,21 @@ sys.path.insert(0, str(Path(__file__).parent))
 class SingleInstance:
     """
     Ensures only one instance of the application can run at a time.
-    Uses a lock file with fcntl for reliable locking on Linux.
+    Uses fcntl on Linux/macOS and msvcrt on Windows for reliable locking.
     """
 
     def __init__(self, app_name: str = "argus-overview"):
         self.app_name = app_name
         self.lock_file: Optional[TextIO] = None
-        self.lock_path = Path.home() / ".config" / "argus-overview" / f"{app_name}.lock"
+
+        # Platform-specific lock file location
+        if sys.platform == "win32":
+            # Windows: Use AppData/Local
+            app_data = os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")
+            self.lock_path = Path(app_data) / "argus-overview" / f"{app_name}.lock"
+        else:
+            # Linux/macOS: Use ~/.config
+            self.lock_path = Path.home() / ".config" / "argus-overview" / f"{app_name}.lock"
 
         # Ensure directory exists
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -65,7 +78,12 @@ class SingleInstance:
         try:
             self.lock_file = open(self.lock_path, "w")
             try:
-                fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                if sys.platform == "win32":
+                    # Windows: Use msvcrt.locking
+                    msvcrt.locking(self.lock_file.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    # Linux/macOS: Use fcntl.flock
+                    fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
                 # Write PID to lock file
                 self.lock_file.write(str(os.getpid()))
                 self.lock_file.flush()
@@ -83,7 +101,12 @@ class SingleInstance:
         """Release the lock"""
         if self.lock_file:
             try:
-                fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
+                if sys.platform == "win32":
+                    # Windows: Unlock with msvcrt
+                    msvcrt.locking(self.lock_file.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    # Linux/macOS: Unlock with fcntl
+                    fcntl.flock(self.lock_file.fileno(), fcntl.LOCK_UN)
                 self.lock_file.close()
             except (OSError, ValueError):
                 pass  # File already closed or released, safe to ignore
@@ -191,8 +214,8 @@ def main():
         )
         sys.exit(1)
 
-    # Check Wayland compatibility before importing X11-dependent modules
-    if not check_wayland_compatibility():
+    # Check Wayland compatibility before importing X11-dependent modules (Linux only)
+    if sys.platform != "win32" and not check_wayland_compatibility():
         logger.info("User cancelled due to Wayland limitations")
         single_instance.release()
         sys.exit(0)
