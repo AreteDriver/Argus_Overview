@@ -5,21 +5,6 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.10.0] - 2026-01-30
-
-### Added
-- **ESI Integration (Phase 1)** - Jump distance calculation for intel reports
-  - New "Jumps" column in intel table showing distance from current system
-  - Color-coded by proximity: red (0-1), orange (2-5), gold (6-10), gray (10+)
-  - ESI client with rate limiting and exponential backoff
-  - Bundled universe cache with 8,437 EVE systems from SDE
-  - Route calculation via ESI `/route/` endpoint with 5-minute caching
-  - Set current system in Intel tab to enable jump filtering
-  - Graceful degradation: shows "-" when ESI unavailable or no current system set
-
-### Dependencies
-- Added `httpx>=0.27.0` for ESI HTTP client
-
 ## [2.9.0] - 2026-01-29
 
 ### Added

@@ -36,7 +36,6 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from argus_overview.esi import RouteService
 from argus_overview.intel.alerts import AlertConfig, AlertDispatcher, AlertType
 from argus_overview.intel.log_watcher import ChatLogWatcher, ChatMessage
 from argus_overview.intel.parser import IntelParser, IntelReport, ThreatLevel
@@ -63,19 +62,9 @@ class IntelLogTable(QTableWidget):
 
         self._setup_table()
 
-    # Jump distance colors (indexed by distance ranges)
-    JUMP_COLORS = {
-        0: QColor("#FF0000"),  # 0 jumps - in system (red)
-        1: QColor("#FF4500"),  # 1 jump (orange-red)
-        2: QColor("#FF8C00"),  # 2 jumps (dark orange)
-        5: QColor("#FFA500"),  # 3-5 jumps (orange)
-        10: QColor("#FFD700"),  # 6-10 jumps (gold)
-        999: QColor("#888888"),  # 10+ jumps (gray)
-    }
-
     def _setup_table(self):
         """Setup table columns and appearance."""
-        columns = ["Time", "Threat", "Jumps", "System", "Count", "Ships", "Message"]
+        columns = ["Time", "Threat", "System", "Count", "Ships", "Message"]
         self.setColumnCount(len(columns))
         self.setHorizontalHeaderLabels(columns)
 
@@ -91,30 +80,13 @@ class IntelLogTable(QTableWidget):
         header = self.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Time
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Threat
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Jumps
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # System
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Count
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Interactive)  # Ships
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.Stretch)  # Message
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # System
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Count
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)  # Ships
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Message
 
         # Selection signal
         self.itemSelectionChanged.connect(self._on_selection_changed)
-
-    def _get_jump_color(self, jumps: Optional[int]) -> QColor:
-        """Get color for jump distance."""
-        if jumps is None:
-            return QColor("#888888")
-        if jumps == 0:
-            return self.JUMP_COLORS[0]
-        if jumps == 1:
-            return self.JUMP_COLORS[1]
-        if jumps == 2:
-            return self.JUMP_COLORS[2]
-        if jumps <= 5:
-            return self.JUMP_COLORS[5]
-        if jumps <= 10:
-            return self.JUMP_COLORS[10]
-        return self.JUMP_COLORS[999]
 
     def add_report(self, report: IntelReport):
         """Add an intel report to the table."""
@@ -136,33 +108,21 @@ class IntelLogTable(QTableWidget):
         threat_item.setFont(QFont("", -1, QFont.Weight.Bold))
         self.setItem(0, 1, threat_item)
 
-        # Jumps
-        if report.jumps_from_current is not None:
-            jumps_str = str(report.jumps_from_current)
-        else:
-            jumps_str = "-"
-        jumps_item = QTableWidgetItem(jumps_str)
-        jumps_color = self._get_jump_color(report.jumps_from_current)
-        jumps_item.setForeground(QBrush(jumps_color))
-        jumps_item.setFont(QFont("", -1, QFont.Weight.Bold))
-        jumps_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setItem(0, 2, jumps_item)
-
         # System
         system_item = QTableWidgetItem(report.system or "Unknown")
-        self.setItem(0, 3, system_item)
+        self.setItem(0, 2, system_item)
 
         # Count
         count_str = str(report.hostile_count) if report.hostile_count else "-"
         count_item = QTableWidgetItem(count_str)
-        self.setItem(0, 4, count_item)
+        self.setItem(0, 3, count_item)
 
         # Ships
         ships_str = ", ".join(report.ship_types[:3]) if report.ship_types else "-"
         if len(report.ship_types) > 3:
             ships_str += f" +{len(report.ship_types) - 3}"
         ships_item = QTableWidgetItem(ships_str)
-        self.setItem(0, 5, ships_item)
+        self.setItem(0, 4, ships_item)
 
         # Message (truncated)
         msg_text = report.raw_message[:100]
@@ -170,7 +130,7 @@ class IntelLogTable(QTableWidget):
             msg_text += "..."
         msg_item = QTableWidgetItem(msg_text)
         msg_item.setToolTip(report.raw_message)
-        self.setItem(0, 6, msg_item)
+        self.setItem(0, 5, msg_item)
 
         # Apply row background color based on threat
         for col in range(self.columnCount()):
@@ -230,9 +190,6 @@ class IntelTab(QWidget):
         self.alert_config = self._load_alert_config()
         self.alert_dispatcher = AlertDispatcher(self.alert_config)
 
-        # ESI route service for jump calculations
-        self._init_route_service()
-
         # Connect internal signals
         self.log_watcher.message_received.connect(self._on_chat_message)
         self.log_watcher.error_occurred.connect(self._on_watcher_error)
@@ -243,23 +200,6 @@ class IntelTab(QWidget):
         self._load_settings()
 
         self.logger.info("Intel tab initialized")
-
-    def _init_route_service(self):
-        """Initialize ESI route service for jump calculations."""
-        try:
-            self.route_service = RouteService(parent=self)
-            self.route_service.route_failed.connect(self._on_route_failed)
-            self.logger.info(
-                f"Route service initialized with {self.route_service.get_cache_stats()['systems_loaded']} systems"
-            )
-        except Exception as e:
-            self.logger.warning(f"Failed to initialize route service: {e}")
-            self.route_service = None
-
-    @Slot(str, str, str)
-    def _on_route_failed(self, origin: str, dest: str, error: str):
-        """Handle route calculation failure."""
-        self.logger.debug(f"Route calculation failed: {origin} -> {dest}: {error}")
 
     def _load_alert_config(self) -> AlertConfig:
         """Load alert configuration from settings."""
@@ -639,9 +579,6 @@ class IntelTab(QWidget):
         if report:
             self.logger.debug(f"Intel detected: {report.system} - {report.threat_level.value}")
 
-            # Calculate jump distance if we have a system and current location
-            self._calculate_jumps(report)
-
             # Add to table
             self.intel_table.add_report(report)
 
@@ -650,30 +587,6 @@ class IntelTab(QWidget):
 
             # Emit signal
             self.intel_received.emit(report)
-
-    def _calculate_jumps(self, report: IntelReport):
-        """Calculate jump distance from current system to intel report system."""
-        if not self.route_service:
-            return
-
-        if not report.system:
-            return
-
-        # Get current system from settings
-        current_system = self.current_system_edit.text().strip()
-        if not current_system:
-            current_system = self.settings_manager.get("intel.current_system", "")
-
-        if not current_system:
-            return
-
-        try:
-            jumps = self.route_service.calculate_jumps(current_system, report.system)
-            if jumps is not None:
-                report.jumps_from_current = jumps
-                self.logger.debug(f"Jump distance: {current_system} -> {report.system} = {jumps}")
-        except Exception as e:
-            self.logger.warning(f"Jump calculation failed: {e}")
 
     @Slot(str)
     def _on_watcher_error(self, error: str):
@@ -765,5 +678,3 @@ class IntelTab(QWidget):
         """Stop monitoring (called on app close)."""
         if self.log_watcher.is_running():
             self.log_watcher.stop()
-        if self.route_service:
-            self.route_service.close()

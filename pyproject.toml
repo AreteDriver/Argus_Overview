@@ -1,6 +1,6 @@
 [project]
 name = "argus-overview"
-version = "2.10.0"
+version = "2.9.0"
 description = "Professional multi-boxing tool for EVE Online on Linux"
 readme = "README.md"
 license = {text = "MIT"}
@@ -28,7 +28,6 @@ dependencies = [
     "pynput>=1.7.0",
     "numpy>=1.24.0",
     "watchdog>=4.0.0",
-    "httpx>=0.27.0",
 ]
 
 [project.optional-dependencies]
