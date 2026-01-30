@@ -12,8 +12,8 @@ block_cipher = None
 pyside6_datas, pyside6_binaries, pyside6_hiddenimports = collect_all('PySide6')
 
 a = Analysis(
-    ['../src/main.py'],
-    pathex=[os.path.abspath('..')],
+    ['src/main.py'],
+    pathex=[os.path.abspath('src')],
     binaries=pyside6_binaries,
     datas=[
         ('../assets', 'assets'),
