@@ -7953,3 +7953,192 @@ class TestWindowPreviewWidgetActivityState:
             result = widget.get_activity_state()
 
             assert result == "focused"
+
+
+class TestGridApplierInvalidWindowId:
+    """Test GridApplier with invalid window IDs (lines 535-536)."""
+
+    def test_move_window_position_only_invalid_id(self):
+        """Test _move_window_position_only returns early for invalid window ID."""
+        from argus_overview.ui.main_tab import GridApplier
+
+        applier = GridApplier()
+
+        # Invalid window ID formats that should trigger early return
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
+            applier._move_window_position_only("invalid", 100, 200)
+            mock_run.assert_not_called()
+
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
+            applier._move_window_position_only("abc123", 100, 200)
+            mock_run.assert_not_called()
+
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
+            applier._move_window_position_only("", 100, 200)
+            mock_run.assert_not_called()
+
+
+class TestWindowManagerFrameProcessingError:
+    """Test WindowManager frame processing error handling (lines 1094-1095)."""
+
+    def test_process_capture_results_frame_update_error(self, qapp):
+        """Test that frame update errors are logged and don't crash."""
+        import threading
+
+        from argus_overview.ui.main_tab import WindowManager
+
+        mock_char_mgr = MagicMock()
+        mock_capture = MagicMock()
+        mock_settings = MagicMock()
+        mock_settings.get.return_value = None
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            mgr = WindowManager.__new__(WindowManager)
+            mgr.character_manager = mock_char_mgr
+            mgr.capture_system = mock_capture
+            mgr.settings_manager = mock_settings
+            mgr.logger = MagicMock()
+            mgr.refresh_rate = 30
+            mgr.pending_requests = {"req1": "0x12345"}
+            mgr._pending_lock = threading.Lock()
+
+            # Create a mock frame that raises an exception
+            mock_frame = MagicMock()
+            mock_frame.update_frame.side_effect = RuntimeError("Frame update failed")
+            mgr.preview_frames = {"0x12345": mock_frame}
+
+            # Simulate a capture result via capture_system.get_result
+            from PIL import Image
+
+            mock_image = Image.new("RGB", (100, 100))
+            mock_capture.get_result.side_effect = [
+                ("req1", "0x12345", mock_image),
+                None,  # Stop iteration
+            ]
+
+            # Should not raise, just log
+            mgr._process_capture_results()
+
+            # Error should be logged
+            mgr.logger.error.assert_called()
+
+
+class TestMainTabInitPreviewsDisabled:
+    """Test MainTab initialization with previews disabled (lines 1156-1159)."""
+
+    # Skip on Python 3.12 due to PySide6 segfault with QTimer
+    import sys
+
+    import pytest
+
+    @pytest.mark.skipif(
+        sys.version_info >= (3, 12),
+        reason="PySide6 segfault on Python 3.12 - QTimer issue",
+    )
+    def test_init_with_previews_disabled(self, qapp):
+        """Test MainTab doesn't start capture loop when previews disabled."""
+        from argus_overview.ui.main_tab import MainTab
+
+        mock_capture = MagicMock()
+        mock_char_mgr = MagicMock()
+        mock_settings = MagicMock()
+        mock_settings.get.side_effect = lambda key, default=None: (
+            True if key == "performance.disable_previews" else default
+        )
+
+        with patch.object(MainTab, "_setup_ui"):
+            with patch.object(MainTab, "_load_cycling_groups"):
+                tab = MainTab(mock_capture, mock_char_mgr, mock_settings)
+
+        # Capture loop should not be started
+        assert not tab.window_manager.capture_timer.isActive()
+
+
+class TestMainTabStopCaptureLoopFrameTimers:
+    """Test MainTab.stop_capture_loop stops frame timers (lines 1919-1923)."""
+
+    import sys
+
+    import pytest
+
+    @pytest.mark.skipif(
+        sys.version_info >= (3, 12),
+        reason="PySide6 segfault on Python 3.12 - QTimer issue",
+    )
+    def test_stop_capture_loop_stops_frame_timers(self, qapp):
+        """Test that stop_capture_loop stops all frame session timers."""
+        from argus_overview.ui.main_tab import MainTab
+
+        mock_capture = MagicMock()
+        mock_char_mgr = MagicMock()
+        mock_settings = MagicMock()
+        mock_settings.get.return_value = None
+
+        with patch.object(MainTab, "_setup_ui"):
+            with patch.object(MainTab, "_load_cycling_groups"):
+                tab = MainTab(mock_capture, mock_char_mgr, mock_settings)
+
+        # Create mock frames with timers
+        mock_frame1 = MagicMock()
+        mock_frame2 = MagicMock()
+        tab.window_manager.preview_frames = {
+            "0x1111": mock_frame1,
+            "0x2222": mock_frame2,
+        }
+
+        tab.stop_capture_loop()
+
+        # Frame timers should be stopped
+        mock_frame1.session_timer.stop.assert_called_once()
+        mock_frame2.session_timer.stop.assert_called_once()
+
+
+class TestMainTabAutoMinimizeCount:
+    """Test auto-minimize window counting (lines 1840-1846)."""
+
+    import sys
+
+    import pytest
+
+    @pytest.mark.skipif(
+        sys.version_info >= (3, 12),
+        reason="PySide6 segfault on Python 3.12 - QTimer issue",
+    )
+    def test_toggle_minimize_inactive_counts_minimized(self, qapp):
+        """Test that toggle_minimize_inactive counts minimized windows."""
+        from argus_overview.ui.main_tab import MainTab
+
+        mock_capture = MagicMock()
+        mock_capture.minimize_window.return_value = True
+        mock_char_mgr = MagicMock()
+        mock_settings = MagicMock()
+        mock_settings.get.side_effect = lambda key, default=None: (
+            True if key == "performance.auto_minimize_inactive" else default
+        )
+        mock_settings.set = MagicMock()
+
+        with patch.object(MainTab, "_setup_ui"):
+            with patch.object(MainTab, "_load_cycling_groups"):
+                tab = MainTab(mock_capture, mock_char_mgr, mock_settings)
+
+        # Add some preview frames
+        tab.window_manager.preview_frames = {
+            "0x1111": MagicMock(),
+            "0x2222": MagicMock(),
+            "0x3333": MagicMock(),
+        }
+        tab._windows_minimized = False
+        tab.status_label = MagicMock()
+
+        # Mock xdotool to return a focused window
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = b"0x1111"
+
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess", return_value=mock_result):
+            tab._toggle_minimize_inactive()
+
+        # Status should show count
+        tab.status_label.setText.assert_called()
+        call_args = tab.status_label.setText.call_args[0][0]
+        assert "minimized" in call_args.lower() or "auto-minimize" in call_args.lower()
