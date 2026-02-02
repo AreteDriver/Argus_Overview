@@ -5,6 +5,28 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1] - 2026-02-02
+
+### Added
+- **Intel Alert Sounds** - Four new audio alert files for different threat levels
+  - `info.wav` - Low-priority intel (440Hz, 0.3s)
+  - `warning.wav` - Neutral/unknown hostiles (587Hz, 0.4s)
+  - `danger.wav` - Confirmed hostiles nearby (880Hz, 0.5s)
+  - `critical.wav` - Immediate threat (dual-tone, 0.6s)
+- **Windows Build Configuration** - PyInstaller spec file for building Windows .exe
+- **GitHub Actions CI/CD** - Cross-platform build workflow
+  - Automated testing with pytest and coverage
+  - Linux AppImage builds
+  - Windows PyInstaller builds
+  - Automated releases on version tags
+
+### Changed
+- **Test Coverage** - Improved from 92% to 93% (97% excluding Windows-only code)
+  - 55+ new tests for `intel_tab.py` and `main_window_v21.py`
+  - `intel_tab.py`: 77% → 93%
+  - `main_window_v21.py`: 79% → 89%
+  - 1798 total tests passing
+
 ## [3.0.0] - 2026-02-01
 
 ### Added
