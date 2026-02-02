@@ -5,7 +5,7 @@ Tests IntelLogTable and IntelTab widgets.
 
 import sys
 from datetime import datetime
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PySide6.QtCore import Qt
@@ -605,16 +605,22 @@ class TestIntelTabUI:
         tab.log_watcher.add_channel("TestChannel")
         tab._update_channel_list()
 
-        # Select the channel
-        items = tab.channel_list.findItems("TestChannel", Qt.MatchFlag.MatchExactly)
-        if items:
-            tab.channel_list.setCurrentItem(items[0])
+        # Verify channel was added (stored lowercase)
+        assert "testchannel" in tab.log_watcher.monitored_channels
+
+        # Select the channel by setting current row (stored lowercase in list)
+        items = tab.channel_list.findItems("testchannel", Qt.MatchFlag.MatchExactly)
+        assert len(items) > 0, "Channel not found in list"
+        tab.channel_list.setCurrentRow(tab.channel_list.row(items[0]))
+
+        # Verify item is selected
+        assert tab.channel_list.currentItem() is not None
 
         # Remove it
         tab._remove_channel()
 
         # Channel should be removed
-        assert "TestChannel" not in tab.log_watcher.monitored_channels
+        assert "testchannel" not in tab.log_watcher.monitored_channels
 
     def test_on_alert_triggered(self, qapp, mock_settings_manager):
         """Test alert triggered handler (lines 607)."""
@@ -662,3 +668,116 @@ class TestIntelTabUI:
 
         # Should not add to table
         assert tab.intel_table.rowCount() == initial_count
+
+    def test_update_log_dir_label_not_found(self, qapp, mock_settings_manager):
+        """Test log dir label when dir not found (lines 491-492)."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        tab = IntelTab(mock_settings_manager)
+
+        # Mock log_dir to return None
+        tab.log_watcher.log_dir = None
+
+        tab._update_log_dir_label()
+
+        assert tab.log_dir_label.text() == "Log Dir: Not found"
+        assert "F44336" in tab.log_dir_label.styleSheet()  # Red color
+
+    def test_add_channel_with_dialog(self, qapp, mock_settings_manager):
+        """Test adding channel via dialog (lines 528-539)."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        tab = IntelTab(mock_settings_manager)
+
+        # Mock QInputDialog.getText to return a channel name
+        with patch(
+            "argus_overview.ui.intel_tab.QInputDialog.getText",
+            return_value=("NewChannel", True),
+        ):
+            tab._add_channel()
+
+        assert "newchannel" in tab.log_watcher.monitored_channels
+
+    def test_add_channel_dialog_cancelled(self, qapp, mock_settings_manager):
+        """Test adding channel when dialog is cancelled."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        tab = IntelTab(mock_settings_manager)
+        initial_channels = set(tab.log_watcher.monitored_channels)
+
+        # Mock QInputDialog.getText to return cancelled
+        with patch(
+            "argus_overview.ui.intel_tab.QInputDialog.getText",
+            return_value=("", False),
+        ):
+            tab._add_channel()
+
+        assert tab.log_watcher.monitored_channels == initial_channels
+
+    def test_add_channel_empty_string(self, qapp, mock_settings_manager):
+        """Test adding channel with empty string."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        tab = IntelTab(mock_settings_manager)
+        initial_channels = set(tab.log_watcher.monitored_channels)
+
+        # Mock QInputDialog.getText to return empty string but OK clicked
+        with patch(
+            "argus_overview.ui.intel_tab.QInputDialog.getText",
+            return_value=("   ", True),
+        ):
+            tab._add_channel()
+
+        # Empty string after strip should not be added
+        assert tab.log_watcher.monitored_channels == initial_channels
+
+    @pytest.mark.skipif(
+        sys.version_info >= (3, 12),
+        reason="PySide6 segfault on Python 3.12 in CI - Qt signal/slot issue",
+    )
+    def test_chat_message_with_valid_intel(self, qapp, mock_settings_manager):
+        """Test chat message that produces valid intel report (lines 572-589)."""
+        from argus_overview.intel.log_watcher import ChatMessage
+        from argus_overview.ui.intel_tab import IntelTab
+
+        tab = IntelTab(mock_settings_manager)
+
+        # Don't filter by channel (empty monitored_channels allows all)
+        tab.log_watcher.monitored_channels = set()
+
+        signal_handler = MagicMock()
+        tab.intel_received.connect(signal_handler)
+
+        msg = ChatMessage(
+            timestamp=datetime.now(),
+            channel="Intel",
+            speaker="Scout",
+            message="HED-GP +5 hostiles",  # Valid intel format
+            raw_line="test",
+        )
+
+        initial_count = tab.intel_table.rowCount()
+        tab._on_chat_message(msg)
+
+        # Should add to table and emit signal
+        assert tab.intel_table.rowCount() > initial_count
+        assert signal_handler.called
+
+    def test_show_context_menu_no_report_returns_early(self, qapp, mock_settings_manager):
+        """Test context menu returns early when no report selected (line 633-634)."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        tab = IntelTab(mock_settings_manager)
+
+        # No reports in table, so get_selected_report returns None
+        assert tab.intel_table.get_selected_report() is None
+
+        # The method should return early without error when no report is selected
+        # We can't easily test that QMenu isn't created without blocking,
+        # so just verify it doesn't crash
+        from PySide6.QtCore import QPoint
+
+        # Mock at the module level to prevent blocking exec()
+        with patch.object(tab.intel_table, "get_selected_report", return_value=None):
+            tab._show_context_menu(QPoint(0, 0))
+            # If we get here, the early return worked
