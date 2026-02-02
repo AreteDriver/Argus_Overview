@@ -3,6 +3,7 @@
 Tests IntelLogTable and IntelTab widgets.
 """
 
+import sys
 from datetime import datetime
 from unittest.mock import MagicMock
 
@@ -176,6 +177,10 @@ class TestIntelTab:
 class TestIntelTabIntegration:
     """Integration tests for IntelTab."""
 
+    @pytest.mark.skipif(
+        sys.version_info >= (3, 12),
+        reason="PySide6 segfault on Python 3.12 in CI - Qt signal/slot issue",
+    )
     def test_process_message(self, qapp, mock_settings_manager):
         """Test processing a chat message."""
         from argus_overview.intel.log_watcher import ChatMessage
