@@ -4,4 +4,4 @@ Pillow==12.1.0
 pynput==1.8.1
 numpy==2.4.1
 watchdog==6.0.0
-pywin32==308
+pywin32==311
