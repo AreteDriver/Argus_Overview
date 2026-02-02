@@ -1774,3 +1774,383 @@ class TestApplyToAllWindowsInvalidAction:
         # Should not try to call any methods since action was invalid
         window.capture_system.minimize_window.assert_not_called()
         window.capture_system.restore_window.assert_not_called()
+
+
+# Test _create_intel_tab
+class TestCreateIntelTab:
+    """Tests for _create_intel_tab method"""
+
+    @patch("argus_overview.ui.intel_tab.IntelTab")
+    def test_create_intel_tab(self, mock_tab_class):
+        """Test creating intel tab"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.settings_manager = MagicMock()
+        window.tabs = MagicMock()
+
+        mock_tab = MagicMock()
+        mock_dispatcher = MagicMock()
+        mock_tab.get_alert_dispatcher.return_value = mock_dispatcher
+        mock_tab_class.return_value = mock_tab
+
+        MainWindowV21._create_intel_tab(window)
+
+        # Should create tab
+        mock_tab_class.assert_called_once_with(window.settings_manager)
+        window.tabs.addTab.assert_called_once()
+
+        # Should connect signals
+        assert mock_tab.alert_triggered.connect.called
+        assert mock_tab.intel_received.connect.called
+        assert mock_dispatcher.border_flash_requested.connect.called
+
+
+# Test _flash_preview_borders
+class TestFlashPreviewBorders:
+    """Tests for _flash_preview_borders method"""
+
+    def test_flash_preview_borders(self):
+        """Test flashing preview borders"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+
+        mock_frame1 = MagicMock()
+        mock_frame2 = MagicMock()
+
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.window_manager.preview_frames = {
+            "0x111": mock_frame1,
+            "0x222": mock_frame2,
+        }
+
+        MainWindowV21._flash_preview_borders(window, "#FF0000", 2000)
+
+        mock_frame1.flash_border.assert_called_once_with("#FF0000", 2000)
+        mock_frame2.flash_border.assert_called_once_with("#FF0000", 2000)
+
+    def test_flash_preview_borders_no_main_tab(self):
+        """Test flash_preview_borders handles missing main_tab"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        del window.main_tab
+
+        # Should not raise
+        MainWindowV21._flash_preview_borders(window, "#FF0000", 2000)
+
+    def test_flash_preview_borders_no_window_manager(self):
+        """Test flash_preview_borders handles missing window_manager"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.main_tab = MagicMock(spec=[])  # No window_manager attr
+
+        # Should not raise
+        MainWindowV21._flash_preview_borders(window, "#FF0000", 2000)
+
+    def test_flash_preview_borders_frame_without_flash_border(self):
+        """Test flash_preview_borders handles frames without flash_border method"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+
+        mock_frame = MagicMock(spec=[])  # No flash_border method
+
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.window_manager.preview_frames = {"0x111": mock_frame}
+
+        # Should not raise
+        MainWindowV21._flash_preview_borders(window, "#FF0000", 2000)
+
+
+# Test _on_intel_alert
+class TestOnIntelAlert:
+    """Tests for _on_intel_alert method"""
+
+    def test_on_intel_alert_critical_shows_notification(self):
+        """Test critical intel alert shows tray notification"""
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.system_tray = MagicMock()
+
+        report = IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.CRITICAL,
+            hostile_count=5,
+            ship_types=["Sabre", "Loki"],
+            player_names=[],
+            raw_message="HED-GP 5 hostiles",
+        )
+
+        MainWindowV21._on_intel_alert(window, report, MagicMock())
+
+        window.system_tray.show_notification.assert_called_once()
+        call_args = window.system_tray.show_notification.call_args[0]
+        assert "CRITICAL" in call_args[0]
+        assert "HED-GP" in call_args[0]
+
+    def test_on_intel_alert_warning_no_notification(self):
+        """Test warning-level alert doesn't show notification"""
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.system_tray = MagicMock()
+
+        report = IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.WARNING,
+            hostile_count=1,
+            ship_types=[],
+            player_names=[],
+            raw_message="HED-GP 1 neutral",
+        )
+
+        MainWindowV21._on_intel_alert(window, report, MagicMock())
+
+        window.system_tray.show_notification.assert_not_called()
+
+    def test_on_intel_alert_invalid_report_type(self):
+        """Test intel alert with non-IntelReport type returns early"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.system_tray = MagicMock()
+
+        # Pass invalid type
+        MainWindowV21._on_intel_alert(window, "not a report", MagicMock())
+
+        window.system_tray.show_notification.assert_not_called()
+
+    def test_on_intel_alert_no_system_tray(self):
+        """Test intel alert handles missing system_tray"""
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        del window.system_tray  # No system tray
+
+        report = IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.CRITICAL,
+            hostile_count=5,
+            ship_types=[],
+            player_names=[],
+            raw_message="test",
+        )
+
+        # Should not raise
+        MainWindowV21._on_intel_alert(window, report, MagicMock())
+
+
+# Test _on_intel_received
+class TestOnIntelReceived:
+    """Tests for _on_intel_received method"""
+
+    def test_on_intel_received(self):
+        """Test intel received handler (currently a pass)"""
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+
+        report = IntelReport(
+            system="TEST",
+            threat_level=ThreatLevel.INFO,
+            hostile_count=0,
+            ship_types=[],
+            player_names=[],
+            raw_message="test",
+        )
+
+        # Should not raise (just a pass)
+        MainWindowV21._on_intel_received(window, report)
+
+
+# Test _disconnect_signals
+class TestDisconnectSignals:
+    """Tests for _disconnect_signals method"""
+
+    def test_disconnect_signals_all_present(self):
+        """Test disconnecting all signals when all tabs present"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+
+        # Mock all tabs and their signals
+        window.main_tab = MagicMock()
+        window.characters_tab = MagicMock()
+        window.settings_tab = MagicMock()
+        window.hotkeys_tab = MagicMock()
+        window.intel_tab = MagicMock()
+        window.system_tray = MagicMock()
+        window.auto_discovery = MagicMock()
+        window.hotkey_manager = MagicMock()
+
+        # Bind the required methods
+        window._on_character_detected = MagicMock()
+        window._on_layout_applied = MagicMock()
+        window._on_team_selected = MagicMock()
+        window._apply_setting = MagicMock()
+        window._toggle_visibility = MagicMock()
+        window._toggle_thumbnails = MagicMock()
+        window._minimize_all_windows = MagicMock()
+        window._restore_all_windows = MagicMock()
+        window._on_profile_selected = MagicMock()
+        window._show_settings = MagicMock()
+        window._reload_config = MagicMock()
+        window._quit_application = MagicMock()
+        window._on_new_character_discovered = MagicMock()
+        window._on_character_gone = MagicMock()
+        window._on_intel_alert = MagicMock()
+        window._on_intel_received = MagicMock()
+
+        MainWindowV21._disconnect_signals(window)
+
+        window.logger.debug.assert_called_with("Signals disconnected")
+
+    def test_disconnect_signals_missing_tabs(self):
+        """Test disconnecting signals when some tabs missing"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+
+        # Only have main_tab and hotkey_manager
+        window.main_tab = MagicMock()
+        window.hotkey_manager = MagicMock()
+        window._on_character_detected = MagicMock()
+        window._on_layout_applied = MagicMock()
+
+        # Remove other tabs
+        del window.characters_tab
+        del window.settings_tab
+        del window.hotkeys_tab
+        del window.intel_tab
+        del window.system_tray
+        del window.auto_discovery
+
+        # Should not raise
+        MainWindowV21._disconnect_signals(window)
+
+        window.logger.debug.assert_called_with("Signals disconnected")
+
+    def test_disconnect_signals_handles_runtime_error(self):
+        """Test disconnecting handles RuntimeError (already disconnected)"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.hotkey_manager = MagicMock()
+
+        # main_tab with signal that raises RuntimeError on disconnect
+        window.main_tab = MagicMock()
+        window.main_tab.character_detected = MagicMock()
+        window.main_tab.character_detected.disconnect.side_effect = RuntimeError("Already disconnected")
+        window.main_tab.layout_applied = MagicMock()
+
+        window._on_character_detected = MagicMock()
+        window._on_layout_applied = MagicMock()
+
+        # Should not raise
+        MainWindowV21._disconnect_signals(window)
+
+        window.logger.debug.assert_called_with("Signals disconnected")
+
+    def test_disconnect_signals_with_hotkeys_tab_edits(self):
+        """Test disconnecting hotkey recording signals"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.hotkey_manager = MagicMock()
+
+        # hotkeys_tab with recording edits
+        window.hotkeys_tab = MagicMock()
+        window.hotkeys_tab.cycle_forward_edit = MagicMock()
+        window.hotkeys_tab.cycle_backward_edit = MagicMock()
+        window.hotkeys_tab.group_changed = MagicMock()
+        window.main_tab = MagicMock()
+
+        window._on_character_detected = MagicMock()
+        window._on_layout_applied = MagicMock()
+
+        MainWindowV21._disconnect_signals(window)
+
+        # Should have tried to disconnect recording signals
+        window.hotkeys_tab.cycle_forward_edit.recordingStarted.disconnect.assert_called()
+        window.hotkeys_tab.cycle_backward_edit.recordingStopped.disconnect.assert_called()
+
+    def test_disconnect_signals_no_cycle_edits(self):
+        """Test disconnecting when cycle edits don't exist"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.hotkey_manager = MagicMock()
+
+        # hotkeys_tab without cycle edits
+        window.hotkeys_tab = MagicMock()
+        window.hotkeys_tab.cycle_forward_edit = None
+        window.hotkeys_tab.cycle_backward_edit = None
+        window.hotkeys_tab.group_changed = MagicMock()
+        window.main_tab = MagicMock()
+
+        window._on_character_detected = MagicMock()
+        window._on_layout_applied = MagicMock()
+
+        # Should not raise
+        MainWindowV21._disconnect_signals(window)
+
+
+# Test _on_character_gone
+class TestOnCharacterGone:
+    """Tests for _on_character_gone method"""
+
+    def test_on_character_gone_unassigns_window(self):
+        """Test character gone unassigns window from character manager"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.character_manager = MagicMock()
+
+        MainWindowV21._on_character_gone(window, "TestPilot", "0x12345")
+
+        window.character_manager.unassign_window.assert_called_with("TestPilot")
+        window.logger.info.assert_called()
+
+    def test_on_character_gone_updates_characters_tab(self):
+        """Test character gone updates characters tab status"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.character_manager = MagicMock()
+        window.characters_tab = MagicMock()
+
+        MainWindowV21._on_character_gone(window, "TestPilot", "0x12345")
+
+        window.characters_tab.update_character_status.assert_called_with("TestPilot", None)
+
+    def test_on_character_gone_no_characters_tab(self):
+        """Test character gone when no characters_tab"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.character_manager = MagicMock()
+        del window.characters_tab
+
+        # Should not raise
+        MainWindowV21._on_character_gone(window, "Pilot", "0x12345")
+
+        window.character_manager.unassign_window.assert_called_with("Pilot")
