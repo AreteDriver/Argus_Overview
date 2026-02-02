@@ -2156,3 +2156,92 @@ class TestOnCharacterGone:
         MainWindowV21._on_character_gone(window, "Pilot", "0x12345")
 
         window.character_manager.unassign_window.assert_called_with("Pilot")
+
+
+class TestDisconnectSignalsRecordingException:
+    """Tests for exception handling in recording signal disconnect (lines 752-753)."""
+
+    def test_disconnect_signals_recording_type_error(self):
+        """Test disconnecting handles TypeError on recording signal disconnect."""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.hotkey_manager = MagicMock()
+        window.main_tab = MagicMock()
+        window._on_character_detected = MagicMock()
+        window._on_layout_applied = MagicMock()
+
+        # hotkeys_tab with recording edits that raise TypeError
+        window.hotkeys_tab = MagicMock()
+        mock_edit = MagicMock()
+        mock_edit.recordingStarted = MagicMock()
+        mock_edit.recordingStarted.disconnect.side_effect = TypeError("Not connected")
+        mock_edit.recordingStopped = MagicMock()
+        mock_edit.recordingStopped.disconnect.side_effect = RuntimeError("Already disconnected")
+        window.hotkeys_tab.cycle_forward_edit = mock_edit
+        window.hotkeys_tab.cycle_backward_edit = mock_edit
+        window.hotkeys_tab.group_changed = MagicMock()
+
+        # Should not raise - exceptions are caught
+        MainWindowV21._disconnect_signals(window)
+
+        window.logger.debug.assert_called_with("Signals disconnected")
+
+
+class TestCloseEventMainTab:
+    """Tests for closeEvent main_tab handling (line 933)."""
+
+    def test_close_event_stops_main_tab_capture_loop(self, qapp):
+        """Test closeEvent calls main_tab.stop_capture_loop."""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = False  # Don't minimize to tray
+        window.main_tab = MagicMock()
+        window.intel_tab = MagicMock()
+        window.auto_discovery = MagicMock()
+        window.capture_system = MagicMock()
+        window.hotkey_manager = MagicMock()
+        window.system_tray = MagicMock()
+        window._disconnect_signals = MagicMock()
+        window._already_closing = False
+
+        # Call closeEvent
+        from PySide6.QtGui import QCloseEvent
+
+        event = MagicMock(spec=QCloseEvent)
+        MainWindowV21.closeEvent(window, event)
+
+        window.main_tab.stop_capture_loop.assert_called_once()
+
+
+class TestCloseEventIntelTab:
+    """Tests for closeEvent intel_tab handling (line 937)."""
+
+    def test_close_event_stops_intel_tab(self, qapp):
+        """Test closeEvent calls intel_tab.stop."""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock(spec=MainWindowV21)
+        window.logger = MagicMock()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = False  # Don't minimize to tray
+        window.main_tab = MagicMock()
+        window.intel_tab = MagicMock()
+        window.auto_discovery = MagicMock()
+        window.capture_system = MagicMock()
+        window.hotkey_manager = MagicMock()
+        window.system_tray = MagicMock()
+        window._disconnect_signals = MagicMock()
+        window._already_closing = False
+
+        # Call closeEvent
+        from PySide6.QtGui import QCloseEvent
+
+        event = MagicMock(spec=QCloseEvent)
+        MainWindowV21.closeEvent(window, event)
+
+        window.intel_tab.stop.assert_called_once()
