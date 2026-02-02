@@ -5,7 +5,6 @@ Tests WindowCaptureThreaded class which wraps platform-specific capture implemen
 v3.0: Tests now mock the platform abstraction layer.
 """
 
-import time
 from unittest.mock import MagicMock, patch
 
 

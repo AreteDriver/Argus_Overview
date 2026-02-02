@@ -237,8 +237,8 @@ class TestGridApplier:
 
     def test_get_screen_geometry_success(self):
         """Test get_screen_geometry with successful result"""
-        from argus_overview.ui.layouts_tab import GridApplier
         from argus_overview.platform.base import ScreenGeometry
+        from argus_overview.ui.layouts_tab import GridApplier
 
         with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
             mock_sm = MagicMock()
@@ -257,8 +257,8 @@ class TestGridApplier:
 
     def test_get_screen_geometry_failure(self):
         """Test get_screen_geometry with failure (returns default)"""
-        from argus_overview.ui.layouts_tab import GridApplier
         from argus_overview.platform.base import ScreenGeometry
+        from argus_overview.ui.layouts_tab import GridApplier
 
         with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
             mock_sm = MagicMock()
@@ -276,8 +276,8 @@ class TestGridApplier:
 
     def test_get_screen_geometry_exception(self):
         """Test get_screen_geometry with exception (returns default)"""
-        from argus_overview.ui.layouts_tab import GridApplier
         from argus_overview.platform.base import ScreenGeometry
+        from argus_overview.ui.layouts_tab import GridApplier
 
         with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
             mock_sm = MagicMock()

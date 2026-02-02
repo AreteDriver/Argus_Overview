@@ -73,9 +73,10 @@ class TestGetScreenGeometry:
             mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
             mock_get_sm.return_value = mock_sm
 
-            geom = get_screen_geometry()
+            result = get_screen_geometry()
 
             mock_sm.get_screen_geometry.assert_called_once_with(0)
+            assert result is not None
 
     def test_get_screen_geometry_fallback(self):
         """Test fallback when platform layer returns default"""
