@@ -1051,6 +1051,85 @@ class TestEVEPathResolverLinuxEdgeCases:
         assert all("Gamelogs" in str(p) for p in paths)
 
 
+class TestWindowsFactoryBranches:
+    """Tests for Windows branches of factory functions (mocked)."""
+
+    def test_get_platform_name_windows(self):
+        """Test get_platform_name returns windows on win32."""
+        from argus_overview.platform import get_platform_name
+
+        with patch.object(sys, "platform", "win32"):
+            assert get_platform_name() == "windows"
+
+    def test_get_window_manager_windows_branch(self):
+        """Test get_window_manager Windows branch is reachable."""
+        # Create mock Windows classes
+        mock_wm_class = MagicMock()
+        mock_windows_module = MagicMock()
+        mock_windows_module.WindowManagerWindows = mock_wm_class
+
+        # The function imports inside the if branch, so we need to mock the import
+        with patch.object(sys, "platform", "win32"):
+            with patch.dict(sys.modules, {"argus_overview.platform.windows": mock_windows_module}):
+                # Need to re-import since we're testing the import path
+                from argus_overview.platform import get_window_manager
+
+                _ = get_window_manager()
+                mock_wm_class.assert_called_once()
+
+    def test_get_window_capture_windows_branch(self):
+        """Test get_window_capture Windows branch is reachable."""
+        mock_wc_class = MagicMock()
+        mock_windows_module = MagicMock()
+        mock_windows_module.WindowCaptureWindows = mock_wc_class
+
+        with patch.object(sys, "platform", "win32"):
+            with patch.dict(sys.modules, {"argus_overview.platform.windows": mock_windows_module}):
+                from argus_overview.platform import get_window_capture
+
+                _ = get_window_capture(max_workers=2)
+                mock_wc_class.assert_called_once_with(max_workers=2)
+
+    def test_get_screen_manager_windows_branch(self):
+        """Test get_screen_manager Windows branch is reachable."""
+        mock_sm_class = MagicMock()
+        mock_windows_module = MagicMock()
+        mock_windows_module.ScreenManagerWindows = mock_sm_class
+
+        with patch.object(sys, "platform", "win32"):
+            with patch.dict(sys.modules, {"argus_overview.platform.windows": mock_windows_module}):
+                from argus_overview.platform import get_screen_manager
+
+                _ = get_screen_manager()
+                mock_sm_class.assert_called_once()
+
+    def test_get_eve_path_resolver_windows_branch(self):
+        """Test get_eve_path_resolver Windows branch is reachable."""
+        mock_resolver_class = MagicMock()
+        mock_windows_module = MagicMock()
+        mock_windows_module.EVEPathResolverWindows = mock_resolver_class
+
+        with patch.object(sys, "platform", "win32"):
+            with patch.dict(sys.modules, {"argus_overview.platform.windows": mock_windows_module}):
+                from argus_overview.platform import get_eve_path_resolver
+
+                _ = get_eve_path_resolver()
+                mock_resolver_class.assert_called_once()
+
+    def test_get_hotkey_helper_windows_branch(self):
+        """Test get_hotkey_helper Windows branch is reachable."""
+        mock_helper_class = MagicMock()
+        mock_windows_module = MagicMock()
+        mock_windows_module.HotkeyHelperWindows = mock_helper_class
+
+        with patch.object(sys, "platform", "win32"):
+            with patch.dict(sys.modules, {"argus_overview.platform.windows": mock_windows_module}):
+                from argus_overview.platform import get_hotkey_helper
+
+                _ = get_hotkey_helper()
+                mock_helper_class.assert_called_once()
+
+
 class TestWindowCaptureLinuxEdgeCases:
     """Edge case tests for WindowCaptureLinux."""
 
