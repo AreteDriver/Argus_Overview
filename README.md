@@ -38,7 +38,7 @@ General settings with auto-save and notifications.
 | Platform | Status | Download |
 |----------|--------|----------|
 | **Linux** | Full-featured native application | [Portable Tarball / AppImage](https://github.com/AreteDriver/Argus_Overview/releases) |
-| **Windows** | Standalone .exe available | [Download Windows .exe](https://github.com/AreteDriver/Argus_Overview/releases) |
+| **Windows** | Standalone .exe available | [Download Windows .exe](https://github.com/AreteDriver/Argus_Overview_Windows/releases/latest) |
 
 - **Linux**: This repository - X11/XWayland support with native tools. **Portable tarball** runs directly after unpacking.
 - **Windows**: See [windows/README_WINDOWS.md](windows/README_WINDOWS.md) for Windows-specific instructions. Uses native Win32 API implementation.
