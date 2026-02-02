@@ -2054,7 +2054,9 @@ class TestDisconnectSignals:
         # main_tab with signal that raises RuntimeError on disconnect
         window.main_tab = MagicMock()
         window.main_tab.character_detected = MagicMock()
-        window.main_tab.character_detected.disconnect.side_effect = RuntimeError("Already disconnected")
+        window.main_tab.character_detected.disconnect.side_effect = RuntimeError(
+            "Already disconnected"
+        )
         window.main_tab.layout_applied = MagicMock()
 
         window._on_character_detected = MagicMock()
