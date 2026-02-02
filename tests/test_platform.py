@@ -730,3 +730,75 @@ class TestFactoryFunctions:
         with patch("argus_overview.platform.is_linux", return_value=True):
             wc = get_window_capture()
             assert isinstance(wc, WindowCaptureLinux)
+
+    def test_get_platform_name_macos(self):
+        """Test get_platform_name returns macos on darwin."""
+        from argus_overview.platform import get_platform_name
+
+        with patch.object(sys, "platform", "darwin"):
+            assert get_platform_name() == "macos"
+
+    def test_get_platform_name_unknown(self):
+        """Test get_platform_name returns unknown on unsupported platform."""
+        from argus_overview.platform import get_platform_name
+
+        with patch.object(sys, "platform", "freebsd"):
+            assert get_platform_name() == "unknown"
+
+    def test_get_window_manager_unsupported_platform(self):
+        """Test get_window_manager raises on unsupported platform."""
+        from argus_overview.platform import get_window_manager
+
+        with patch("argus_overview.platform.get_platform_name", return_value="unknown"):
+            with pytest.raises(RuntimeError, match="Unsupported platform"):
+                get_window_manager()
+
+    def test_get_window_capture_unsupported_platform(self):
+        """Test get_window_capture raises on unsupported platform."""
+        from argus_overview.platform import get_window_capture
+
+        with patch("argus_overview.platform.get_platform_name", return_value="unknown"):
+            with pytest.raises(RuntimeError, match="Unsupported platform"):
+                get_window_capture()
+
+    def test_get_screen_manager_unsupported_platform(self):
+        """Test get_screen_manager raises on unsupported platform."""
+        from argus_overview.platform import get_screen_manager
+
+        with patch("argus_overview.platform.get_platform_name", return_value="unknown"):
+            with pytest.raises(RuntimeError, match="Unsupported platform"):
+                get_screen_manager()
+
+    def test_get_eve_path_resolver_linux(self):
+        """Test get_eve_path_resolver returns Linux implementation."""
+        from argus_overview.platform import get_eve_path_resolver
+        from argus_overview.platform.linux import EVEPathResolverLinux
+
+        with patch("argus_overview.platform.get_platform_name", return_value="linux"):
+            resolver = get_eve_path_resolver()
+            assert isinstance(resolver, EVEPathResolverLinux)
+
+    def test_get_eve_path_resolver_unsupported_platform(self):
+        """Test get_eve_path_resolver raises on unsupported platform."""
+        from argus_overview.platform import get_eve_path_resolver
+
+        with patch("argus_overview.platform.get_platform_name", return_value="unknown"):
+            with pytest.raises(RuntimeError, match="Unsupported platform"):
+                get_eve_path_resolver()
+
+    def test_get_hotkey_helper_linux(self):
+        """Test get_hotkey_helper returns Linux implementation."""
+        from argus_overview.platform import get_hotkey_helper
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        with patch("argus_overview.platform.get_platform_name", return_value="linux"):
+            helper = get_hotkey_helper()
+            assert isinstance(helper, HotkeyHelperLinux)
+
+    def test_get_hotkey_helper_unsupported_platform(self):
+        """Test get_hotkey_helper raises on unsupported platform."""
+        from argus_overview.platform import get_hotkey_helper
+
+        with patch("argus_overview.platform.get_platform_name", return_value="unknown"):
+            with pytest.raises(RuntimeError, match="Unsupported platform"):
+                get_hotkey_helper()

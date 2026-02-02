@@ -3,7 +3,7 @@
 Tests AlertDispatcher, AlertConfig, and AlertType.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from argus_overview.intel.alerts import AlertConfig, AlertDispatcher, AlertType
 from argus_overview.intel.parser import IntelReport, ThreatLevel
@@ -328,3 +328,249 @@ class TestShouldAlert:
 
         # Should still alert since danger > warning (default)
         assert dispatcher._should_alert(report) is True
+
+
+class TestAudioAlerts:
+    """Tests for audio alert functionality."""
+
+    def test_play_audio_no_file(self):
+        """Test _play_audio handles missing audio file."""
+        config = AlertConfig(audio=True, audio_file=None)
+        dispatcher = AlertDispatcher(config=config)
+
+        report = make_report(threat_level=ThreatLevel.WARNING)
+
+        # Should not raise even without audio file
+        dispatcher._play_audio(report)
+
+    def test_play_sound_paplay_success(self):
+        """Test _play_sound uses paplay successfully."""
+        dispatcher = AlertDispatcher()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch(
+            "argus_overview.intel.alerts.subprocess.run", return_value=mock_result
+        ) as mock_run:
+            from pathlib import Path
+
+            dispatcher._play_sound(Path("/fake/sound.wav"))
+
+            mock_run.assert_called_once()
+            assert "paplay" in mock_run.call_args[0][0]
+
+    def test_play_sound_fallback_to_aplay(self):
+        """Test _play_sound falls back to aplay."""
+        dispatcher = AlertDispatcher()
+
+        mock_paplay_fail = MagicMock()
+        mock_paplay_fail.returncode = 1
+        mock_aplay_success = MagicMock()
+        mock_aplay_success.returncode = 0
+
+        with patch(
+            "argus_overview.intel.alerts.subprocess.run",
+            side_effect=[mock_paplay_fail, mock_aplay_success],
+        ) as mock_run:
+            from pathlib import Path
+
+            dispatcher._play_sound(Path("/fake/sound.wav"))
+
+            assert mock_run.call_count == 2
+
+    def test_play_sound_no_player_found(self):
+        """Test _play_sound handles no audio player."""
+        dispatcher = AlertDispatcher()
+
+        with patch(
+            "argus_overview.intel.alerts.subprocess.run",
+            side_effect=FileNotFoundError("No paplay"),
+        ):
+            from pathlib import Path
+
+            # Should not raise
+            dispatcher._play_sound(Path("/fake/sound.wav"))
+
+    def test_play_sound_timeout(self):
+        """Test _play_sound handles timeout."""
+        import subprocess
+
+        dispatcher = AlertDispatcher()
+
+        with patch(
+            "argus_overview.intel.alerts.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("paplay", 10),
+        ):
+            from pathlib import Path
+
+            # Should not raise
+            dispatcher._play_sound(Path("/fake/sound.wav"))
+
+    def test_default_audio_returns_path(self):
+        """Test _default_audio returns correct paths."""
+        dispatcher = AlertDispatcher()
+
+        warning_path = dispatcher._default_audio(ThreatLevel.WARNING)
+        danger_path = dispatcher._default_audio(ThreatLevel.DANGER)
+        clear_path = dispatcher._default_audio(ThreatLevel.CLEAR)
+
+        assert warning_path is not None
+        assert "warning.wav" in str(warning_path)
+        assert danger_path is not None
+        assert "danger.wav" in str(danger_path)
+        assert clear_path is None  # No sound for CLEAR
+
+
+class TestNotifications:
+    """Tests for desktop notification functionality."""
+
+    def test_send_notification_success(self):
+        """Test _send_notification sends notification."""
+        dispatcher = AlertDispatcher()
+
+        report = make_report(
+            system="HED-GP",
+            threat_level=ThreatLevel.DANGER,
+        )
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch(
+            "argus_overview.intel.alerts.subprocess.run", return_value=mock_result
+        ) as mock_run:
+            dispatcher._send_notification(report)
+
+            mock_run.assert_called_once()
+            call_args = mock_run.call_args[0][0]
+            assert "notify-send" in call_args
+
+    def test_send_notification_with_hostiles(self):
+        """Test notification includes hostile count."""
+        dispatcher = AlertDispatcher()
+
+        report = IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.DANGER,
+            hostile_count=5,
+            ship_types=["Sabre", "Loki", "Tengu", "Legion"],
+            player_names=[],
+            raw_message="test",
+            jumps_from_current=3,
+        )
+
+        with patch("argus_overview.intel.alerts.subprocess.run") as mock_run:
+            dispatcher._send_notification(report)
+
+            mock_run.assert_called_once()
+
+    def test_send_notification_no_notifysend(self):
+        """Test notification handles missing notify-send."""
+        dispatcher = AlertDispatcher()
+
+        report = make_report()
+
+        with patch(
+            "argus_overview.intel.alerts.subprocess.run",
+            side_effect=FileNotFoundError("No notify-send"),
+        ):
+            # Should not raise
+            dispatcher._send_notification(report)
+
+    def test_send_notification_timeout(self):
+        """Test notification handles timeout."""
+        import subprocess
+
+        dispatcher = AlertDispatcher()
+
+        report = make_report()
+
+        with patch(
+            "argus_overview.intel.alerts.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("notify-send", 5),
+        ):
+            # Should not raise
+            dispatcher._send_notification(report)
+
+    def test_send_notification_critical_urgency(self):
+        """Test critical alerts have critical urgency."""
+        dispatcher = AlertDispatcher()
+
+        report = make_report(threat_level=ThreatLevel.CRITICAL)
+
+        with patch("argus_overview.intel.alerts.subprocess.run") as mock_run:
+            dispatcher._send_notification(report)
+
+            call_args = mock_run.call_args[0][0]
+            assert "--urgency=critical" in call_args
+
+
+class TestTestAlert:
+    """Tests for test_alert method."""
+
+    def test_test_alert_triggers_dispatch(self):
+        """Test test_alert creates and dispatches a test report."""
+        config = AlertConfig(
+            enabled=True,
+            min_threat_level="info",
+            visual_border=True,
+            visual_overlay=False,
+            audio=False,
+            system_notification=False,
+        )
+        dispatcher = AlertDispatcher(config=config)
+
+        signal_handler = MagicMock()
+        dispatcher.alert_triggered.connect(signal_handler)
+
+        dispatcher.test_alert(ThreatLevel.WARNING)
+
+        assert signal_handler.call_count >= 1
+
+    def test_test_alert_default_warning(self):
+        """Test test_alert defaults to WARNING level."""
+        config = AlertConfig(
+            enabled=True,
+            min_threat_level="info",
+            visual_border=True,
+            visual_overlay=False,
+            audio=False,
+            system_notification=False,
+        )
+        dispatcher = AlertDispatcher(config=config)
+
+        signal_handler = MagicMock()
+        dispatcher.alert_triggered.connect(signal_handler)
+
+        dispatcher.test_alert()
+
+        call_args = signal_handler.call_args[0]
+        assert call_args[0].threat_level == ThreatLevel.WARNING
+
+
+class TestClearCooldowns:
+    """Tests for clear_cooldowns method."""
+
+    def test_clear_cooldowns(self):
+        """Test clear_cooldowns removes all cooldowns."""
+        config = AlertConfig(
+            enabled=True,
+            min_threat_level="info",
+            cooldown_seconds=60,
+            visual_border=True,
+            visual_overlay=False,
+            audio=False,
+            system_notification=False,
+        )
+        dispatcher = AlertDispatcher(config=config)
+
+        # Trigger alert to set cooldown
+        report = make_report(system="HED-GP")
+        dispatcher.dispatch(report)
+
+        assert len(dispatcher._cooldowns) > 0
+
+        dispatcher.clear_cooldowns()
+
+        assert len(dispatcher._cooldowns) == 0
