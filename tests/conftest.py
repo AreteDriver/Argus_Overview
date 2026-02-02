@@ -1,18 +1,29 @@
 """Pytest configuration and shared fixtures."""
 
+import os
+import sys
+
 import pytest
+
+# Set Qt platform plugin before importing PySide6
+# This helps with CI environments using xvfb
+if "QT_QPA_PLATFORM" not in os.environ:
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
 from PySide6.QtWidgets import QApplication
+
+# Create QApplication at module load time to ensure it exists
+# before any Qt widgets are imported by test files
+_qapp_instance = QApplication.instance()
+if _qapp_instance is None:
+    _qapp_instance = QApplication(sys.argv[:1])
 
 
 @pytest.fixture(scope="session")
 def qapp():
-    """Create a single QApplication instance for all tests.
+    """Provide the QApplication instance for tests.
 
-    Session-scoped to avoid Qt abort when multiple modules try to
-    create QApplication instances.
+    The application is created at module load time to avoid
+    issues with Qt initialization order in CI.
     """
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    yield app
-    # Don't destroy - let Python garbage collector handle it
+    return _qapp_instance
