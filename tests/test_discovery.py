@@ -364,10 +364,11 @@ class TestScanEveWindowsFunction:
 
     def test_returns_list(self):
         """Returns list of tuples"""
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="0x123  0 host EVE - Pilot1\n0x456  0 host EVE - Pilot2\n"
-            )
+        mock_windows = [("0x123", "EVE - Pilot1"), ("0x456", "EVE - Pilot2")]
+        with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.get_eve_windows.return_value = mock_windows
+            mock_get_wm.return_value = mock_wm
 
             result = scan_eve_windows()
 
@@ -376,28 +377,33 @@ class TestScanEveWindowsFunction:
             assert result[1] == ("0x456", "EVE - Pilot2", "Pilot2")
 
     def test_handles_empty_output(self):
-        """Handles empty wmctrl output"""
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0, stdout="")
+        """Handles empty window list"""
+        with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.get_eve_windows.return_value = []
+            mock_get_wm.return_value = mock_wm
 
             result = scan_eve_windows()
             assert result == []
 
-    def test_handles_subprocess_error(self):
-        """Handles subprocess failure"""
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            mock_run.side_effect = Exception("wmctrl failed")
+    def test_handles_window_manager_error(self):
+        """Handles window manager failure"""
+        with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.get_eve_windows.side_effect = Exception("wmctrl failed")
+            mock_get_wm.return_value = mock_wm
 
             result = scan_eve_windows()
             assert result == []
 
     def test_filters_non_eve_windows(self):
-        """Only returns EVE windows"""
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0,
-                stdout="0x1  0 host Firefox\n0x2  0 host EVE - Test\n0x3  0 host Terminal\n",
-            )
+        """Only returns EVE windows (window manager already filters)"""
+        # Window manager already filters, so we only get EVE windows
+        mock_windows = [("0x2", "EVE - Test")]
+        with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.get_eve_windows.return_value = mock_windows
+            mock_get_wm.return_value = mock_wm
 
             result = scan_eve_windows()
             assert len(result) == 1
@@ -496,67 +502,57 @@ class TestScanCycleEdgeCases:
 
 
 class TestGetEVEWindows:
-    """Tests for _get_eve_windows method"""
+    """Tests for _get_eve_windows method (now delegates to platform layer)"""
 
     def test_get_eve_windows_success(self):
-        """Returns EVE windows from wmctrl"""
-        discovery = AutoDiscovery()
+        """Returns EVE windows from platform layer"""
+        mock_windows = [("0x123", "EVE - Pilot1")]
 
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="0x123  0 host EVE - Pilot1\n0x456  0 host Firefox\n"
-            )
+        with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.get_eve_windows.return_value = mock_windows
+            mock_get_wm.return_value = mock_wm
 
+            discovery = AutoDiscovery()
             result = discovery._get_eve_windows()
 
             assert len(result) == 1
             assert result[0] == ("0x123", "EVE - Pilot1")
 
-    def test_get_eve_windows_timeout(self):
-        """Handles wmctrl timeout"""
-        import subprocess
-
-        discovery = AutoDiscovery()
-
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            mock_run.side_effect = subprocess.TimeoutExpired("wmctrl", 2)
-
-            result = discovery._get_eve_windows()
-
-            assert result == []
-
-    def test_get_eve_windows_failure(self):
-        """Handles wmctrl failure"""
-        discovery = AutoDiscovery()
-
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(returncode=1, stdout="")
-
-            result = discovery._get_eve_windows()
-
-            assert result == []
-
     def test_get_eve_windows_exception(self):
-        """Handles general exceptions"""
-        discovery = AutoDiscovery()
+        """Handles window manager exception"""
+        with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.get_eve_windows.side_effect = Exception("window manager failed")
+            mock_get_wm.return_value = mock_wm
 
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            mock_run.side_effect = Exception("wmctrl not found")
-
+            discovery = AutoDiscovery()
             result = discovery._get_eve_windows()
 
             assert result == []
 
-    def test_get_eve_windows_skips_empty_lines(self):
-        """Skips empty lines in wmctrl output"""
-        discovery = AutoDiscovery()
+    def test_get_eve_windows_empty(self):
+        """Returns empty list when no EVE windows found"""
+        with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.get_eve_windows.return_value = []
+            mock_get_wm.return_value = mock_wm
 
-        with patch("argus_overview.core.discovery.subprocess.run") as mock_run:
-            # Output with empty lines interspersed
-            mock_run.return_value = MagicMock(
-                returncode=0, stdout="0x123  0 host EVE - Pilot1\n\n0x456  0 host EVE - Pilot2\n\n"
-            )
+            discovery = AutoDiscovery()
+            result = discovery._get_eve_windows()
 
+            assert result == []
+
+    def test_get_eve_windows_multiple(self):
+        """Returns multiple EVE windows"""
+        mock_windows = [("0x123", "EVE - Pilot1"), ("0x456", "EVE - Pilot2")]
+
+        with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.get_eve_windows.return_value = mock_windows
+            mock_get_wm.return_value = mock_wm
+
+            discovery = AutoDiscovery()
             result = discovery._get_eve_windows()
 
             assert len(result) == 2

@@ -5,6 +5,26 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0] - 2026-02-01
+
+### Added
+- **Cross-Platform Support** - Single unified codebase supporting both Linux and Windows
+- **Platform Abstraction Layer** - New `argus_overview.platform` module with clean separation
+  - `base.py` - Abstract interfaces for window management, capture, and screen utilities
+  - `linux.py` - Linux implementation using X11 tools (wmctrl, xdotool, xrandr)
+  - `windows.py` - Windows implementation using native Win32 API (pywin32)
+- **Platform-specific dependencies** - Install with `pip install argus-overview[linux]` or `[windows]`
+- **Platform tests** - 25 new tests for platform abstraction layer (1612 total tests)
+
+### Changed
+- **Unified Windows support** - Windows version now built from same codebase (previously separate repo)
+- **Core modules refactored** - `discovery.py`, `window_capture_threaded.py`, `eve_settings_sync.py`, `screen.py`, `window_utils.py` now delegate to platform layer
+- **CI/CD updated** - GitHub Actions workflows updated for cross-platform builds
+- **Coverage threshold** - Adjusted to 80% to account for platform-specific code paths
+
+### Deprecated
+- **Argus_Overview_Windows repository** - Now archived; all development in main repo
+
 ## [2.9.0] - 2026-01-29
 
 ### Added

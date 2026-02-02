@@ -2,6 +2,8 @@
 EVE Settings Synchronization
 Copies EVE Online client settings between characters
 Scans local EVE installation for ALL character data (even logged off)
+
+v3.0: Cross-platform support via platform abstraction layer.
 """
 
 import logging
@@ -11,6 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
+
+from argus_overview.platform import get_eve_path_resolver
 
 
 @dataclass
@@ -45,93 +49,12 @@ class EVESettingsSync:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
 
-        # Steam/Proton paths (most common on Linux)
-        steam_base = Path.home() / ".steam" / "debian-installation" / "steamapps" / "compatdata"
-        steam_alt = Path.home() / ".local" / "share" / "Steam" / "steamapps" / "compatdata"
+        # Use platform abstraction for path resolution
+        path_resolver = get_eve_path_resolver()
 
-        # EVE Online Steam App ID is 8500
-        eve_steam_paths = [
-            steam_base
-            / "8500"
-            / "pfx"
-            / "drive_c"
-            / "users"
-            / "steamuser"
-            / "AppData"
-            / "Local"
-            / "CCP"
-            / "EVE",
-            steam_alt
-            / "8500"
-            / "pfx"
-            / "drive_c"
-            / "users"
-            / "steamuser"
-            / "AppData"
-            / "Local"
-            / "CCP"
-            / "EVE",
-        ]
-
-        # Steam game logs paths
-        self.eve_logs_paths = [
-            steam_base
-            / "8500"
-            / "pfx"
-            / "drive_c"
-            / "users"
-            / "steamuser"
-            / "Documents"
-            / "EVE"
-            / "logs"
-            / "Gamelogs",
-            steam_alt
-            / "8500"
-            / "pfx"
-            / "drive_c"
-            / "users"
-            / "steamuser"
-            / "Documents"
-            / "EVE"
-            / "logs"
-            / "Gamelogs",
-        ]
-
-        # Common EVE installation paths (Wine, CrossOver, native)
-        legacy_paths = [
-            Path.home()
-            / ".eve"
-            / "wineenv"
-            / "drive_c"
-            / "users"
-            / "crossover"
-            / "Local Settings"
-            / "Application Data"
-            / "CCP"
-            / "EVE",
-            Path.home()
-            / ".wine"
-            / "drive_c"
-            / "users"
-            / Path.home().name
-            / "Local Settings"
-            / "Application Data"
-            / "CCP"
-            / "EVE",
-            Path.home()
-            / ".wine"
-            / "drive_c"
-            / "users"
-            / Path.home().name
-            / "AppData"
-            / "Local"
-            / "CCP"
-            / "EVE",
-            Path.home() / "EVE" / "settings",
-            Path.home() / ".local" / "share" / "CCP" / "EVE",
-        ]
-
-        self.eve_paths = eve_steam_paths + legacy_paths
+        # Get platform-specific EVE paths
+        self.eve_paths = path_resolver.get_eve_settings_paths()
+        self.eve_logs_paths = path_resolver.get_eve_logs_paths()
 
         self.custom_paths: List[Path] = []
         self.character_settings: Dict[str, EVECharacterSettings] = {}

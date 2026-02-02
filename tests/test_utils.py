@@ -1,4 +1,7 @@
-"""Tests for utility modules."""
+"""Tests for utility modules.
+
+v3.0: Window utils tests now mock the platform abstraction layer.
+"""
 
 import os
 import tempfile
@@ -58,280 +61,175 @@ class TestConstants:
 
 
 class TestWindowUtils:
-    """Tests for window utilities."""
+    """Tests for window utilities (now delegates to platform layer)."""
 
     def test_valid_window_id_hex_format(self):
         """Test valid window IDs in hex format."""
-        from argus_overview.utils.window_utils import is_valid_window_id
+        import argus_overview.utils.window_utils as window_utils
 
-        assert is_valid_window_id("0x03800003") is True
-        assert is_valid_window_id("0x1") is True
-        assert is_valid_window_id("0xABCDEF") is True
-        assert is_valid_window_id("0xabcdef") is True
-        assert is_valid_window_id("0x0") is True
+        # Reset cached window manager and mock
+        window_utils._window_mgr = None
+
+        mock_wm = MagicMock()
+        mock_wm.is_valid_window_id.side_effect = lambda x: isinstance(x, str) and x.startswith("0x") and len(x) > 2
+
+        with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
+            assert window_utils.is_valid_window_id("0x03800003") is True
+            assert window_utils.is_valid_window_id("0x1") is True
+            assert window_utils.is_valid_window_id("0xABCDEF") is True
 
     def test_invalid_window_id_formats(self):
         """Test invalid window ID formats."""
-        from argus_overview.utils.window_utils import is_valid_window_id
+        import argus_overview.utils.window_utils as window_utils
 
-        assert is_valid_window_id("") is False
-        assert is_valid_window_id(None) is False
-        assert is_valid_window_id("12345") is False  # No 0x prefix
-        assert is_valid_window_id("0x") is False  # No digits after 0x
-        assert is_valid_window_id("0xGHIJKL") is False  # Invalid hex
-        assert is_valid_window_id("window123") is False
-        assert is_valid_window_id("0x123; rm -rf /") is False  # Injection attempt
+        window_utils._window_mgr = None
 
-    def test_invalid_window_id_types(self):
-        """Test non-string types."""
-        from argus_overview.utils.window_utils import is_valid_window_id
+        mock_wm = MagicMock()
+        mock_wm.is_valid_window_id.return_value = False
 
-        assert is_valid_window_id(12345) is False
-        assert is_valid_window_id([]) is False
-        assert is_valid_window_id({}) is False
+        with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
+            assert window_utils.is_valid_window_id("") is False
+            assert window_utils.is_valid_window_id(None) is False
+            assert window_utils.is_valid_window_id("12345") is False
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_move_window_validates_id(self, mock_run):
-        """Test move_window validates window ID before calling subprocess."""
-        from argus_overview.utils.window_utils import move_window
+    def test_move_window_validates_id(self):
+        """Test move_window validates window ID via platform layer."""
+        import argus_overview.utils.window_utils as window_utils
 
-        # Invalid ID should return False without calling subprocess
-        result = move_window("invalid", 0, 0, 100, 100)
-        assert result is False
-        mock_run.assert_not_called()
+        window_utils._window_mgr = None
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_move_window_calls_xdotool(self, mock_run):
-        """Test move_window calls xdotool with correct args."""
-        from argus_overview.utils.window_utils import move_window
+        mock_wm = MagicMock()
+        mock_wm.move_window.return_value = False
 
-        mock_run.return_value = MagicMock(returncode=0)
+        with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
+            result = window_utils.move_window("invalid", 0, 0, 100, 100)
+            assert result is False
+            mock_wm.move_window.assert_called_once_with("invalid", 0, 0, 100, 100, 2.0)
 
-        result = move_window("0x03800003", 100, 200, 800, 600)
+    def test_move_window_success(self):
+        """Test move_window delegates to platform layer."""
+        import argus_overview.utils.window_utils as window_utils
 
-        assert result is True
-        assert mock_run.call_count >= 2  # windowmove and windowsize
+        window_utils._window_mgr = None
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_activate_window_validates_id(self, mock_run):
-        """Test activate_window validates window ID."""
-        from argus_overview.utils.window_utils import activate_window
+        mock_wm = MagicMock()
+        mock_wm.move_window.return_value = True
 
-        result = activate_window("invalid")
-        assert result is False
-        mock_run.assert_not_called()
+        with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
+            result = window_utils.move_window("0x03800003", 100, 200, 800, 600)
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_activate_window_calls_xdotool(self, mock_run):
-        """Test activate_window calls xdotool."""
-        from argus_overview.utils.window_utils import activate_window
+            assert result is True
+            mock_wm.move_window.assert_called_once_with("0x03800003", 100, 200, 800, 600, 2.0)
 
-        mock_run.return_value = MagicMock(returncode=0)
+    def test_activate_window_validates_id(self):
+        """Test activate_window validates window ID via platform layer."""
+        import argus_overview.utils.window_utils as window_utils
 
-        result = activate_window("0x03800003")
+        window_utils._window_mgr = None
 
-        assert result is True
-        mock_run.assert_called()
+        mock_wm = MagicMock()
+        mock_wm.activate_window.return_value = False
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_get_focused_window_success(self, mock_run):
-        """Test get_focused_window returns window ID."""
-        from argus_overview.utils.window_utils import get_focused_window
+        with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
+            result = window_utils.activate_window("invalid")
+            assert result is False
 
-        mock_run.return_value = MagicMock(returncode=0, stdout=b"58720259\n")
+    def test_activate_window_success(self):
+        """Test activate_window delegates to platform layer."""
+        import argus_overview.utils.window_utils as window_utils
 
-        result = get_focused_window()
+        window_utils._window_mgr = None
 
-        # 58720259 in hex is 0x3800003
-        assert result == "0x3800003"
+        mock_wm = MagicMock()
+        mock_wm.activate_window.return_value = True
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_get_focused_window_failure(self, mock_run):
+        with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
+            result = window_utils.activate_window("0x03800003")
+
+            assert result is True
+            mock_wm.activate_window.assert_called_once_with("0x03800003", 2.0)
+
+    def test_get_focused_window_success(self):
+        """Test get_focused_window returns window ID from platform layer."""
+        import argus_overview.utils.window_utils as window_utils
+
+        window_utils._window_mgr = None
+
+        mock_wm = MagicMock()
+        mock_wm.get_focused_window.return_value = "0x3800003"
+
+        with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
+            result = window_utils.get_focused_window()
+
+            assert result == "0x3800003"
+
+    def test_get_focused_window_failure(self):
         """Test get_focused_window handles errors."""
-        from argus_overview.utils.window_utils import get_focused_window
+        import argus_overview.utils.window_utils as window_utils
 
-        mock_run.side_effect = Exception("xdotool not found")
+        window_utils._window_mgr = None
 
-        result = get_focused_window()
+        mock_wm = MagicMock()
+        mock_wm.get_focused_window.return_value = None
 
-        assert result is None
+        with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
+            result = window_utils.get_focused_window()
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_get_focused_window_invalid_output(self, mock_run):
-        """Test get_focused_window handles non-integer output."""
-        from argus_overview.utils.window_utils import get_focused_window
-
-        # xdotool returns something that can't be converted to int
-        mock_run.return_value = MagicMock(returncode=0, stdout=b"not_a_number\n")
-
-        result = get_focused_window()
-
-        # Should return None since "not_a_number" isn't a valid window ID
-        assert result is None
-
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_move_window_timeout_fallback(self, mock_run):
-        """Test move_window falls back when --sync times out."""
-        import subprocess
-
-        from argus_overview.utils.window_utils import move_window
-
-        # First call (with --sync) times out, second (without) succeeds
-        mock_run.side_effect = [
-            subprocess.TimeoutExpired("xdotool", 2),  # windowmove --sync timeout
-            MagicMock(returncode=0),  # windowmove without --sync
-            subprocess.TimeoutExpired("xdotool", 2),  # windowsize --sync timeout
-            MagicMock(returncode=0),  # windowsize without --sync
-        ]
-
-        result = move_window("0x03800003", 100, 200, 800, 600)
-
-        assert result is True
-        assert mock_run.call_count == 4
-
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_move_window_exception(self, mock_run):
-        """Test move_window handles unexpected exceptions."""
-        from argus_overview.utils.window_utils import move_window
-
-        mock_run.side_effect = OSError("xdotool crashed")
-
-        result = move_window("0x03800003", 100, 200, 800, 600)
-
-        assert result is False
-
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_activate_window_timeout_fallback(self, mock_run):
-        """Test activate_window falls back when --sync times out."""
-        import subprocess
-
-        from argus_overview.utils.window_utils import activate_window
-
-        mock_run.side_effect = [
-            subprocess.TimeoutExpired("xdotool", 2),  # First call with --sync
-            MagicMock(returncode=0),  # Fallback without --sync
-        ]
-
-        result = activate_window("0x03800003")
-
-        assert result is True
-        assert mock_run.call_count == 2
-
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_activate_window_exception(self, mock_run):
-        """Test activate_window handles unexpected exceptions."""
-        from argus_overview.utils.window_utils import activate_window
-
-        mock_run.side_effect = OSError("xdotool crashed")
-
-        result = activate_window("0x03800003")
-
-        assert result is False
+            assert result is None
 
 
 class TestRunX11Subprocess:
-    """Tests for run_x11_subprocess retry helper."""
+    """Tests for run_x11_subprocess (Linux-only, re-exported from platform layer)."""
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_success_on_first_attempt(self, mock_run):
-        """Test successful command on first try."""
-        from argus_overview.utils.window_utils import run_x11_subprocess
+    def test_run_x11_subprocess_available_on_linux(self):
+        """Test run_x11_subprocess is available on Linux."""
+        from argus_overview.platform import is_linux
 
-        mock_run.return_value = MagicMock(returncode=0)
+        if is_linux():
+            from argus_overview.utils.window_utils import run_x11_subprocess
 
-        result = run_x11_subprocess(["xdotool", "getwindowfocus"], max_attempts=3)
+            assert callable(run_x11_subprocess)
 
-        assert result.returncode == 0
-        assert mock_run.call_count == 1
+    def test_run_x11_subprocess_success(self):
+        """Test run_x11_subprocess success case (Linux only)."""
+        from argus_overview.platform import is_linux
 
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_retries_on_failure(self, mock_run):
-        """Test retries on transient failure then succeeds."""
+        if not is_linux():
+            return  # Skip on non-Linux
+
+        with patch("argus_overview.platform.linux.subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+
+            from argus_overview.platform.linux import run_x11_subprocess
+
+            result = run_x11_subprocess(["xdotool", "getwindowfocus"], max_attempts=3)
+
+            assert result.returncode == 0
+            assert mock_run.call_count == 1
+
+    def test_run_x11_subprocess_retries(self):
+        """Test run_x11_subprocess retries on failure (Linux only)."""
+        from argus_overview.platform import is_linux
+
+        if not is_linux():
+            return  # Skip on non-Linux
+
         import subprocess as sp
 
-        from argus_overview.utils.window_utils import run_x11_subprocess
+        with patch("argus_overview.platform.linux.subprocess.run") as mock_run:
+            mock_run.side_effect = [
+                sp.TimeoutExpired("xdotool", 2),
+                MagicMock(returncode=0),
+            ]
 
-        mock_run.side_effect = [
-            sp.TimeoutExpired("xdotool", 2),
-            MagicMock(returncode=0),
-        ]
+            from argus_overview.platform.linux import run_x11_subprocess
 
-        result = run_x11_subprocess(["xdotool", "getwindowfocus"], max_attempts=3, backoff=0.01)
-
-        assert result.returncode == 0
-        assert mock_run.call_count == 2
-
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_raises_after_all_attempts_exhausted(self, mock_run):
-        """Test raises exception after all retries fail."""
-        import subprocess as sp
-
-        import pytest
-
-        from argus_overview.utils.window_utils import run_x11_subprocess
-
-        mock_run.side_effect = sp.TimeoutExpired("xdotool", 2)
-
-        with pytest.raises(sp.TimeoutExpired):
-            run_x11_subprocess(["xdotool", "getwindowfocus"], max_attempts=2, backoff=0.01)
-
-        assert mock_run.call_count == 2
-
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_nonzero_returncode_triggers_retry(self, mock_run):
-        """Test non-zero return code is treated as failure when check_returncode=True."""
-        import subprocess as sp
-
-        import pytest
-
-        from argus_overview.utils.window_utils import run_x11_subprocess
-
-        mock_run.return_value = MagicMock(returncode=1, stdout=b"", stderr=b"error")
-
-        with pytest.raises(sp.CalledProcessError):
-            run_x11_subprocess(
-                ["wmctrl", "-l"], max_attempts=2, backoff=0.01, check_returncode=True
+            result = run_x11_subprocess(
+                ["xdotool", "getwindowfocus"], max_attempts=3, backoff=0.01
             )
 
-        assert mock_run.call_count == 2
-
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_nonzero_returncode_ignored_when_unchecked(self, mock_run):
-        """Test non-zero return code passes through when check_returncode=False."""
-        from argus_overview.utils.window_utils import run_x11_subprocess
-
-        mock_run.return_value = MagicMock(returncode=1, stdout=b"", stderr=b"err")
-
-        result = run_x11_subprocess(
-            ["wmctrl", "-l"], max_attempts=2, backoff=0.01, check_returncode=False
-        )
-
-        assert result.returncode == 1
-        assert mock_run.call_count == 1
-
-    @patch("argus_overview.utils.window_utils.subprocess.run")
-    def test_max_attempts_clamped(self, mock_run):
-        """Test max_attempts is clamped between 1 and 5."""
-        import subprocess as sp
-
-        import pytest
-
-        from argus_overview.utils.window_utils import run_x11_subprocess
-
-        mock_run.side_effect = sp.TimeoutExpired("cmd", 1)
-
-        # max_attempts=0 should be clamped to 1
-        with pytest.raises(sp.TimeoutExpired):
-            run_x11_subprocess(["cmd"], max_attempts=0, backoff=0.01)
-        assert mock_run.call_count == 1
-
-        mock_run.reset_mock()
-        mock_run.side_effect = sp.TimeoutExpired("cmd", 1)
-
-        # max_attempts=10 should be clamped to 5
-        with pytest.raises(sp.TimeoutExpired):
-            run_x11_subprocess(["cmd"], max_attempts=10, backoff=0.01)
-        assert mock_run.call_count == 5
+            assert result.returncode == 0
+            assert mock_run.call_count == 2
 
 
 class TestUtilsExports:
@@ -353,4 +251,3 @@ class TestUtilsExports:
         assert hasattr(utils, "move_window")
         assert hasattr(utils, "activate_window")
         assert hasattr(utils, "get_focused_window")
-        assert hasattr(utils, "run_x11_subprocess")

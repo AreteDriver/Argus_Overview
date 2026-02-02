@@ -1,27 +1,24 @@
-"""Screen geometry utilities - shared across UI components"""
+"""Screen geometry utilities - shared across UI components.
+
+v3.0: Cross-platform support via platform abstraction layer.
+"""
 
 import logging
-import re
-import subprocess
-from dataclasses import dataclass
 from typing import List
+
+from argus_overview.platform import get_screen_manager
+from argus_overview.platform.base import ScreenGeometry
 
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class ScreenGeometry:
-    """Screen/monitor geometry"""
-
-    x: int
-    y: int
-    width: int
-    height: int
-    is_primary: bool = False
+# Re-export ScreenGeometry for backward compatibility
+__all__ = ["ScreenGeometry", "get_screen_geometry", "get_all_monitors"]
 
 
 def get_screen_geometry(monitor: int = 0) -> ScreenGeometry:
-    """Get screen geometry using xrandr.
+    """Get screen geometry for a specific monitor.
+
+    Uses platform-specific methods (xrandr on Linux, EnumDisplayMonitors on Windows).
 
     Args:
         monitor: Monitor index (0-based)
@@ -29,58 +26,17 @@ def get_screen_geometry(monitor: int = 0) -> ScreenGeometry:
     Returns:
         ScreenGeometry for requested monitor, or default 1920x1080 on failure
     """
-    try:
-        result = subprocess.run(["xrandr", "--query"], capture_output=True, text=True, timeout=5)
-
-        if result.returncode != 0:
-            logger.error("xrandr failed")
-            return ScreenGeometry(0, 0, 1920, 1080, True)
-
-        monitors: List[ScreenGeometry] = []
-        for line in result.stdout.split("\n"):
-            if " connected" in line:
-                match = re.search(r"(\d+)x(\d+)\+(\d+)\+(\d+)", line)
-                if match:
-                    w, h, x, y = map(int, match.groups())
-                    is_primary = "primary" in line
-                    monitors.append(ScreenGeometry(x, y, w, h, is_primary))
-
-        if monitor < len(monitors):
-            return monitors[monitor]
-        elif monitors:
-            return monitors[0]
-
-        logger.warning("Could not parse xrandr output, using default geometry")
-        return ScreenGeometry(0, 0, 1920, 1080, True)
-
-    except Exception as e:
-        logger.error(f"Failed to get screen geometry: {e}")
-        return ScreenGeometry(0, 0, 1920, 1080, True)
+    screen_mgr = get_screen_manager()
+    return screen_mgr.get_screen_geometry(monitor)
 
 
 def get_all_monitors() -> List[ScreenGeometry]:
     """Get geometry for all connected monitors.
 
+    Uses platform-specific methods (xrandr on Linux, EnumDisplayMonitors on Windows).
+
     Returns:
         List of ScreenGeometry for all monitors, or single default on failure
     """
-    try:
-        result = subprocess.run(["xrandr", "--query"], capture_output=True, text=True, timeout=5)
-
-        if result.returncode != 0:
-            return [ScreenGeometry(0, 0, 1920, 1080, True)]
-
-        monitors: List[ScreenGeometry] = []
-        for line in result.stdout.split("\n"):
-            if " connected" in line:
-                match = re.search(r"(\d+)x(\d+)\+(\d+)\+(\d+)", line)
-                if match:
-                    w, h, x, y = map(int, match.groups())
-                    is_primary = "primary" in line
-                    monitors.append(ScreenGeometry(x, y, w, h, is_primary))
-
-        return monitors if monitors else [ScreenGeometry(0, 0, 1920, 1080, True)]
-
-    except Exception as e:
-        logger.error(f"Failed to get monitors: {e}")
-        return [ScreenGeometry(0, 0, 1920, 1080, True)]
+    screen_mgr = get_screen_manager()
+    return screen_mgr.get_all_monitors()

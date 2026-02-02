@@ -33,7 +33,7 @@ jobs:
     - name: Install Python dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -e ".[linux]"
         pip install pyinstaller
 
     - name: Get version
@@ -61,6 +61,9 @@ jobs:
           --hidden-import=watchdog \
           --hidden-import=watchdog.observers \
           --hidden-import=watchdog.events \
+          --hidden-import=argus_overview.platform \
+          --hidden-import=argus_overview.platform.linux \
+          --hidden-import=Xlib \
           --collect-all=PySide6 \
           src/main.py
 

@@ -1,29 +1,41 @@
-# Argus Overview - Windows Edition
+# Argus Overview - Windows
 
-The Windows version of Argus Overview has moved to its own repository for better maintenance and releases.
+As of v3.0, Argus Overview is a unified cross-platform application supporting both Linux and Windows from a single codebase.
 
 ## Download
 
-**[Download Latest Windows Release](https://github.com/AreteDriver/Argus_Overview_Windows/releases/latest)**
+**[Download Latest Release](https://github.com/AreteDriver/Argus_Overview/releases/latest)**
 
 | Option | Description |
 |--------|-------------|
-| `Argus_Overview.exe` | Portable - just download and run |
-| `Argus_Overview_Setup_*.exe` | Installer with Start Menu shortcuts |
+| `Argus-Overview-*-Windows.zip` | Portable - extract and run |
+| `Argus-Overview-*-x86_64.AppImage` | Linux AppImage |
 
-## Repository
+## Installation
 
-**[github.com/AreteDriver/Argus_Overview_Windows](https://github.com/AreteDriver/Argus_Overview_Windows)**
+### Windows (Portable)
 
-- Full source code
-- Build instructions
-- Windows-specific documentation
-- Issue tracking
+1. Download `Argus-Overview-*-Windows.zip` from the releases page
+2. Extract to a folder of your choice
+3. Run `Argus-Overview.exe`
+
+### From Source
+
+```powershell
+git clone https://github.com/AreteDriver/Argus_Overview.git
+cd Argus_Overview
+pip install -e ".[windows]"
+python src/main.py
+```
 
 ## Requirements
 
 - Windows 10/11 (64-bit)
 - EVE Online installed
+
+## Previous Windows Repository
+
+The separate `Argus_Overview_Windows` repository has been archived. All Windows development now happens in this main repository.
 
 ## Support Development
 

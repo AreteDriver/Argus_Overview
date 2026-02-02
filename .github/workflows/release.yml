@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -e ".[dev,linux]"
 
       - name: Run tests
         env:
@@ -95,12 +95,18 @@ jobs:
           body: |
             ## Argus Overview v${{ steps.get_version.outputs.VERSION }}
 
-            Professional multi-boxing tool for EVE Online on Linux.
+            Professional multi-boxing tool for EVE Online (Linux & Windows).
 
             ### Installation
 
+            **Linux:**
             ```bash
-            pip install argus-overview
+            pip install argus-overview[linux]
+            ```
+
+            **Windows:**
+            ```bash
+            pip install argus-overview[windows]
             ```
 
             ### Quick Start

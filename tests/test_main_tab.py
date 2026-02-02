@@ -1632,10 +1632,15 @@ class TestGridApplierExtended:
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
-            applier._move_window("0x03800003", 0, 0, 960, 540)
+            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
+                mock_wm = MagicMock()
+                mock_wm.is_valid_window_id.return_value = True
+                mock_get_wm.return_value = mock_wm
+
+                applier._move_window("0x03800003", 0, 0, 960, 540)
 
             assert mock_run.called
             call_args = mock_run.call_args[0][0]
@@ -1647,8 +1652,13 @@ class TestGridApplierExtended:
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
-            applier._move_window("12345", 0, 0, 960, 540)
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
+            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
+                mock_wm = MagicMock()
+                mock_wm.is_valid_window_id.return_value = False
+                mock_get_wm.return_value = mock_wm
+
+                applier._move_window("12345", 0, 0, 960, 540)
             mock_run.assert_not_called()
 
     def test_move_window_position_only(self):
@@ -1657,10 +1667,15 @@ class TestGridApplierExtended:
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
 
-            applier._move_window_position_only("0x03800003", 100, 200)
+            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
+                mock_wm = MagicMock()
+                mock_wm.is_valid_window_id.return_value = True
+                mock_get_wm.return_value = mock_wm
+
+                applier._move_window_position_only("0x03800003", 100, 200)
 
             assert mock_run.called
             call_args = mock_run.call_args[0][0]
@@ -2487,7 +2502,7 @@ class TestWindowPreviewWidgetActions:
                 mock_msgbox.question.return_value = 1
 
                 with patch(
-                    "argus_overview.utils.window_utils.subprocess.run",
+                    "argus_overview.utils.window_utils.run_x11_subprocess",
                     side_effect=Exception("wmctrl failed"),
                 ):
                     widget._close_window()
@@ -3306,16 +3321,21 @@ class TestGridApplierTimeout:
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
-            # First call raises timeout, second succeeds (retry inside run_x11_subprocess)
-            # then windowsize call succeeds
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
+            # First call raises timeout (caught by _move_window, triggers fallback),
+            # second is fallback, third and fourth are size calls
             mock_run.side_effect = [
-                subprocess.TimeoutExpired("xdotool", 2),
-                MagicMock(returncode=0),  # Retry of windowmove --sync
+                subprocess.TimeoutExpired("xdotool", 2),  # windowmove --sync timeout
+                MagicMock(returncode=0),  # windowmove fallback (no --sync)
                 MagicMock(returncode=0),  # windowsize with sync
             ]
 
-            applier._move_window("0x03800003", 100, 100, 800, 600)
+            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
+                mock_wm = MagicMock()
+                mock_wm.is_valid_window_id.return_value = True
+                mock_get_wm.return_value = mock_wm
+
+                applier._move_window("0x03800003", 100, 100, 800, 600)
 
             assert mock_run.call_count >= 2
 
@@ -3327,15 +3347,20 @@ class TestGridApplierTimeout:
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
             # Move succeeds, size times out then retry succeeds
             mock_run.side_effect = [
                 MagicMock(returncode=0),  # windowmove with sync
-                subprocess.TimeoutExpired("xdotool", 2),
-                MagicMock(returncode=0),  # Retry windowsize
+                subprocess.TimeoutExpired("xdotool", 2),  # windowsize timeout
+                MagicMock(returncode=0),  # windowsize fallback
             ]
 
-            applier._move_window("0x03800003", 100, 100, 800, 600)
+            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
+                mock_wm = MagicMock()
+                mock_wm.is_valid_window_id.return_value = True
+                mock_get_wm.return_value = mock_wm
+
+                applier._move_window("0x03800003", 100, 100, 800, 600)
 
             assert mock_run.call_count >= 2
 
@@ -3347,13 +3372,18 @@ class TestGridApplierTimeout:
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.subprocess.run") as mock_run:
+        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
             mock_run.side_effect = [
-                subprocess.TimeoutExpired("xdotool", 2),
-                MagicMock(returncode=0),
+                subprocess.TimeoutExpired("xdotool", 2),  # windowmove --sync timeout
+                MagicMock(returncode=0),  # windowmove fallback
             ]
 
-            applier._move_window_position_only("0x03800003", 100, 100)
+            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
+                mock_wm = MagicMock()
+                mock_wm.is_valid_window_id.return_value = True
+                mock_get_wm.return_value = mock_wm
+
+                applier._move_window_position_only("0x03800003", 100, 100)
 
             assert mock_run.call_count == 2
 
@@ -5132,77 +5162,85 @@ class TestGridApplierScreenGeometry:
     """Tests for GridApplier screen geometry methods"""
 
     def test_get_screen_geometry_success(self):
-        """Test get_screen_geometry with successful xrandr call"""
-        from argus_overview.ui.main_tab import GridApplier
+        """Test get_screen_geometry with successful call"""
+        from argus_overview.ui.main_tab import GridApplier, ScreenGeometry
 
         with patch.object(GridApplier, "__init__", return_value=None):
             applier = GridApplier.__new__(GridApplier)
             applier.logger = MagicMock()
 
-            mock_result = MagicMock()
-            mock_result.returncode = 0
-            mock_result.stdout = "DP-1 connected primary 1920x1080+0+0"
+            with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
+                mock_sm = MagicMock()
+                mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+                mock_get_sm.return_value = mock_sm
 
-            with patch("argus_overview.utils.screen.subprocess.run", return_value=mock_result):
-                applier.get_screen_geometry(0)
+                result = applier.get_screen_geometry(0)
 
-                # Should return ScreenGeometry or None
-                # The actual parsing depends on implementation
+                assert result is not None
+                assert result.width == 1920
+                assert result.height == 1080
+                mock_sm.get_screen_geometry.assert_called_once_with(0)
 
     def test_get_screen_geometry_failure(self):
-        """Test get_screen_geometry with failed xrandr call - returns fallback"""
+        """Test get_screen_geometry with failed call - returns fallback from platform layer"""
         from argus_overview.ui.main_tab import GridApplier, ScreenGeometry
 
         with patch.object(GridApplier, "__init__", return_value=None):
             applier = GridApplier.__new__(GridApplier)
             applier.logger = MagicMock()
 
-            with patch("argus_overview.utils.screen.subprocess.run", side_effect=FileNotFoundError):
+            with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
+                mock_sm = MagicMock()
+                # Platform layer returns default fallback on failure
+                mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+                mock_get_sm.return_value = mock_sm
+
                 result = applier.get_screen_geometry(0)
 
-                # Method returns fallback on exception
+                # Method returns fallback from platform layer
                 assert result == ScreenGeometry(0, 0, 1920, 1080, True)
-                # Note: logger is now in the shared module
 
     def test_get_screen_geometry_xrandr_nonzero_returncode(self):
-        """Test get_screen_geometry when xrandr returns non-zero"""
+        """Test get_screen_geometry with platform layer returning default"""
         from argus_overview.ui.main_tab import GridApplier, ScreenGeometry
 
         with patch.object(GridApplier, "__init__", return_value=None):
             applier = GridApplier.__new__(GridApplier)
             applier.logger = MagicMock()
 
-            mock_result = MagicMock()
-            mock_result.returncode = 1  # Non-zero = failure
-            mock_result.stdout = ""
+            with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
+                mock_sm = MagicMock()
+                # Platform layer returns default when underlying command fails
+                mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+                mock_get_sm.return_value = mock_sm
 
-            with patch("argus_overview.utils.screen.subprocess.run", return_value=mock_result):
                 result = applier.get_screen_geometry(0)
 
-                # Should return default on non-zero returncode
+                # Should return default from platform layer
                 assert result == ScreenGeometry(0, 0, 1920, 1080, True)
 
     def test_get_screen_geometry_monitor_out_of_range(self):
         """Test get_screen_geometry with monitor index out of range"""
-        from argus_overview.ui.main_tab import GridApplier
+        from argus_overview.ui.main_tab import GridApplier, ScreenGeometry
 
         with patch.object(GridApplier, "__init__", return_value=None):
             applier = GridApplier.__new__(GridApplier)
             applier.logger = MagicMock()
 
-            mock_result = MagicMock()
-            mock_result.returncode = 0
-            # Only one monitor at index 0
-            mock_result.stdout = "DP-1 connected primary 1920x1080+0+0"
+            with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
+                mock_sm = MagicMock()
+                # Platform layer handles fallback for out of range
+                mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+                mock_get_sm.return_value = mock_sm
 
-            with patch("argus_overview.utils.screen.subprocess.run", return_value=mock_result):
                 # Request monitor 5 when only monitor 0 exists
                 result = applier.get_screen_geometry(5)
 
-                # Should fall back to monitors[0]
+                # Platform layer handles fallback
                 assert result is not None
                 assert result.width == 1920
                 assert result.height == 1080
+                mock_sm.get_screen_geometry.assert_called_once_with(5)
 
 
 class TestGridApplierApply:

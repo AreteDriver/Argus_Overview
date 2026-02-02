@@ -235,59 +235,63 @@ class TestGridApplier:
 
         assert applier.layout_manager is mock_layout_manager
 
-    @patch("argus_overview.utils.screen.subprocess.run")
-    def test_get_screen_geometry_success(self, mock_subprocess):
-        """Test get_screen_geometry with successful xrandr"""
+    def test_get_screen_geometry_success(self):
+        """Test get_screen_geometry with successful result"""
         from argus_overview.ui.layouts_tab import GridApplier
+        from argus_overview.platform.base import ScreenGeometry
 
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "HDMI-1 connected primary 1920x1080+0+0"
-        mock_subprocess.return_value = mock_result
+        with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
+            mock_sm = MagicMock()
+            mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+            mock_get_sm.return_value = mock_sm
 
-        mock_layout_manager = MagicMock()
-        applier = GridApplier(mock_layout_manager)
+            mock_layout_manager = MagicMock()
+            applier = GridApplier(mock_layout_manager)
 
-        result = applier.get_screen_geometry()
+            result = applier.get_screen_geometry()
 
-        assert result is not None
-        assert result.width == 1920
-        assert result.height == 1080
-        assert result.is_primary is True
+            assert result is not None
+            assert result.width == 1920
+            assert result.height == 1080
+            assert result.is_primary is True
 
-    @patch("argus_overview.utils.screen.subprocess.run")
-    def test_get_screen_geometry_failure(self, mock_subprocess):
-        """Test get_screen_geometry with xrandr failure"""
+    def test_get_screen_geometry_failure(self):
+        """Test get_screen_geometry with failure (returns default)"""
         from argus_overview.ui.layouts_tab import GridApplier
+        from argus_overview.platform.base import ScreenGeometry
 
-        mock_result = MagicMock()
-        mock_result.returncode = 1
-        mock_subprocess.return_value = mock_result
+        with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
+            mock_sm = MagicMock()
+            # Platform layer returns default on failure
+            mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+            mock_get_sm.return_value = mock_sm
 
-        mock_layout_manager = MagicMock()
-        applier = GridApplier(mock_layout_manager)
+            mock_layout_manager = MagicMock()
+            applier = GridApplier(mock_layout_manager)
 
-        result = applier.get_screen_geometry()
+            result = applier.get_screen_geometry()
 
-        # Should return default geometry on failure
-        assert result is not None
-        assert result.width == 1920
+            assert result is not None
+            assert result.width == 1920
 
-    @patch("argus_overview.utils.screen.subprocess.run")
-    def test_get_screen_geometry_exception(self, mock_subprocess):
-        """Test get_screen_geometry with exception"""
+    def test_get_screen_geometry_exception(self):
+        """Test get_screen_geometry with exception (returns default)"""
         from argus_overview.ui.layouts_tab import GridApplier
+        from argus_overview.platform.base import ScreenGeometry
 
-        mock_subprocess.side_effect = Exception("xrandr not found")
+        with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
+            mock_sm = MagicMock()
+            # Platform layer returns default on exception
+            mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+            mock_get_sm.return_value = mock_sm
 
-        mock_layout_manager = MagicMock()
-        applier = GridApplier(mock_layout_manager)
+            mock_layout_manager = MagicMock()
+            applier = GridApplier(mock_layout_manager)
 
-        result = applier.get_screen_geometry()
+            result = applier.get_screen_geometry()
 
-        # Should return default geometry on exception
-        assert result is not None
-        assert result.width == 1920
+            assert result is not None
+            assert result.width == 1920
 
     @patch("argus_overview.ui.layouts_tab.subprocess.run")
     def test_apply_arrangement_stacked(self, mock_subprocess):
@@ -972,17 +976,14 @@ class TestLayoutsTabMethods:
 class TestGridApplierMore:
     """More tests for GridApplier"""
 
-    @patch("argus_overview.utils.screen.subprocess.run")
-    def test_get_screen_geometry_with_monitor(self, mock_subprocess):
+    @patch("argus_overview.utils.screen.get_screen_manager")
+    def test_get_screen_geometry_with_monitor(self, mock_get_sm):
         """Test get_screen_geometry with specific monitor"""
-        from argus_overview.ui.layouts_tab import GridApplier
+        from argus_overview.ui.layouts_tab import GridApplier, ScreenGeometry
 
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = (
-            "HDMI-1 connected primary 1920x1080+0+0\nDP-1 connected 2560x1440+1920+0"
-        )
-        mock_subprocess.return_value = mock_result
+        mock_sm = MagicMock()
+        mock_sm.get_screen_geometry.return_value = ScreenGeometry(1920, 0, 2560, 1440, False)
+        mock_get_sm.return_value = mock_sm
 
         mock_layout_manager = MagicMock()
         applier = GridApplier(mock_layout_manager)
@@ -990,6 +991,9 @@ class TestGridApplierMore:
         result = applier.get_screen_geometry(monitor=1)
 
         assert result is not None
+        assert result.width == 2560
+        assert result.height == 1440
+        assert result.x == 1920
 
     @patch("argus_overview.ui.layouts_tab.subprocess.run")
     def test_apply_arrangement_empty(self, mock_subprocess):
@@ -1260,48 +1264,47 @@ class TestArrangementGridSetGridSizeWithTiles:
 class TestGridApplierScreenGeometryEdgeCases:
     """Tests for GridApplier.get_screen_geometry edge cases"""
 
-    @patch("argus_overview.utils.screen.subprocess.run")
-    def test_get_screen_geometry_monitor_out_of_range(self, mock_subprocess):
+    @patch("argus_overview.utils.screen.get_screen_manager")
+    def test_get_screen_geometry_monitor_out_of_range(self, mock_get_sm):
         """Test get_screen_geometry falls back to first monitor when index out of range"""
-        from argus_overview.ui.layouts_tab import GridApplier
+        from argus_overview.ui.layouts_tab import GridApplier, ScreenGeometry
 
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "HDMI-1 connected primary 1920x1080+0+0"  # Only 1 monitor
-        mock_subprocess.return_value = mock_result
+        mock_sm = MagicMock()
+        # Platform layer handles fallback - returns default geometry for out-of-range index
+        mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+        mock_get_sm.return_value = mock_sm
 
         mock_layout_manager = MagicMock()
         applier = GridApplier(mock_layout_manager)
 
-        # Request monitor 5 but only 1 exists - should fall back to monitors[0]
+        # Request monitor 5 - platform layer handles fallback
         result = applier.get_screen_geometry(monitor=5)
 
         assert result is not None
         assert result.width == 1920
         assert result.height == 1080
+        mock_sm.get_screen_geometry.assert_called_once_with(5)
 
-    @patch("argus_overview.utils.screen.subprocess.run")
-    @patch("argus_overview.utils.screen.logger")
-    def test_get_screen_geometry_no_monitors_parsed(self, mock_logger, mock_subprocess):
+    @patch("argus_overview.utils.screen.get_screen_manager")
+    def test_get_screen_geometry_no_monitors_parsed(self, mock_get_sm):
         """Test get_screen_geometry returns default when no monitors parsed"""
-        from argus_overview.ui.layouts_tab import GridApplier
+        from argus_overview.ui.layouts_tab import GridApplier, ScreenGeometry
 
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = "some unrecognized output"  # No valid monitor lines
-        mock_subprocess.return_value = mock_result
+        mock_sm = MagicMock()
+        # Platform layer handles fallback and returns default on failure
+        mock_sm.get_screen_geometry.return_value = ScreenGeometry(0, 0, 1920, 1080, True)
+        mock_get_sm.return_value = mock_sm
 
         mock_layout_manager = MagicMock()
         applier = GridApplier(mock_layout_manager)
 
         result = applier.get_screen_geometry(monitor=0)
 
-        # Should return default geometry
+        # Should return default geometry from platform layer
         assert result is not None
         assert result.width == 1920
         assert result.height == 1080
-        # Now logger is the module-level logger in utils.screen
-        mock_logger.warning.assert_called()
+        mock_sm.get_screen_geometry.assert_called_once_with(0)
 
 
 class TestGridApplierApplyArrangementEdgeCases:

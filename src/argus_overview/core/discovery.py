@@ -1,45 +1,26 @@
 """
 Auto-Discovery - Background process to detect new EVE windows
 v2.2 Feature: Automatic detection of new EVE clients
+v3.0: Cross-platform support via platform abstraction layer
 """
 
 import logging
 import re
-import subprocess
-import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
-# Module-level cache for wmctrl results (reduces subprocess calls)
-_wmctrl_cache: Dict[str, tuple] = {"result": None, "timestamp": 0.0}
-_WMCTRL_CACHE_TTL = 1.0  # seconds
+from argus_overview.platform import get_window_manager, is_linux
 
-
-def _clear_wmctrl_cache() -> None:
-    """Clear wmctrl cache (for testing)"""
-    _wmctrl_cache["result"] = None
-    _wmctrl_cache["timestamp"] = 0.0
-
-
-def _get_wmctrl_window_list() -> str:
-    """Get wmctrl -l output with caching (1 second TTL)"""
-    now = time.monotonic()
-    if _wmctrl_cache["result"] is not None and now - _wmctrl_cache["timestamp"] < _WMCTRL_CACHE_TTL:
-        return _wmctrl_cache["result"]
-
-    try:
-        result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, timeout=2)
-        if result.returncode == 0:
-            _wmctrl_cache["result"] = result.stdout
-            _wmctrl_cache["timestamp"] = now
-            return result.stdout
-    except (subprocess.TimeoutExpired, OSError):
+# Re-export cache clearing function for tests (Linux only)
+if is_linux():
+    from argus_overview.platform.linux import _clear_wmctrl_cache
+else:
+    # Stub for Windows - no cache to clear
+    def _clear_wmctrl_cache() -> None:
         pass
-
-    return _wmctrl_cache["result"] or ""
 
 
 @dataclass
@@ -85,6 +66,9 @@ class AutoDiscovery(QObject):
     def __init__(self, interval_seconds: int = 5, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
+
+        # Platform abstraction for window management
+        self._window_mgr = get_window_manager()
 
         # Configuration
         self.interval = interval_seconds * 1000  # Convert to milliseconds
@@ -214,33 +198,16 @@ class AutoDiscovery(QObject):
 
     def _get_eve_windows(self) -> List[Tuple[str, str]]:
         """
-        Get all EVE Online windows
+        Get all EVE Online windows using platform abstraction.
 
         Returns:
             List of (window_id, window_title) tuples
         """
-        eve_windows = []
-
         try:
-            # Use cached wmctrl output
-            output = _get_wmctrl_window_list()
-
-            for line in output.strip().split("\n"):
-                if not line:
-                    continue
-
-                parts = line.split(None, 3)
-                if len(parts) >= 4:
-                    window_id = parts[0]
-                    window_title = parts[3]
-
-                    # Check if it's an EVE window
-                    if self._is_eve_window(window_title):
-                        eve_windows.append((window_id, window_title))
+            return self._window_mgr.get_eve_windows()
         except Exception as e:
             self.logger.error(f"Failed to get EVE windows: {e}")
-
-        return eve_windows
+            return []
 
     def _is_eve_window(self, title: str) -> bool:
         """
@@ -369,26 +336,18 @@ def scan_eve_windows() -> List[Tuple[str, str, str]]:
     results = []
 
     try:
-        # Use cached wmctrl output
-        output = _get_wmctrl_window_list()
+        window_mgr = get_window_manager()
+        eve_windows = window_mgr.get_eve_windows()
 
-        for line in output.strip().split("\n"):
-            if not line:
-                continue
-
-            parts = line.split(None, 3)
-            if len(parts) >= 4:
-                window_id = parts[0]
-                window_title = parts[3]
-
-                # Check EVE patterns
-                for pattern in AutoDiscovery.EVE_TITLE_PATTERNS:
-                    match = re.match(pattern, window_title)
-                    if match:
-                        char_name = match.group(1).strip()
-                        if char_name:  # Skip empty character names
-                            results.append((window_id, window_title, char_name))
-                        break
+        for window_id, window_title in eve_windows:
+            # Check EVE patterns to extract character name
+            for pattern in AutoDiscovery.EVE_TITLE_PATTERNS:
+                match = re.match(pattern, window_title)
+                if match:
+                    char_name = match.group(1).strip()
+                    if char_name:  # Skip empty character names
+                        results.append((window_id, window_title, char_name))
+                    break
 
     except Exception as e:
         logger.error(f"scan_eve_windows failed: {e}")

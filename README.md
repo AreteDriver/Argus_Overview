@@ -1,4 +1,4 @@
-# Argus Overview v2.9
+# Argus Overview v3.0
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/pypi/pyversions/argus-overview)](https://pypi.org/project/argus-overview/)
 [![CI](https://github.com/AreteDriver/Argus_Overview/actions/workflows/ci.yml/badge.svg)](https://github.com/AreteDriver/Argus_Overview/actions)
 [![License](https://img.shields.io/badge/license-MIT-orange)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Linux-lightgrey)]()
+[![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)]()
 [![Downloads](https://img.shields.io/github/downloads/AreteDriver/Argus_Overview/total)](https://github.com/AreteDriver/Argus_Overview/releases)
 
 ## Screenshots
@@ -38,10 +38,10 @@ General settings with auto-save and notifications.
 | Platform | Status | Download |
 |----------|--------|----------|
 | **Linux** | Full-featured native application | [Portable Tarball / AppImage](https://github.com/AreteDriver/Argus_Overview/releases) |
-| **Windows** | Standalone .exe available | [Download Windows .exe](https://github.com/AreteDriver/Argus_Overview_Windows/releases/latest) |
+| **Windows** | Full-featured native application | [Windows .exe](https://github.com/AreteDriver/Argus_Overview/releases) |
 
-- **Linux**: This repository - X11/XWayland support with native tools. **Portable tarball** runs directly after unpacking.
-- **Windows**: See [windows/README_WINDOWS.md](windows/README_WINDOWS.md) for Windows-specific instructions. Uses native Win32 API implementation.
+- **Linux**: X11/XWayland support with native tools (xdotool, wmctrl). **Portable tarball** runs directly after unpacking.
+- **Windows**: Native Win32 API implementation. No external tools required.
 
 ## ☕ Support Development
 
@@ -54,7 +54,23 @@ Your support helps keep this project maintained and improving! o7
 
 ---
 
-## 🌟 **v2.9 - Intel Channel Parser**
+## 🌟 **v3.0 - Unified Cross-Platform Release**
+
+One codebase for both Linux and Windows!
+
+### New in v3.0:
+- **Unified Codebase** - Single repository supporting both Linux and Windows
+- **Platform Abstraction Layer** - Clean separation of platform-specific code
+- **Native Win32 API** - Full Windows support using native APIs (pywin32)
+- **Improved Architecture** - Better testability and maintainability
+- **All v2.9 Features** - Intel parser, settings sync, and more
+
+---
+
+## Previous Releases
+
+<details>
+<summary><strong>v2.9 Intel Channel Parser</strong></summary>
 
 Monitor your intel channels and stay safe in null-sec!
 
@@ -67,9 +83,7 @@ Monitor your intel channels and stay safe in null-sec!
 - **Configurable Alerts** - Set thresholds and cooldowns
 - **Auto Log Detection** - Finds EVE logs in native and Proton installs
 
----
-
-## Previous Releases
+</details>
 
 <details>
 <summary><strong>v2.8 CCP Fair Play Compliance</strong></summary>

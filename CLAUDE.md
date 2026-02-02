@@ -3,9 +3,9 @@
 ## Project Overview
 Professional multi-boxing tool for EVE Online on Linux. Window preview management, team organization, layout presets, and settings synchronization.
 
-**Stack**: Python, PySide6 (Qt), python-xlib
-**Version**: 2.8.x
-**Platforms**: Linux (native), Windows (separate repo)
+**Stack**: Python, PySide6 (Qt), platform abstraction layer
+**Version**: 3.0.x
+**Platforms**: Linux (native X11), Windows (native Win32)
 
 ---
 
@@ -19,8 +19,12 @@ src/argus_overview/
 │   ├── main_window.py
 │   └── tabs/            # Overview, Roster, Layouts, Cycle Control, Sync, Settings
 ├── core/                # Business logic
-├── capture/             # Window capture (X11/Wayland)
-└── config/              # Settings persistence
+├── platform/            # Cross-platform abstraction layer
+│   ├── base.py          # Abstract base classes
+│   ├── linux.py         # Linux (X11/xdotool/wmctrl)
+│   └── windows.py       # Windows (Win32 API)
+├── intel/               # Intel channel parser
+└── utils/               # Shared utilities (screen, constants)
 ```
 
 ### Action Registry System (v2.3+)
@@ -91,7 +95,9 @@ python -m argus_overview.ui.action_registry
 - ActionRegistry for all UI actions (no ad-hoc menus)
 - Type hints required
 - ruff for linting/formatting
-- X11 via python-xlib, Wayland support where possible
+- Platform abstraction: use `argus_overview.platform` for window/screen ops
+- Linux: X11 via python-xlib, xdotool, wmctrl
+- Windows: Win32 API via pywin32
 
 ---
 
