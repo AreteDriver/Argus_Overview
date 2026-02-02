@@ -308,3 +308,241 @@ class TestChatLogWatcherGetActiveChannels:
             # The comparison is: "Intel" in {"intel"} which is False
             # So this test verifies the current behavior
             assert isinstance(result, list)
+
+
+class TestChatLogWatcherTailFileAdvanced:
+    """Advanced tests for tail_file covering rotation and reading."""
+
+    def test_tail_file_truncated_resets_position(self):
+        """Test file truncation resets read position."""
+        watcher = ChatLogWatcher()
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".txt", delete=False) as f:
+            # Write initial content in UTF-16-LE (EVE log format)
+            initial = "[ 2026.01.15 12:30:45 ] Player > first message\n"
+            f.write(initial.encode("utf-16-le"))
+            filepath = Path(f.name)
+
+        try:
+            # First tail sets position
+            watcher.tail_file(filepath)
+            initial_pos = watcher.file_positions.get(filepath)
+            assert initial_pos is not None
+
+            # Truncate file (simulate rotation)
+            with open(filepath, "wb") as f:
+                f.write(b"")  # Empty file
+
+            # Tail should detect truncation
+            watcher.tail_file(filepath)
+            assert watcher.file_positions[filepath] == 0
+        finally:
+            filepath.unlink()
+
+    def test_tail_file_reads_new_content(self):
+        """Test reading new content from file."""
+        watcher = ChatLogWatcher()
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".txt", delete=False) as f:
+            filepath = Path(f.name)
+
+        try:
+            # First tail sets position at end
+            watcher.tail_file(filepath)
+
+            # Append new content in UTF-16-LE
+            new_line = "[ 2026.01.15 12:30:45 ] TestPlayer > new message\n"
+            with open(filepath, "ab") as f:
+                f.write(new_line.encode("utf-16-le"))
+
+            # Second tail should read new content
+            result = watcher.tail_file(filepath)
+            assert len(result) == 1
+            assert result[0].speaker == "TestPlayer"
+            assert result[0].message == "new message"
+        finally:
+            filepath.unlink()
+
+    def test_tail_file_no_change(self):
+        """Test tail with no new content."""
+        watcher = ChatLogWatcher()
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".txt", delete=False) as f:
+            content = "[ 2026.01.15 12:30:45 ] Player > message\n"
+            f.write(content.encode("utf-16-le"))
+            filepath = Path(f.name)
+
+        try:
+            # First tail
+            watcher.tail_file(filepath)
+            # Second tail with no changes
+            result = watcher.tail_file(filepath)
+            assert result == []
+        finally:
+            filepath.unlink()
+
+    def test_tail_file_permission_error(self):
+        """Test handling permission errors."""
+        watcher = ChatLogWatcher()
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".txt", delete=False) as f:
+            # Write some content
+            content = "[ 2026.01.15 12:30:45 ] Player > message\n"
+            f.write(content.encode("utf-16-le"))
+            filepath = Path(f.name)
+
+        try:
+            # First tail sets position
+            watcher.tail_file(filepath)
+
+            # Append more content
+            with open(filepath, "ab") as f:
+                new_content = "[ 2026.01.15 12:31:00 ] Player > new\n"
+                f.write(new_content.encode("utf-16-le"))
+
+            # Mock open to raise PermissionError on the next read
+            original_open = open
+
+            def mock_open_permission(*args, **kwargs):
+                if str(filepath) in str(args[0]) and "r" in kwargs.get("mode", "r"):
+                    raise PermissionError("denied")
+                return original_open(*args, **kwargs)
+
+            with patch("builtins.open", side_effect=mock_open_permission):
+                result = watcher.tail_file(filepath)
+
+            assert result == []
+        finally:
+            filepath.unlink()
+
+    def test_tail_file_generic_error(self):
+        """Test handling generic errors emits error signal."""
+        watcher = ChatLogWatcher()
+
+        error_handler = MagicMock()
+        watcher.error_occurred.connect(error_handler)
+
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".txt", delete=False) as f:
+            content = "[ 2026.01.15 12:30:45 ] Player > message\n"
+            f.write(content.encode("utf-16-le"))
+            filepath = Path(f.name)
+
+        try:
+            # First tail sets position
+            watcher.tail_file(filepath)
+
+            # Append more content
+            with open(filepath, "ab") as f:
+                new_content = "[ 2026.01.15 12:31:00 ] Player > new\n"
+                f.write(new_content.encode("utf-16-le"))
+
+            # Mock open to raise a generic exception
+            original_open = open
+
+            def mock_open_error(*args, **kwargs):
+                if str(filepath) in str(args[0]):
+                    raise OSError("test error")
+                return original_open(*args, **kwargs)
+
+            with patch("builtins.open", side_effect=mock_open_error):
+                result = watcher.tail_file(filepath)
+
+            assert result == []
+            error_handler.assert_called_once()
+        finally:
+            filepath.unlink()
+
+
+class TestChatLogWatcherPollFiles:
+    """Tests for _poll_files method."""
+
+    def test_poll_files_emits_messages(self):
+        """Test _poll_files emits messages for each file."""
+        watcher = ChatLogWatcher()
+
+        message_handler = MagicMock()
+        watcher.message_received.connect(message_handler)
+
+        mock_message = ChatMessage(
+            timestamp=datetime.now(),
+            channel="Intel",
+            speaker="Player",
+            message="test",
+            raw_line="test",
+        )
+
+        with patch.object(watcher, "get_active_channels", return_value=[Path("/fake/file.txt")]):
+            with patch.object(watcher, "tail_file", return_value=[mock_message]):
+                watcher._poll_files()
+
+        message_handler.assert_called_once_with(mock_message)
+
+    def test_poll_files_multiple_files(self):
+        """Test _poll_files handles multiple files."""
+        watcher = ChatLogWatcher()
+
+        message_handler = MagicMock()
+        watcher.message_received.connect(message_handler)
+
+        msg1 = ChatMessage(
+            timestamp=datetime.now(),
+            channel="Intel",
+            speaker="Player1",
+            message="msg1",
+            raw_line="",
+        )
+        msg2 = ChatMessage(
+            timestamp=datetime.now(),
+            channel="Local",
+            speaker="Player2",
+            message="msg2",
+            raw_line="",
+        )
+
+        files = [Path("/fake/intel.txt"), Path("/fake/local.txt")]
+
+        with patch.object(watcher, "get_active_channels", return_value=files):
+            with patch.object(watcher, "tail_file", side_effect=[[msg1], [msg2]]):
+                watcher._poll_files()
+
+        assert message_handler.call_count == 2
+
+
+class TestChatLogWatcherStartAdvanced:
+    """Advanced tests for start method."""
+
+    def test_start_already_running(self):
+        """Test start when already running does nothing."""
+        watcher = ChatLogWatcher()
+        watcher._running = True
+
+        with patch.object(watcher, "find_log_directory") as mock_find:
+            watcher.start()
+            mock_find.assert_not_called()
+
+    def test_start_success(self):
+        """Test successful start."""
+        watcher = ChatLogWatcher()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch.object(watcher, "find_log_directory", return_value=Path(tmpdir)):
+                watcher.start()
+
+                assert watcher._running is True
+                assert watcher._log_directory == Path(tmpdir)
+
+                # Clean up
+                watcher.stop()
+
+    def test_start_sets_log_directory(self):
+        """Test start sets the log directory."""
+        watcher = ChatLogWatcher()
+
+        test_path = Path("/test/logs")
+        with patch.object(watcher, "find_log_directory", return_value=test_path):
+            with patch.object(watcher.poll_timer, "start"):
+                watcher.start()
+
+        assert watcher._log_directory == test_path
+        assert watcher._running is True
+        watcher.stop()

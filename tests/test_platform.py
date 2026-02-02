@@ -802,3 +802,311 @@ class TestFactoryFunctions:
         with patch("argus_overview.platform.get_platform_name", return_value="unknown"):
             with pytest.raises(RuntimeError, match="Unsupported platform"):
                 get_hotkey_helper()
+
+
+class TestWindowManagerLinuxActivateMinimizeRestore:
+    """Tests for activate, minimize, restore window operations."""
+
+    def test_activate_window_success(self):
+        """Test successful window activation."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch("argus_overview.platform.linux.run_x11_subprocess", return_value=mock_result):
+            result = wm.activate_window("0x12345")
+
+        assert result is True
+
+    def test_activate_window_invalid_id(self):
+        """Test activate_window rejects invalid ID."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+        result = wm.activate_window("invalid")
+        assert result is False
+
+    def test_activate_window_failure(self):
+        """Test activate_window returns False on failure."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.run_x11_subprocess",
+            side_effect=subprocess.TimeoutExpired("cmd", 2),
+        ):
+            result = wm.activate_window("0x12345")
+
+        assert result is False
+
+    def test_minimize_window_success(self):
+        """Test successful window minimization."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch("argus_overview.platform.linux.run_x11_subprocess", return_value=mock_result):
+            result = wm.minimize_window("0x12345")
+
+        assert result is True
+
+    def test_minimize_window_invalid_id(self):
+        """Test minimize_window rejects invalid ID."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+        result = wm.minimize_window("invalid")
+        assert result is False
+
+    def test_minimize_window_failure(self):
+        """Test minimize_window returns False on failure."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.run_x11_subprocess",
+            side_effect=subprocess.TimeoutExpired("cmd", 2),
+        ):
+            result = wm.minimize_window("0x12345")
+
+        assert result is False
+
+    def test_restore_window_success(self):
+        """Test successful window restoration."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch("argus_overview.platform.linux.run_x11_subprocess", return_value=mock_result):
+            result = wm.restore_window("0x12345")
+
+        assert result is True
+
+    def test_restore_window_invalid_id(self):
+        """Test restore_window rejects invalid ID."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+        result = wm.restore_window("invalid")
+        assert result is False
+
+    def test_restore_window_failure(self):
+        """Test restore_window returns False on failure."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.run_x11_subprocess",
+            side_effect=subprocess.TimeoutExpired("cmd", 2),
+        ):
+            result = wm.restore_window("0x12345")
+
+        assert result is False
+
+
+class TestWindowManagerLinuxGetWindowListEdgeCases:
+    """Edge case tests for get_window_list."""
+
+    def test_get_window_list_exception(self):
+        """Test get_window_list returns empty list on exception."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.run_x11_subprocess",
+            side_effect=Exception("test error"),
+        ):
+            result = wm.get_window_list()
+
+        assert result == []
+
+    def test_get_eve_windows_empty_lines_skipped(self):
+        """Test empty lines are skipped in get_eve_windows."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        # Output with empty lines
+        wmctrl_output = "\n\n0x03800003  0 hostname EVE - CharOne\n\n"
+
+        with patch(
+            "argus_overview.platform.linux._get_wmctrl_window_list",
+            return_value=wmctrl_output,
+        ):
+            windows = wm.get_eve_windows()
+
+        assert len(windows) == 1
+        assert windows[0] == ("0x03800003", "EVE - CharOne")
+
+
+class TestScreenManagerLinuxEdgeCases:
+    """Edge case tests for ScreenManagerLinux."""
+
+    def test_get_screen_geometry_exception(self):
+        """Test get_screen_geometry returns default on exception."""
+        from argus_overview.platform.linux import ScreenManagerLinux
+
+        sm = ScreenManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("xrandr", 2),
+        ):
+            geom = sm.get_screen_geometry(0)
+
+        # Should return default geometry
+        assert geom.width == 1920
+        assert geom.height == 1080
+
+    def test_get_screen_geometry_invalid_monitor_index(self):
+        """Test get_screen_geometry with out-of-range index."""
+        from argus_overview.platform.linux import ScreenManagerLinux
+
+        sm = ScreenManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "DP-1 connected primary 1920x1080+0+0"
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            # Request monitor index 5 when only 1 exists
+            geom = sm.get_screen_geometry(5)
+
+        # Should return default
+        assert geom.width == 1920
+        assert geom.height == 1080
+
+    def test_get_all_monitors_exception(self):
+        """Test get_all_monitors returns default on exception."""
+        from argus_overview.platform.linux import ScreenManagerLinux
+
+        sm = ScreenManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("xrandr", 2),
+        ):
+            monitors = sm.get_all_monitors()
+
+        # Returns default monitor on failure
+        assert len(monitors) == 1
+        assert monitors[0].width == 1920
+        assert monitors[0].height == 1080
+
+    def test_get_all_monitors_empty_output(self):
+        """Test get_all_monitors with empty xrandr output returns default."""
+        from argus_overview.platform.linux import ScreenManagerLinux
+
+        sm = ScreenManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = ""
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            monitors = sm.get_all_monitors()
+
+        # Returns default monitor when no monitors found
+        assert len(monitors) == 1
+        assert monitors[0].width == 1920
+
+
+class TestEVEPathResolverLinuxEdgeCases:
+    """Edge case tests for EVEPathResolverLinux."""
+
+    def test_get_eve_settings_paths_no_steam(self):
+        """Test paths when Steam directory doesn't exist."""
+        from argus_overview.platform.linux import EVEPathResolverLinux
+
+        resolver = EVEPathResolverLinux()
+
+        # Mock Path.home() to return a non-existent home
+        with patch("pathlib.Path.home", return_value=Path("/nonexistent")):
+            paths = resolver.get_eve_settings_paths()
+
+        # Should still return paths (they just won't exist)
+        assert isinstance(paths, list)
+
+    def test_get_eve_logs_paths_returns_paths(self):
+        """Test EVE logs paths structure."""
+        from argus_overview.platform.linux import EVEPathResolverLinux
+
+        resolver = EVEPathResolverLinux()
+        paths = resolver.get_eve_logs_paths()
+
+        # All paths should contain Gamelogs
+        assert all("Gamelogs" in str(p) for p in paths)
+
+
+class TestWindowCaptureLinuxEdgeCases:
+    """Edge case tests for WindowCaptureLinux."""
+
+    def test_start_stop_lifecycle(self):
+        """Test start/stop lifecycle."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        assert capture.running is False
+
+        capture.start()
+        assert capture.running is True
+
+        capture.stop()
+        assert capture.running is False
+
+    def test_capture_window_sync_command_fails(self):
+        """Test sync capture when import command fails."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = b""
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            result = capture.capture_window_sync("0x12345")
+
+        assert result is None
+
+    def test_capture_window_sync_file_not_found(self):
+        """Test sync capture when import command not found."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=FileNotFoundError("import not found"),
+        ):
+            result = capture.capture_window_sync("0x12345")
+
+        assert result is None
+
+    def test_capture_window_sync_timeout(self):
+        """Test sync capture handles timeout."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("import", 2),
+        ):
+            result = capture.capture_window_sync("0x12345")
+
+        assert result is None
