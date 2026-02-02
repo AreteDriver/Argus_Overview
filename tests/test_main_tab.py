@@ -6037,16 +6037,8 @@ class TestMainTabOnLayoutSourceChanged:
 
 import pytest  # noqa: E402
 from PySide6.QtGui import QColor  # noqa: E402
-from PySide6.QtWidgets import QApplication  # noqa: E402
 
-
-@pytest.fixture(scope="module")
-def qapp():
-    """Create QApplication for tests that need real Qt widgets."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    yield app
+# qapp fixture is provided by conftest.py (session-scoped)
 
 
 class TestFlowLayoutRealInit:

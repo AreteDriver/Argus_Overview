@@ -3,18 +3,10 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PySide6.QtWidgets import QApplication
 
 from argus_overview.ui.hotkey_edit import HotkeyEdit
 
-
-@pytest.fixture(scope="module")
-def qapp():
-    """Create QApplication for tests."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    yield app
+# qapp fixture is provided by conftest.py (session-scoped)
 
 
 class TestHotkeyEditInit:

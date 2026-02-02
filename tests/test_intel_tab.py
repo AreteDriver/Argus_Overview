@@ -12,15 +12,7 @@ from PySide6.QtWidgets import QApplication
 
 from argus_overview.intel.parser import IntelReport, ThreatLevel
 
-
-# Ensure QApplication exists for widget tests
-@pytest.fixture(scope="module")
-def qapp():
-    """Create QApplication for tests."""
-    app = QApplication.instance()
-    if app is None:
-        app = QApplication([])
-    yield app
+# qapp fixture is provided by conftest.py (session-scoped)
 
 
 @pytest.fixture
