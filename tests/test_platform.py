@@ -3,7 +3,9 @@
 v3.0: Tests for cross-platform window management, capture, and screen utilities.
 """
 
+import subprocess
 import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -307,6 +309,395 @@ class TestRunX11Subprocess:
                 run_x11_subprocess(["echo", "test"], max_attempts=3, backoff=0.01)
 
         assert mock_run.call_count == 3
+
+
+class TestWmctrlCache:
+    """Tests for wmctrl caching."""
+
+    def test_cache_hit(self):
+        """Test cache returns cached value within TTL."""
+        from argus_overview.platform.linux import _clear_wmctrl_cache, _get_wmctrl_window_list
+
+        _clear_wmctrl_cache()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "0x123 0 host Window1\n"
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result) as mock_run:
+            result1 = _get_wmctrl_window_list()
+            result2 = _get_wmctrl_window_list()
+
+            assert result1 == result2
+            assert mock_run.call_count == 1  # Only called once due to cache
+
+    def test_cache_cleared(self):
+        """Test clearing cache."""
+        from argus_overview.platform.linux import (
+            _clear_wmctrl_cache,
+            _get_wmctrl_window_list,
+            _wmctrl_cache,
+        )
+
+        _wmctrl_cache["result"] = "cached"
+        _wmctrl_cache["timestamp"] = 999999999999.0
+
+        _clear_wmctrl_cache()
+
+        assert _wmctrl_cache["result"] is None
+        assert _wmctrl_cache["timestamp"] == 0.0
+
+    def test_cache_timeout_returns_cached(self):
+        """Test cache returns old value on subprocess failure."""
+        from argus_overview.platform.linux import _clear_wmctrl_cache, _get_wmctrl_window_list
+
+        _clear_wmctrl_cache()
+
+        # First call succeeds
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = "cached_value"
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            _get_wmctrl_window_list()
+
+        # Force cache expiry and simulate failure
+        from argus_overview.platform.linux import _wmctrl_cache
+
+        _wmctrl_cache["timestamp"] = 0  # Force expiry
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("wmctrl", 2),
+        ):
+            result = _get_wmctrl_window_list()
+
+        assert result == "cached_value"
+
+
+class TestWindowManagerLinuxMoveWindow:
+    """Tests for WindowManagerLinux.move_window."""
+
+    def test_move_window_sync_timeout_fallback(self):
+        """Test move_window falls back when --sync times out."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        call_count = 0
+
+        def mock_run(cmd, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if "--sync" in cmd:
+                raise subprocess.TimeoutExpired(" ".join(cmd), 2)
+            result = MagicMock()
+            result.returncode = 0
+            return result
+
+        with patch("argus_overview.platform.linux.subprocess.run", side_effect=mock_run):
+            result = wm.move_window("0x12345", 100, 200, 800, 600, timeout=0.1)
+
+        assert result is True
+        assert call_count >= 2  # At least one retry
+
+    def test_move_window_invalid_id(self):
+        """Test move_window rejects invalid window ID."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+        result = wm.move_window("invalid", 0, 0, 100, 100)
+        assert result is False
+
+    def test_move_window_complete_failure(self):
+        """Test move_window returns False on complete failure."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("cmd", 2),
+        ):
+            result = wm.move_window("0x12345", 0, 0, 100, 100, timeout=0.01)
+
+        assert result is False
+
+
+class TestWindowManagerLinuxFocusedWindow:
+    """Tests for WindowManagerLinux.get_focused_window."""
+
+    def test_decimal_to_hex_conversion(self):
+        """Test decimal window ID is converted to hex."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = b"12345678"  # Decimal
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            result = wm.get_focused_window()
+
+        assert result == "0xbc614e"  # hex(12345678)
+
+    def test_already_hex_window_id(self):
+        """Test hex window ID is validated."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = b"0x12345"  # Already hex
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            result = wm.get_focused_window()
+
+        assert result == "0x12345"
+
+    def test_invalid_window_id_returns_none(self):
+        """Test invalid output returns None."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = b"not_a_number"
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            result = wm.get_focused_window()
+
+        assert result is None
+
+    def test_failure_returns_none(self):
+        """Test failure returns None."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("cmd", 2),
+        ):
+            result = wm.get_focused_window()
+
+        assert result is None
+
+
+class TestWindowManagerLinuxGetWindowTitle:
+    """Tests for WindowManagerLinux.get_window_title."""
+
+    def test_get_window_title_success(self):
+        """Test getting window title."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = b"EVE - CharName\n"
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            result = wm.get_window_title("0x12345")
+
+        assert result == "EVE - CharName"
+
+    def test_get_window_title_failure(self):
+        """Test getting window title on failure returns Unknown."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        wm = WindowManagerLinux()
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("cmd", 2),
+        ):
+            result = wm.get_window_title("0x12345")
+
+        assert result == "Unknown"
+
+
+class TestWindowCaptureLinux:
+    """Tests for WindowCaptureLinux."""
+
+    def test_running_property(self):
+        """Test running property reflects state."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        assert capture.running is False
+
+        capture._stop_event.clear()
+        assert capture.running is True
+
+        capture._stop_event.set()
+        assert capture.running is False
+
+    def test_capture_window_async_invalid_id(self):
+        """Test async capture rejects invalid window ID."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        result = capture.capture_window_async("invalid")
+        assert result == ""
+
+    def test_capture_window_async_valid_id(self):
+        """Test async capture returns request ID."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        result = capture.capture_window_async("0x12345")
+        assert result != ""
+        assert len(result) > 0
+
+    def test_capture_window_sync_failure(self):
+        """Test sync capture returns None on failure."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        with patch(
+            "argus_overview.platform.linux.subprocess.run",
+            side_effect=subprocess.TimeoutExpired("cmd", 2),
+        ):
+            result = capture.capture_window_sync("0x12345")
+
+        assert result is None
+
+    def test_capture_window_sync_nonzero_returncode(self):
+        """Test sync capture returns None on non-zero returncode."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1
+        mock_result.stdout = b""
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            result = capture.capture_window_sync("0x12345")
+
+        assert result is None
+
+    def test_get_result_empty_queue(self):
+        """Test get_result returns None when queue empty."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        result = capture.get_result(timeout=0.01)
+        assert result is None
+
+
+class TestEVEPathResolverLinux:
+    """Tests for EVEPathResolverLinux."""
+
+    def test_get_eve_settings_paths(self):
+        """Test EVE settings paths are returned."""
+        from argus_overview.platform.linux import EVEPathResolverLinux
+
+        resolver = EVEPathResolverLinux()
+        paths = resolver.get_eve_settings_paths()
+
+        assert len(paths) > 0
+        assert all(isinstance(p, Path) for p in paths)
+        # Should include Steam paths
+        steam_path_found = any("steamapps" in str(p) for p in paths)
+        assert steam_path_found
+
+    def test_get_eve_logs_paths(self):
+        """Test EVE logs paths are returned."""
+        from argus_overview.platform.linux import EVEPathResolverLinux
+
+        resolver = EVEPathResolverLinux()
+        paths = resolver.get_eve_logs_paths()
+
+        assert len(paths) > 0
+        assert all(isinstance(p, Path) for p in paths)
+        assert all("Gamelogs" in str(p) for p in paths)
+
+    def test_get_config_directory(self):
+        """Test config directory path."""
+        from argus_overview.platform.linux import EVEPathResolverLinux
+
+        resolver = EVEPathResolverLinux()
+        config_dir = resolver.get_config_directory()
+
+        assert config_dir == Path.home() / ".config" / "argus-overview"
+
+
+class TestHotkeyHelperLinux:
+    """Tests for HotkeyHelperLinux."""
+
+    def test_normalize_combo_modifier_keys(self):
+        """Test modifier keys keep angle brackets."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+
+        assert helper.normalize_combo("<ctrl>+a") == "<ctrl>+a"
+        assert helper.normalize_combo("<alt>+b") == "<alt>+b"
+        assert helper.normalize_combo("<shift>+c") == "<shift>+c"
+
+    def test_normalize_combo_single_char_brackets(self):
+        """Test single char brackets are removed."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+
+        assert helper.normalize_combo("<ctrl>+<v>") == "<ctrl>+v"
+        assert helper.normalize_combo("<alt>+<R>") == "<alt>+r"
+
+    def test_normalize_combo_special_keys_kept(self):
+        """Test special keys keep brackets."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+
+        assert helper.normalize_combo("<ctrl>+<space>") == "<ctrl>+<space>"
+        assert helper.normalize_combo("<alt>+<enter>") == "<alt>+<enter>"
+
+    def test_normalize_combo_empty(self):
+        """Test empty combo returns empty."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+        assert helper.normalize_combo("") == ""
+
+    def test_normalize_combo_uppercase_modifiers(self):
+        """Test uppercase modifiers are lowercased."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+        assert helper.normalize_combo("<CTRL>+a") == "<ctrl>+a"
+
+    def test_is_single_key_true(self):
+        """Test is_single_key returns True for single keys."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+
+        assert helper.is_single_key("a") is True
+        assert helper.is_single_key("<space>") is True
+        assert helper.is_single_key("F1") is True
+
+    def test_is_single_key_false(self):
+        """Test is_single_key returns False for combos."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+
+        assert helper.is_single_key("<ctrl>+a") is False
+        assert helper.is_single_key("a+b") is False
+
+    def test_is_single_key_empty(self):
+        """Test is_single_key returns False for empty."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+        assert helper.is_single_key("") is False
 
 
 class TestFactoryFunctions:
