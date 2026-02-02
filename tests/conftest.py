@@ -6,13 +6,10 @@ import sys
 import pytest
 
 # Set Qt platform plugin before importing PySide6
-# When running under xvfb (DISPLAY is set), use xcb platform
-# Otherwise use offscreen for headless testing
+# Use offscreen platform for CI environments (GitHub Actions sets CI=true)
+# This avoids display server compatibility issues with PySide6
 if "QT_QPA_PLATFORM" not in os.environ:
-    if "DISPLAY" in os.environ:
-        os.environ["QT_QPA_PLATFORM"] = "xcb"
-    else:
-        os.environ["QT_QPA_PLATFORM"] = "offscreen"
+    os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
 from PySide6.QtWidgets import QApplication
 

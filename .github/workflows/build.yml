@@ -32,7 +32,9 @@ jobs:
 
       - name: Run tests
         run: |
-          xvfb-run -a pytest --cov=src/argus_overview --cov-report=xml
+          pytest --cov=src/argus_overview --cov-report=xml
+        env:
+          QT_QPA_PLATFORM: offscreen
 
       - name: Upload coverage
         uses: codecov/codecov-action@v4
