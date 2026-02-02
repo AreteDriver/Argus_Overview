@@ -404,3 +404,49 @@ class TestComplexMessages:
         assert report is not None
         assert report.system == "1DQ1-A"
         assert "dreadnought" in report.ship_types or report.hostile_count is None
+
+
+class TestIntelParserEdgeCases:
+    """Tests for edge cases in IntelParser."""
+
+    def setup_method(self):
+        """Create parser instance for tests."""
+        from argus_overview.intel.parser import IntelParser
+
+        self.parser = IntelParser()
+
+    def test_add_known_system(self):
+        """Test add_known_system method (line 354)."""
+        self.parser.add_known_system("MySystem")
+        assert "mysystem" in self.parser.known_systems
+
+    def test_extract_system_lowercase_pattern(self):
+        """Test system extraction with lowercase null-sec pattern (line 462)."""
+        # Lowercase null-sec format should be uppercased
+        system = self.parser._extract_system("hostiles in abc-123")
+        assert system == "ABC-123"
+
+    def test_threat_level_super_ships(self):
+        """Test threat level with super ships (line 588)."""
+        from argus_overview.intel.parser import ThreatLevel
+
+        # Titan should be CRITICAL
+        level = self.parser._assess_threat(1, ["avatar"])
+        assert level == ThreatLevel.CRITICAL
+
+        # Supercarrier should be CRITICAL
+        level = self.parser._assess_threat(1, ["hel"])
+        assert level == ThreatLevel.CRITICAL
+
+    def test_threat_level_small_gang(self):
+        """Test threat level for small gang 2-4 (line 600)."""
+        from argus_overview.intel.parser import ThreatLevel
+
+        level = self.parser._assess_threat(3, [])
+        assert level == ThreatLevel.WARNING
+
+    def test_is_likely_intel_clear_keywords(self):
+        """Test is_likely_intel with clear keywords (line 623)."""
+        assert self.parser.is_likely_intel("HED-GP clr")
+        assert self.parser.is_likely_intel("System clear now")
+        assert self.parser.is_likely_intel("all clear in jita")

@@ -5,6 +5,19 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.3] - 2026-02-02
+
+### Changed
+- **Test Coverage** - Improved overall coverage from 93% to 94%
+  - `alerts.py`: 93% → 100%
+  - `intel_tab.py`: 91% → 96%
+  - `parser.py`: 96% → 99%
+  - `platform/linux.py`: 95% → 97%
+  - `main_tab.py`: 92% → 93%
+  - `main_window_v21.py`: 89% → 90%
+  - 1827 total tests passing (up from 1798)
+- **Test Stability** - Added Python 3.12 skipif decorators for PySide6 segfault-prone tests
+
 ## [3.0.2] - 2026-02-02
 
 ### Fixed

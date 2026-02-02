@@ -1189,3 +1189,87 @@ class TestWindowCaptureLinuxEdgeCases:
             result = capture.capture_window_sync("0x12345")
 
         assert result is None
+
+    def test_capture_window_sync_with_scaling(self):
+        """Test sync capture with scaling (lines 369-371)."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        # Create a fake PNG image
+        from io import BytesIO
+
+        from PIL import Image
+
+        img = Image.new("RGB", (100, 100), color="red")
+        buffer = BytesIO()
+        img.save(buffer, format="PNG")
+        fake_png = buffer.getvalue()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = fake_png
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            result = capture.capture_window_sync("0x12345", scale=0.5)
+
+        assert result is not None
+        assert result.width == 50
+        assert result.height == 50
+
+
+class TestWindowManagerLinuxEmptyLines:
+    """Tests for wmctrl output with empty lines (line 164)."""
+
+    def test_get_eve_windows_with_empty_lines(self):
+        """Test get_eve_windows handles empty lines in wmctrl output."""
+        from argus_overview.platform.linux import WindowManagerLinux
+
+        mgr = WindowManagerLinux()
+
+        # Output with empty lines
+        fake_output = "0x12345  0 host EVE - Character\n\n0x67890  0 host EVE - Another\n"
+
+        with patch(
+            "argus_overview.platform.linux._get_wmctrl_window_list", return_value=fake_output
+        ):
+            windows = mgr.get_eve_windows()
+
+        assert len(windows) == 2
+
+
+class TestScreenManagerLinuxXrandrFailure:
+    """Tests for xrandr failure fallback (line 416)."""
+
+    def test_get_all_monitors_xrandr_failure(self):
+        """Test get_all_monitors returns fallback when xrandr fails."""
+        from argus_overview.platform.linux import ScreenManagerLinux
+
+        mgr = ScreenManagerLinux()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 1  # Non-zero exit
+        mock_result.stdout = ""
+
+        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+            monitors = mgr.get_all_monitors()
+
+        # Should return default fallback
+        assert len(monitors) == 1
+        assert monitors[0].width == 1920
+        assert monitors[0].height == 1080
+
+
+class TestHotkeyHelperEmptyParts:
+    """Tests for hotkey parsing with empty parts (line 553)."""
+
+    def test_normalize_combo_with_empty_parts(self):
+        """Test normalize_combo handles strings with extra spaces."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+
+        # String with extra spaces that would create empty parts
+        result = helper.normalize_combo("<ctrl>  +  a")
+
+        assert result == "<ctrl>+a"

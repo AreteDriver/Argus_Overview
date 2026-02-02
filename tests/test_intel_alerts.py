@@ -574,3 +574,119 @@ class TestClearCooldowns:
         dispatcher.clear_cooldowns()
 
         assert len(dispatcher._cooldowns) == 0
+
+
+class TestDispatchAudioEnabled:
+    """Tests for dispatch with audio enabled (lines 134-135)."""
+
+    def test_dispatch_with_audio_enabled(self):
+        """Test dispatch triggers audio alert when enabled."""
+        from unittest.mock import patch
+
+        config = AlertConfig(
+            enabled=True,
+            min_threat_level="info",
+            cooldown_seconds=0,
+            visual_border=False,
+            visual_overlay=False,
+            audio=True,
+            system_notification=False,
+        )
+        dispatcher = AlertDispatcher(config=config)
+
+        signal_handler = MagicMock()
+        dispatcher.alert_triggered.connect(signal_handler)
+
+        report = make_report(system="TEST", threat_level=ThreatLevel.WARNING)
+
+        with patch.object(dispatcher, "_play_audio"):
+            dispatcher.dispatch(report)
+
+        # Should emit AUDIO alert type
+        calls = [call[0][1] for call in signal_handler.call_args_list]
+        assert AlertType.AUDIO in calls
+
+
+class TestDispatchNotificationEnabled:
+    """Tests for dispatch with system notification enabled (lines 139-140)."""
+
+    def test_dispatch_with_notification_enabled(self):
+        """Test dispatch triggers notification when enabled."""
+        from unittest.mock import patch
+
+        config = AlertConfig(
+            enabled=True,
+            min_threat_level="info",
+            cooldown_seconds=0,
+            visual_border=False,
+            visual_overlay=False,
+            audio=False,
+            system_notification=True,
+        )
+        dispatcher = AlertDispatcher(config=config)
+
+        signal_handler = MagicMock()
+        dispatcher.alert_triggered.connect(signal_handler)
+
+        report = make_report(system="TEST", threat_level=ThreatLevel.WARNING)
+
+        with patch.object(dispatcher, "_send_notification"):
+            dispatcher.dispatch(report)
+
+        # Should emit SYSTEM_NOTIFICATION alert type
+        calls = [call[0][1] for call in signal_handler.call_args_list]
+        assert AlertType.SYSTEM_NOTIFICATION in calls
+
+
+class TestPlayAudioNoFile:
+    """Tests for _play_audio when no file found (line 204)."""
+
+    def test_play_audio_no_file_found(self):
+        """Test _play_audio logs debug when no file found."""
+        from unittest.mock import patch
+
+        config = AlertConfig(enabled=True)
+        dispatcher = AlertDispatcher(config=config)
+
+        report = make_report(threat_level=ThreatLevel.INFO)
+
+        # Mock _default_audio to return None
+        with patch.object(dispatcher, "_default_audio", return_value=None):
+            dispatcher._play_audio(report)
+
+        # Should not crash, just log debug
+
+
+class TestPlaySoundException:
+    """Tests for _play_sound exception handling (lines 234-235)."""
+
+    def test_play_sound_generic_exception(self):
+        """Test _play_sound handles generic exceptions."""
+        from pathlib import Path
+        from unittest.mock import patch
+
+        config = AlertConfig(enabled=True)
+        dispatcher = AlertDispatcher(config=config)
+
+        # Mock subprocess.run to raise generic exception
+        with patch("subprocess.run", side_effect=OSError("Permission denied")):
+            # Should not raise
+            dispatcher._play_sound(Path("/fake/audio.wav"))
+
+
+class TestSendNotificationException:
+    """Tests for _send_notification exception handling (lines 296-297)."""
+
+    def test_send_notification_generic_exception(self):
+        """Test _send_notification handles generic exceptions."""
+        from unittest.mock import patch
+
+        config = AlertConfig(enabled=True)
+        dispatcher = AlertDispatcher(config=config)
+
+        report = make_report(threat_level=ThreatLevel.DANGER)
+
+        # Mock subprocess.run to raise generic exception
+        with patch("subprocess.run", side_effect=OSError("Permission denied")):
+            # Should not raise
+            dispatcher._send_notification(report)
