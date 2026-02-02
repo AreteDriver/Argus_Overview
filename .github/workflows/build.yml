@@ -68,7 +68,9 @@ jobs:
       - name: Build AppImage
         run: |
           chmod +x build-appimage.sh
-          ./build-appimage.sh
+          xvfb-run -a ./build-appimage.sh
+        env:
+          QT_QPA_PLATFORM: offscreen
 
       - name: Upload Linux artifact
         uses: actions/upload-artifact@v4

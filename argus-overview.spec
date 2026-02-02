@@ -70,11 +70,8 @@ pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    [],
-    name='argus-overview',
+    [],  # Don't include binaries in EXE - put them in COLLECT
+    name='Argus-Overview',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -88,4 +85,15 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=str(icon_path) if icon_path.exists() else None,
+)
+
+# Create a directory for AppImage packaging
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    name='Argus-Overview',
 )
