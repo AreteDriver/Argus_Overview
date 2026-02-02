@@ -335,7 +335,6 @@ class TestWmctrlCache:
         """Test clearing cache."""
         from argus_overview.platform.linux import (
             _clear_wmctrl_cache,
-            _get_wmctrl_window_list,
             _wmctrl_cache,
         )
 
