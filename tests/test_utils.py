@@ -71,7 +71,9 @@ class TestWindowUtils:
         window_utils._window_mgr = None
 
         mock_wm = MagicMock()
-        mock_wm.is_valid_window_id.side_effect = lambda x: isinstance(x, str) and x.startswith("0x") and len(x) > 2
+        mock_wm.is_valid_window_id.side_effect = (
+            lambda x: isinstance(x, str) and x.startswith("0x") and len(x) > 2
+        )
 
         with patch.object(window_utils, "_get_window_mgr", return_value=mock_wm):
             assert window_utils.is_valid_window_id("0x03800003") is True
@@ -224,9 +226,7 @@ class TestRunX11Subprocess:
 
             from argus_overview.platform.linux import run_x11_subprocess
 
-            result = run_x11_subprocess(
-                ["xdotool", "getwindowfocus"], max_attempts=3, backoff=0.01
-            )
+            result = run_x11_subprocess(["xdotool", "getwindowfocus"], max_attempts=3, backoff=0.01)
 
             assert result.returncode == 0
             assert mock_run.call_count == 2

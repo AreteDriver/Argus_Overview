@@ -128,7 +128,9 @@ class TestLinuxWindowManager:
             "0x03800005  0 hostname Firefox\n"
         )
 
-        with patch("argus_overview.platform.linux._get_wmctrl_window_list", return_value=wmctrl_output):
+        with patch(
+            "argus_overview.platform.linux._get_wmctrl_window_list", return_value=wmctrl_output
+        ):
             windows = wm.get_eve_windows()
 
         assert len(windows) == 2
@@ -143,7 +145,9 @@ class TestLinuxWindowManager:
 
         wmctrl_output = "0x03800005  0 hostname Firefox\n"
 
-        with patch("argus_overview.platform.linux._get_wmctrl_window_list", return_value=wmctrl_output):
+        with patch(
+            "argus_overview.platform.linux._get_wmctrl_window_list", return_value=wmctrl_output
+        ):
             windows = wm.get_eve_windows()
 
         assert len(windows) == 0
@@ -157,8 +161,7 @@ class TestLinuxWindowManager:
         mock_result = MagicMock()
         mock_result.returncode = 0
         mock_result.stdout = (
-            b"0x03800003  0 hostname EVE - CharOne\n"
-            b"0x03800004  0 hostname Firefox\n"
+            b"0x03800003  0 hostname EVE - CharOne\n0x03800004  0 hostname Firefox\n"
         )
 
         with patch("argus_overview.platform.linux.run_x11_subprocess", return_value=mock_result):
@@ -180,7 +183,9 @@ class TestLinuxScreenManager:
 
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "DP-1 connected primary 1920x1080+0+0\nHDMI-1 connected 2560x1440+1920+0"
+        mock_result.stdout = (
+            "DP-1 connected primary 1920x1080+0+0\nHDMI-1 connected 2560x1440+1920+0"
+        )
 
         with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
             geom = sm.get_screen_geometry(0)
@@ -199,7 +204,9 @@ class TestLinuxScreenManager:
 
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "DP-1 connected primary 1920x1080+0+0\nHDMI-1 connected 2560x1440+1920+0"
+        mock_result.stdout = (
+            "DP-1 connected primary 1920x1080+0+0\nHDMI-1 connected 2560x1440+1920+0"
+        )
 
         with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
             geom = sm.get_screen_geometry(1)
@@ -233,7 +240,9 @@ class TestLinuxScreenManager:
 
         mock_result = MagicMock()
         mock_result.returncode = 0
-        mock_result.stdout = "DP-1 connected primary 1920x1080+0+0\nHDMI-1 connected 2560x1440+1920+0"
+        mock_result.stdout = (
+            "DP-1 connected primary 1920x1080+0+0\nHDMI-1 connected 2560x1440+1920+0"
+        )
 
         with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
             monitors = sm.get_all_monitors()
@@ -253,7 +262,9 @@ class TestRunX11Subprocess:
         mock_result = MagicMock()
         mock_result.returncode = 0
 
-        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result) as mock_run:
+        with patch(
+            "argus_overview.platform.linux.subprocess.run", return_value=mock_result
+        ) as mock_run:
             result = run_x11_subprocess(["echo", "test"], max_attempts=3)
 
         assert result.returncode == 0

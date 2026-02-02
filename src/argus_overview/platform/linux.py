@@ -56,16 +56,11 @@ def _clear_wmctrl_cache() -> None:
 def _get_wmctrl_window_list() -> str:
     """Get wmctrl -l output with caching (1 second TTL)."""
     now = time.monotonic()
-    if (
-        _wmctrl_cache["result"] is not None
-        and now - _wmctrl_cache["timestamp"] < _WMCTRL_CACHE_TTL
-    ):
+    if _wmctrl_cache["result"] is not None and now - _wmctrl_cache["timestamp"] < _WMCTRL_CACHE_TTL:
         return _wmctrl_cache["result"]
 
     try:
-        result = subprocess.run(
-            ["wmctrl", "-l"], capture_output=True, text=True, timeout=2
-        )
+        result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, timeout=2)
         if result.returncode == 0:
             _wmctrl_cache["result"] = result.stdout
             _wmctrl_cache["timestamp"] = now
@@ -352,18 +347,14 @@ class WindowCaptureLinux(WindowCapture):
         self.capture_queue.put((window_id, scale, request_id))
         return request_id
 
-    def get_result(
-        self, timeout: float = 0.1
-    ) -> Optional[Tuple[str, str, Image.Image]]:
+    def get_result(self, timeout: float = 0.1) -> Optional[Tuple[str, str, Image.Image]]:
         """Get capture result if available."""
         try:
             return self.result_queue.get(timeout=timeout)
         except Empty:
             return None
 
-    def capture_window_sync(
-        self, window_id: str, scale: float = 1.0
-    ) -> Optional[Image.Image]:
+    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Optional[Image.Image]:
         """Synchronous window capture using ImageMagick."""
         try:
             result = subprocess.run(
@@ -499,15 +490,7 @@ class EVEPathResolverLinux(EVEPathResolver):
             / "Application Data"
             / "CCP"
             / "EVE",
-            home
-            / ".wine"
-            / "drive_c"
-            / "users"
-            / home.name
-            / "AppData"
-            / "Local"
-            / "CCP"
-            / "EVE",
+            home / ".wine" / "drive_c" / "users" / home.name / "AppData" / "Local" / "CCP" / "EVE",
             home / "EVE" / "settings",
             home / ".local" / "share" / "CCP" / "EVE",
         ]

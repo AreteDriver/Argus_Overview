@@ -13,7 +13,9 @@ class TestWindowCaptureThreadedInit:
 
     def test_init_default_workers(self):
         """Test initialization with default worker count"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_get_capture.return_value = mock_capture
@@ -27,7 +29,9 @@ class TestWindowCaptureThreadedInit:
 
     def test_init_custom_workers(self):
         """Test initialization with custom worker count"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_get_capture.return_value = mock_capture
@@ -41,7 +45,9 @@ class TestWindowCaptureThreadedInit:
 
     def test_init_single_worker(self):
         """Test initialization with single worker"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_get_capture.return_value = mock_capture
@@ -58,7 +64,9 @@ class TestStartStop:
 
     def test_start_delegates_to_capture(self):
         """Test that start delegates to platform capture"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_get_capture.return_value = mock_capture
@@ -72,7 +80,9 @@ class TestStartStop:
 
     def test_stop_delegates_to_capture(self):
         """Test that stop delegates to platform capture"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_get_capture.return_value = mock_capture
@@ -86,7 +96,9 @@ class TestStartStop:
 
     def test_running_property(self):
         """Test that running property delegates to platform capture"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_capture.running = True
@@ -107,7 +119,9 @@ class TestCaptureWindowAsync:
 
     def test_capture_window_async_delegates(self):
         """Test that capture_window_async delegates to platform capture"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_capture.capture_window_async.return_value = "test-uuid-123"
@@ -123,7 +137,9 @@ class TestCaptureWindowAsync:
 
     def test_capture_window_async_default_scale(self):
         """Test capture with default scale of 1.0"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_capture.capture_window_async.return_value = "test-uuid"
@@ -142,7 +158,9 @@ class TestGetResult:
 
     def test_get_result_delegates(self):
         """Test get_result delegates to platform capture"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_image = MagicMock()
@@ -162,7 +180,9 @@ class TestGetResult:
 
     def test_get_result_returns_none_when_empty(self):
         """Test get_result returns None when queue is empty"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
             with patch("argus_overview.core.window_capture_threaded.get_window_manager"):
                 mock_capture = MagicMock()
                 mock_capture.get_result.return_value = None
@@ -182,7 +202,9 @@ class TestGetWindowList:
     def test_get_window_list_delegates(self):
         """Test get_window_list delegates to platform window manager"""
         with patch("argus_overview.core.window_capture_threaded.get_window_capture"):
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_wm = MagicMock()
                 mock_wm.get_window_list.return_value = [
                     ("0x123", "Window 1"),
@@ -203,7 +225,9 @@ class TestGetWindowList:
     def test_get_window_list_empty(self):
         """Test get_window_list returns empty list"""
         with patch("argus_overview.core.window_capture_threaded.get_window_capture"):
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_wm = MagicMock()
                 mock_wm.get_window_list.return_value = []
                 mock_get_wm.return_value = mock_wm
@@ -222,7 +246,9 @@ class TestActivateWindow:
     def test_activate_window_delegates(self):
         """Test activate_window delegates to platform window manager"""
         with patch("argus_overview.core.window_capture_threaded.get_window_capture"):
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_wm = MagicMock()
                 mock_wm.activate_window.return_value = True
                 mock_get_wm.return_value = mock_wm
@@ -238,7 +264,9 @@ class TestActivateWindow:
     def test_activate_window_failure(self):
         """Test activate_window returns False on failure"""
         with patch("argus_overview.core.window_capture_threaded.get_window_capture"):
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_wm = MagicMock()
                 mock_wm.activate_window.return_value = False
                 mock_get_wm.return_value = mock_wm
@@ -257,7 +285,9 @@ class TestMinimizeWindow:
     def test_minimize_window_delegates(self):
         """Test minimize_window delegates to platform window manager"""
         with patch("argus_overview.core.window_capture_threaded.get_window_capture"):
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_wm = MagicMock()
                 mock_wm.minimize_window.return_value = True
                 mock_get_wm.return_value = mock_wm
@@ -273,7 +303,9 @@ class TestMinimizeWindow:
     def test_minimize_window_failure(self):
         """Test minimize_window returns False on failure"""
         with patch("argus_overview.core.window_capture_threaded.get_window_capture"):
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_wm = MagicMock()
                 mock_wm.minimize_window.return_value = False
                 mock_get_wm.return_value = mock_wm
@@ -292,7 +324,9 @@ class TestRestoreWindow:
     def test_restore_window_delegates(self):
         """Test restore_window delegates to platform window manager"""
         with patch("argus_overview.core.window_capture_threaded.get_window_capture"):
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_wm = MagicMock()
                 mock_wm.restore_window.return_value = True
                 mock_get_wm.return_value = mock_wm
@@ -308,7 +342,9 @@ class TestRestoreWindow:
     def test_restore_window_failure(self):
         """Test restore_window returns False on failure"""
         with patch("argus_overview.core.window_capture_threaded.get_window_capture"):
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_wm = MagicMock()
                 mock_wm.restore_window.return_value = False
                 mock_get_wm.return_value = mock_wm
@@ -326,8 +362,12 @@ class TestIntegration:
 
     def test_full_workflow(self):
         """Test full capture workflow through wrapper"""
-        with patch("argus_overview.core.window_capture_threaded.get_window_capture") as mock_get_capture:
-            with patch("argus_overview.core.window_capture_threaded.get_window_manager") as mock_get_wm:
+        with patch(
+            "argus_overview.core.window_capture_threaded.get_window_capture"
+        ) as mock_get_capture:
+            with patch(
+                "argus_overview.core.window_capture_threaded.get_window_manager"
+            ) as mock_get_wm:
                 mock_capture = MagicMock()
                 mock_capture.running = False
                 mock_capture.capture_window_async.return_value = "req-123"

@@ -99,9 +99,7 @@ class TestGetAllMonitors:
         """Test with single monitor"""
         with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
             mock_sm = MagicMock()
-            mock_sm.get_all_monitors.return_value = [
-                ScreenGeometry(0, 0, 1920, 1080, True)
-            ]
+            mock_sm.get_all_monitors.return_value = [ScreenGeometry(0, 0, 1920, 1080, True)]
             mock_get_sm.return_value = mock_sm
 
             monitors = get_all_monitors()
@@ -137,9 +135,7 @@ class TestGetAllMonitors:
         with patch("argus_overview.utils.screen.get_screen_manager") as mock_get_sm:
             mock_sm = MagicMock()
             # Platform layer should always return at least one default
-            mock_sm.get_all_monitors.return_value = [
-                ScreenGeometry(0, 0, 1920, 1080, True)
-            ]
+            mock_sm.get_all_monitors.return_value = [ScreenGeometry(0, 0, 1920, 1080, True)]
             mock_get_sm.return_value = mock_sm
 
             monitors = get_all_monitors()

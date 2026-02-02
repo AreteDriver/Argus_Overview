@@ -171,9 +171,7 @@ class WindowCapture(ABC):
         """
 
     @abstractmethod
-    def get_result(
-        self, timeout: float = 0.1
-    ) -> Optional[Tuple[str, str, Image.Image]]:
+    def get_result(self, timeout: float = 0.1) -> Optional[Tuple[str, str, Image.Image]]:
         """Get capture result if available.
 
         Args:
@@ -184,9 +182,7 @@ class WindowCapture(ABC):
         """
 
     @abstractmethod
-    def capture_window_sync(
-        self, window_id: str, scale: float = 1.0
-    ) -> Optional[Image.Image]:
+    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Optional[Image.Image]:
         """Synchronous window capture.
 
         Args:

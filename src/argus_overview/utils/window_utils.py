@@ -43,9 +43,7 @@ def is_valid_window_id(window_id: str) -> bool:
     return _get_window_mgr().is_valid_window_id(window_id)
 
 
-def move_window(
-    window_id: str, x: int, y: int, w: int, h: int, timeout: float = 2.0
-) -> bool:
+def move_window(window_id: str, x: int, y: int, w: int, h: int, timeout: float = 2.0) -> bool:
     """Move and resize a window safely with validation and retry.
 
     Args:
