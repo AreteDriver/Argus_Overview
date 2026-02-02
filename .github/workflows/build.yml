@@ -32,7 +32,7 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest --cov=src/argus_overview --cov-report=xml
+          xvfb-run -a pytest --cov=src/argus_overview --cov-report=xml
         env:
           QT_QPA_PLATFORM: offscreen
 
