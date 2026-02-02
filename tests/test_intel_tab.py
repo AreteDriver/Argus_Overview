@@ -4,10 +4,9 @@ Tests IntelLogTable and IntelTab widgets.
 """
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
 from argus_overview.intel.parser import IntelReport, ThreatLevel

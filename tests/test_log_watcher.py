@@ -8,8 +8,6 @@ from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from argus_overview.intel.log_watcher import ChatLogWatcher, ChatMessage
 
 
