@@ -11,6 +11,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
 from PySide6.QtWidgets import QMenu, QSystemTrayIcon
 
+from argus_overview import __version__
 from argus_overview.ui.action_registry import ActionRegistry
 from argus_overview.ui.menu_builder import MenuBuilder
 
@@ -56,7 +57,7 @@ class SystemTray(QObject):
         # Create tray icon
         self.tray_icon = QSystemTrayIcon(parent)
         self.tray_icon.setIcon(self._create_icon())
-        self.tray_icon.setToolTip("Argus Overview v2.4")
+        self.tray_icon.setToolTip(f"Argus Overview v{__version__}")
 
         # Create context menu from registry
         self.menu = QMenu()

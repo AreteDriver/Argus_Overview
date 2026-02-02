@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
-Argus Overview v2.4 - ActionRegistry Edition
+Argus Overview - Cross-Platform Edition
 Main entry point with professional UI and all features
+
+v3.0 Features:
+- Cross-platform support (Linux X11, Windows Win32)
+- Platform abstraction layer
+- Unified codebase for all platforms
 
 v2.4 Features:
 - ActionRegistry: Single source of truth for all UI actions
@@ -40,6 +45,8 @@ else:
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication, QMessageBox
+
+from argus_overview import __version__
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -197,7 +204,7 @@ def main():
     setup_logging()
 
     logger = logging.getLogger(__name__)
-    logger.info("Starting Argus Overview v2.4")
+    logger.info(f"Starting Argus Overview v{__version__}")
 
     # Create QApplication early (needed for dialogs)
     app = QApplication(sys.argv)

@@ -5,6 +5,20 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.2] - 2026-02-02
+
+### Fixed
+- **CI Build Fixes** - Resolved Linux AppImage build failures
+  - Added `xvfb-run` wrapper for PyInstaller pynput X11 initialization
+  - Changed spec to use COLLECT for directory output (required by AppImage)
+  - Removed redundant `build.yml` workflow (replaced by dedicated workflows)
+- **Test Stability** - Skip `test_process_message` on Python 3.12 (PySide6 segfault)
+- **Version Strings** - Unified version display across all UI components
+  - Window title, tray tooltip, and logs now use `__version__` from package
+
+### Changed
+- **Removed Deprecated Workflow** - Deleted `build.yml` in favor of `build-linux.yml` and `build-windows.yml`
+
 ## [3.0.1] - 2026-02-02
 
 ### Added

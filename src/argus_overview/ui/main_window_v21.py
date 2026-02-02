@@ -50,7 +50,8 @@ from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
 
-# Import core modules
+# Import version and core modules
+from argus_overview import __version__
 from argus_overview.core.character_manager import CharacterManager
 from argus_overview.core.discovery import AutoDiscovery
 from argus_overview.core.eve_settings_sync import EVESettingsSync
@@ -70,7 +71,7 @@ class MainWindowV21(QMainWindow):
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger(__name__)
-        self.setWindowTitle("Argus Overview v2.4")
+        self.setWindowTitle(f"Argus Overview v{__version__}")
         self.setMinimumSize(1000, 700)
 
         # Set window icon
@@ -922,7 +923,7 @@ class MainWindowV21(QMainWindow):
                 return
 
         # Actually closing the application
-        self.logger.info("Shutting down Argus Overview v2.4...")
+        self.logger.info(f"Shutting down Argus Overview v{__version__}...")
 
         # Disconnect signals to break reference cycles
         self._disconnect_signals()
