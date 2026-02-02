@@ -324,7 +324,9 @@ class TestWmctrlCache:
         mock_result.returncode = 0
         mock_result.stdout = "0x123 0 host Window1\n"
 
-        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result) as mock_run:
+        with patch(
+            "argus_overview.platform.linux.subprocess.run", return_value=mock_result
+        ) as mock_run:
             result1 = _get_wmctrl_window_list()
             result2 = _get_wmctrl_window_list()
 
