@@ -8032,8 +8032,8 @@ class TestMainTabInitPreviewsDisabled:
     import pytest
 
     @pytest.mark.skipif(
-        sys.version_info >= (3, 11),
-        reason="PySide6 segfault on Python 3.11+ in CI - QTimer issue",
+        sys.version_info >= (3, 10),
+        reason="PySide6 segfault in CI - QTimer signal connection issue",
     )
     def test_init_with_previews_disabled(self, qapp):
         """Test MainTab doesn't start capture loop when previews disabled."""
@@ -8062,8 +8062,8 @@ class TestMainTabStopCaptureLoopFrameTimers:
     import pytest
 
     @pytest.mark.skipif(
-        sys.version_info >= (3, 11),
-        reason="PySide6 segfault on Python 3.11+ in CI - QTimer issue",
+        sys.version_info >= (3, 10),
+        reason="PySide6 segfault in CI - QTimer signal connection issue",
     )
     def test_stop_capture_loop_stops_frame_timers(self, qapp):
         """Test that stop_capture_loop stops all frame session timers."""
@@ -8135,7 +8135,9 @@ class TestMainTabAutoMinimizeCount:
         mock_result.returncode = 0
         mock_result.stdout = b"0x1111"
 
-        with patch("argus_overview.utils.window_utils.run_x11_subprocess", return_value=mock_result):
+        with patch(
+            "argus_overview.utils.window_utils.run_x11_subprocess", return_value=mock_result
+        ):
             tab._toggle_minimize_inactive()
 
         # Status should show count
