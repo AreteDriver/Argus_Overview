@@ -65,8 +65,8 @@ def create_mock_window():
     window._show_about_dialog = lambda: MainWindowV21._show_about_dialog(window)
     window._open_url = lambda url: MainWindowV21._open_url(window, url)
     window._open_donation_link = lambda: MainWindowV21._open_donation_link(window)
-    window._on_new_character_discovered = (
-        lambda c, wid, t: MainWindowV21._on_new_character_discovered(window, c, wid, t)
+    window._on_new_character_discovered = lambda c, wid, t: (
+        MainWindowV21._on_new_character_discovered(window, c, wid, t)
     )
     window._apply_low_power_mode = lambda enabled: MainWindowV21._apply_low_power_mode(
         window, enabled
