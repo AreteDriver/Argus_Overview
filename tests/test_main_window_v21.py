@@ -1237,6 +1237,54 @@ class TestRegisterHotkeys:
         window.logger.info.assert_called()
 
 
+class TestRegisterCyclingHotkeys:
+    """Tests for _register_cycling_hotkeys method"""
+
+    def test_register_cycling_hotkeys_unregisters_old(self):
+        """Test that old cycling hotkeys are unregistered before re-registering"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.side_effect = lambda key, default=None: {
+            "hotkeys.cycle_next": "<ctrl>+n",
+            "hotkeys.cycle_prev": "<ctrl>+p",
+        }.get(key, default)
+        window.hotkey_manager = MagicMock()
+        window.logger = MagicMock()
+
+        MainWindowV21._register_cycling_hotkeys(window)
+
+        window.hotkey_manager.unregister_hotkey.assert_any_call("cycle_next")
+        window.hotkey_manager.unregister_hotkey.assert_any_call("cycle_prev")
+        window.hotkey_manager.register_hotkey.assert_any_call(
+            "cycle_next", "<ctrl>+n", window._cycle_next
+        )
+        window.hotkey_manager.register_hotkey.assert_any_call(
+            "cycle_prev", "<ctrl>+p", window._cycle_prev
+        )
+
+    def test_register_cycling_hotkeys_skips_empty(self):
+        """Test that empty combos are not registered"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.side_effect = lambda key, default=None: {
+            "hotkeys.cycle_next": "",
+            "hotkeys.cycle_prev": "",
+        }.get(key, default)
+        window.hotkey_manager = MagicMock()
+        window.logger = MagicMock()
+
+        MainWindowV21._register_cycling_hotkeys(window)
+
+        # Unregister should still be called
+        assert window.hotkey_manager.unregister_hotkey.call_count == 2
+        # But register should NOT be called (empty combos)
+        window.hotkey_manager.register_hotkey.assert_not_called()
+
+
 # Test _activate_window
 class TestActivateWindow:
     """Tests for _activate_window method"""

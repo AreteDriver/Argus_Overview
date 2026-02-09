@@ -123,6 +123,7 @@ class HotkeysTab(QWidget):
     """
 
     group_changed = Signal(str, list)  # group_name, members
+    hotkeys_changed = Signal()  # Emitted when cycling hotkeys are saved
 
     def __init__(self, character_manager, settings_manager, main_tab=None, parent=None):
         super().__init__(parent)
@@ -531,13 +532,14 @@ class HotkeysTab(QWidget):
         self.settings_manager.set("hotkeys.cycle_next", forward, auto_save=True)
         self.settings_manager.set("hotkeys.cycle_prev", backward, auto_save=True)
 
+        self.hotkeys_changed.emit()
+
         QMessageBox.information(
             self,
             "Saved",
-            f"Hotkey settings saved.\n\n"
+            f"Hotkey settings saved and active.\n\n"
             f"Cycling Forward: {forward}\n"
-            f"Cycling Backward: {backward}\n\n"
-            f"Restart the app for hotkeys to take effect.",
+            f"Cycling Backward: {backward}",
         )
         self.logger.info(f"Saved hotkeys: forward={forward}, backward={backward}")
 

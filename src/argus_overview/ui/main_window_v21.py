@@ -210,6 +210,14 @@ class MainWindowV21(QMainWindow):
         self.logger.info(f"Registered {len(char_hotkeys)} per-character hotkeys")
 
         # v2.2: Cycling hotkeys
+        self._register_cycling_hotkeys()
+
+    def _register_cycling_hotkeys(self):
+        """Register (or re-register) cycling hotkeys from current settings"""
+        # Unregister old cycling hotkeys if they exist
+        self.hotkey_manager.unregister_hotkey("cycle_next")
+        self.hotkey_manager.unregister_hotkey("cycle_prev")
+
         cycle_next_combo = self.settings_manager.get("hotkeys.cycle_next", "<ctrl>+<tab>")
         cycle_prev_combo = self.settings_manager.get("hotkeys.cycle_prev", "<ctrl>+<shift>+<tab>")
 
@@ -580,6 +588,9 @@ class MainWindowV21(QMainWindow):
 
         # Connect group changes to refresh layout sources in overview tab
         self.hotkeys_tab.group_changed.connect(self.main_tab.refresh_layout_groups)
+
+        # Re-register cycling hotkeys when user saves new bindings
+        self.hotkeys_tab.hotkeys_changed.connect(self._register_cycling_hotkeys)
 
         # Pause/resume hotkey listeners during key recording to avoid X11 conflicts
         self.hotkeys_tab.cycle_forward_edit.recordingStarted.connect(self.hotkey_manager.pause)

@@ -1072,6 +1072,7 @@ class TestHotkeysTabInteraction:
 
         with patch.object(HotkeysTab, "_setup_ui"):
             tab = HotkeysTab(mock_char_manager, mock_settings_manager)
+            tab.hotkeys_changed = MagicMock()
             tab.cycle_forward_edit = MagicMock()
             tab.cycle_forward_edit.text.return_value = "<ctrl>+<shift>+]"
             tab.cycle_backward_edit = MagicMock()
@@ -1085,6 +1086,7 @@ class TestHotkeysTabInteraction:
             mock_settings_manager.set.assert_any_call(
                 "hotkeys.cycle_prev", "<ctrl>+<shift>+[", auto_save=True
             )
+            tab.hotkeys_changed.emit.assert_called_once()
             mock_msgbox.information.assert_called_once()
 
     @patch("argus_overview.ui.hotkeys_tab.QWidget.__init__")
