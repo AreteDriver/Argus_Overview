@@ -1,5 +1,5 @@
 # Argus Overview v2.7 - Pinned versions for reproducible builds
-PySide6==6.10.1
+PySide6==6.10.2
 python-xlib==0.33
 Pillow==12.1.0
 pynput==1.8.1
