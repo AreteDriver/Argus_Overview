@@ -1255,8 +1255,8 @@ class TestRegisterCyclingHotkeys:
 
         MainWindowV21._register_cycling_hotkeys(window)
 
-        window.hotkey_manager.unregister_hotkey.assert_any_call("cycle_next")
-        window.hotkey_manager.unregister_hotkey.assert_any_call("cycle_prev")
+        window.hotkey_manager.unregister_hotkey.assert_any_call("cycle_next", restart=False)
+        window.hotkey_manager.unregister_hotkey.assert_any_call("cycle_prev", restart=False)
         window.hotkey_manager.register_hotkey.assert_any_call(
             "cycle_next", "<ctrl>+n", window._cycle_next
         )

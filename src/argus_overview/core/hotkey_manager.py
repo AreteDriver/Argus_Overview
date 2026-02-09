@@ -88,8 +88,13 @@ class HotkeyManager(QObject):
 
         return True
 
-    def unregister_hotkey(self, name: str) -> bool:
-        """Unregister a hotkey"""
+    def unregister_hotkey(self, name: str, restart: bool = True) -> bool:
+        """Unregister a hotkey
+
+        Args:
+            name: Hotkey name to unregister
+            restart: Whether to restart listeners immediately (set False for batching)
+        """
         if name in self.hotkeys:
             combo = self.hotkeys[name]["combo"]
 
@@ -103,7 +108,8 @@ class HotkeyManager(QObject):
                     del self.combo_hotkeys[combo]
 
             del self.hotkeys[name]
-            self._restart_listeners()
+            if restart:
+                self._restart_listeners()
             return True
         return False
 

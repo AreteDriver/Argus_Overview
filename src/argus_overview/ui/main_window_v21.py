@@ -214,9 +214,9 @@ class MainWindowV21(QMainWindow):
 
     def _register_cycling_hotkeys(self):
         """Register (or re-register) cycling hotkeys from current settings"""
-        # Unregister old cycling hotkeys if they exist
-        self.hotkey_manager.unregister_hotkey("cycle_next")
-        self.hotkey_manager.unregister_hotkey("cycle_prev")
+        # Unregister old cycling hotkeys without restarting listeners (batched)
+        self.hotkey_manager.unregister_hotkey("cycle_next", restart=False)
+        self.hotkey_manager.unregister_hotkey("cycle_prev", restart=False)
 
         cycle_next_combo = self.settings_manager.get("hotkeys.cycle_next", "<ctrl>+<tab>")
         cycle_prev_combo = self.settings_manager.get("hotkeys.cycle_prev", "<ctrl>+<shift>+<tab>")
