@@ -2293,3 +2293,90 @@ class TestCloseEventIntelTab:
         MainWindowV21.closeEvent(window, event)
 
         window.intel_tab.stop.assert_called_once()
+
+
+# =============================================================================
+# Coverage Push: __init__ partial (lines 72-154, ~45 lines)
+# =============================================================================
+
+
+class TestMainWindowV21InitPartial:
+    """Tests for MainWindowV21.__init__ initialization sequence.
+
+    Patches all Qt and core dependencies to test the init sequence
+    without requiring a real display or full Qt application.
+    """
+
+    def test_init_creates_core_modules(self):
+        """Test __init__ creates all core subsystems"""
+        from contextlib import ExitStack
+
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        mock_char_mgr = MagicMock()
+        mock_layout_mgr = MagicMock()
+        mock_hotkey_mgr = MagicMock()
+        mock_settings_sync = MagicMock()
+        mock_settings_mgr = MagicMock()
+        mock_settings_mgr.get.return_value = 1
+        mock_settings_mgr.validate = MagicMock()
+        mock_capture = MagicMock()
+        mock_discovery = MagicMock()
+        mock_theme = MagicMock()
+
+        mod = "argus_overview.ui.main_window_v21"
+        with ExitStack() as stack:
+            stack.enter_context(patch(f"{mod}.CharacterManager", return_value=mock_char_mgr))
+            stack.enter_context(patch(f"{mod}.LayoutManager", return_value=mock_layout_mgr))
+            stack.enter_context(patch(f"{mod}.HotkeyManager", return_value=mock_hotkey_mgr))
+            stack.enter_context(patch(f"{mod}.EVESettingsSync", return_value=mock_settings_sync))
+            stack.enter_context(patch(f"{mod}.SettingsManager", return_value=mock_settings_mgr))
+            stack.enter_context(patch(f"{mod}.WindowCaptureThreaded", return_value=mock_capture))
+            stack.enter_context(patch(f"{mod}.AutoDiscovery", return_value=mock_discovery))
+            stack.enter_context(patch(f"{mod}.get_theme_manager", return_value=mock_theme))
+            # Patch QMainWindow.__init__ to skip real Qt initialization
+            stack.enter_context(patch("PySide6.QtWidgets.QMainWindow.__init__", return_value=None))
+            stack.enter_context(patch.object(MainWindowV21, "setWindowTitle"))
+            stack.enter_context(patch.object(MainWindowV21, "setMinimumSize"))
+            stack.enter_context(patch.object(MainWindowV21, "setCentralWidget"))
+            stack.enter_context(patch.object(MainWindowV21, "_set_window_icon"))
+            stack.enter_context(patch.object(MainWindowV21, "_apply_initial_settings"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_menu_bar"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_main_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_hotkeys_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_characters_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_intel_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_settings_sync_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_settings_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_connect_signals"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_system_tray"))
+            stack.enter_context(patch.object(MainWindowV21, "_register_hotkeys"))
+            stack.enter_context(patch(f"{mod}.QTabWidget"))
+            stack.enter_context(patch(f"{mod}.QVBoxLayout"))
+            stack.enter_context(patch(f"{mod}.QWidget"))
+
+            window = MainWindowV21()
+
+            # Core modules created
+            assert window.character_manager is mock_char_mgr
+            assert window.layout_manager is mock_layout_mgr
+            assert window.hotkey_manager is mock_hotkey_mgr
+            assert window.settings_sync is mock_settings_sync
+            assert window.settings_manager is mock_settings_mgr
+            assert window.capture_system is mock_capture
+            assert window.auto_discovery is mock_discovery
+            assert window.theme_manager is mock_theme
+
+            # Cycling state initialized
+            assert window.cycling_index == 0
+            assert window.current_cycling_group == "Default"
+
+            # Systems started
+            mock_capture.start.assert_called_once()
+            mock_hotkey_mgr.start.assert_called_once()
+
+            # Settings validated
+            mock_settings_mgr.validate.assert_called_once()
+
+            # Theme applied
+            mock_theme.apply_theme.assert_called()

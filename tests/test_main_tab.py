@@ -8144,3 +8144,416 @@ class TestMainTabAutoMinimizeCount:
         tab.status_label.setText.assert_called()
         call_args = tab.status_label.setText.call_args[0][0]
         assert "minimized" in call_args.lower() or "auto-minimize" in call_args.lower()
+
+
+# =============================================================================
+# Coverage Push: _setup_ui (lines 1172-1202, ~29 lines)
+# =============================================================================
+
+
+class TestMainTabSetupUi:
+    """Tests for MainTab._setup_ui method"""
+
+    def test_setup_ui_creates_layout_and_widgets(self):
+        """Test _setup_ui creates toolbar, layout controls, scroll area, preview container, status bar"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab._create_toolbar = MagicMock(return_value=MagicMock())
+            tab._create_layout_controls = MagicMock(return_value=MagicMock())
+            tab._create_status_bar = MagicMock(return_value=MagicMock())
+            tab.setLayout = MagicMock()
+
+            mock_scroll = MagicMock()
+            mock_container = MagicMock()
+            mock_flow_layout = MagicMock()
+
+            with patch("argus_overview.ui.main_tab.QVBoxLayout") as mock_vbox:
+                with patch("argus_overview.ui.main_tab.QScrollArea", return_value=mock_scroll):
+                    with patch("argus_overview.ui.main_tab.QWidget", return_value=mock_container):
+                        with patch(
+                            "argus_overview.ui.main_tab.FlowLayout",
+                            return_value=mock_flow_layout,
+                        ):
+                            mock_layout = MagicMock()
+                            mock_vbox.return_value = mock_layout
+
+                            tab._setup_ui()
+
+                            # Layout created and set
+                            tab.setLayout.assert_called_once_with(mock_layout)
+
+                            # Toolbar, layout controls, status bar created
+                            tab._create_toolbar.assert_called_once()
+                            tab._create_layout_controls.assert_called_once()
+                            tab._create_status_bar.assert_called_once()
+
+                            # Scroll area configured
+                            mock_scroll.setWidgetResizable.assert_called_once_with(True)
+                            mock_scroll.setWidget.assert_called_once_with(mock_container)
+
+                            # Preview container and layout stored
+                            assert tab.preview_container is mock_container
+                            assert tab.preview_layout is mock_flow_layout
+
+                            # All widgets added to layout
+                            assert mock_layout.addWidget.call_count == 4
+
+
+# =============================================================================
+# Coverage Push: show_add_window_dialog accepted path (lines 1701-1737, ~36 lines)
+# =============================================================================
+
+
+class TestShowAddWindowDialogAccepted:
+    """Tests for show_add_window_dialog when dialog is accepted with selections"""
+
+    def test_show_add_window_dialog_accepted_adds_windows(self):
+        """Test dialog accept with selected items calls _add_window_to_preview"""
+        from PySide6.QtWidgets import QDialog as RealQDialog
+
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab._get_available_windows = MagicMock(
+                return_value=[("0x111", "EVE - Pilot1"), ("0x222", "EVE - Pilot2")]
+            )
+            tab._add_window_to_preview = MagicMock(return_value=True)
+            tab._update_status = MagicMock()
+
+            # Mock the entire dialog flow
+            mock_dialog = MagicMock()
+            mock_dialog.exec.return_value = RealQDialog.DialogCode.Accepted
+
+            # Create mock selected items with data
+            mock_item1 = MagicMock()
+            mock_item1.data.return_value = ("0x111", "EVE - Pilot1")
+            mock_item2 = MagicMock()
+            mock_item2.data.return_value = ("0x222", "EVE - Pilot2")
+
+            mock_list_widget = MagicMock()
+            mock_list_widget.selectedItems.return_value = [mock_item1, mock_item2]
+
+            with patch("argus_overview.ui.main_tab.QDialog", return_value=mock_dialog) as mock_cls:
+                with patch("argus_overview.ui.main_tab.QVBoxLayout"):
+                    with patch("argus_overview.ui.main_tab.QLabel"):
+                        with patch(
+                            "argus_overview.ui.main_tab.QListWidget",
+                            return_value=mock_list_widget,
+                        ):
+                            with patch("argus_overview.ui.main_tab.QListWidgetItem"):
+                                with patch("argus_overview.ui.main_tab.QDialogButtonBox"):
+                                    mock_cls.DialogCode = RealQDialog.DialogCode
+                                    tab.show_add_window_dialog()
+
+                                    assert tab._add_window_to_preview.call_count == 2
+                                    tab._add_window_to_preview.assert_any_call(
+                                        "0x111", "EVE - Pilot1"
+                                    )
+                                    tab._add_window_to_preview.assert_any_call(
+                                        "0x222", "EVE - Pilot2"
+                                    )
+                                    tab._update_status.assert_called_once()
+                                    tab.logger.info.assert_called()
+
+    def test_show_add_window_dialog_accepted_no_selection(self):
+        """Test dialog accept with no selected items does nothing"""
+        from PySide6.QtWidgets import QDialog as RealQDialog
+
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab._get_available_windows = MagicMock(return_value=[("0x111", "EVE - Pilot1")])
+            tab._add_window_to_preview = MagicMock(return_value=True)
+            tab._update_status = MagicMock()
+
+            mock_dialog = MagicMock()
+            mock_dialog.exec.return_value = RealQDialog.DialogCode.Accepted
+
+            mock_list_widget = MagicMock()
+            mock_list_widget.selectedItems.return_value = []  # Nothing selected
+
+            with patch("argus_overview.ui.main_tab.QDialog", return_value=mock_dialog) as mock_cls:
+                with patch("argus_overview.ui.main_tab.QVBoxLayout"):
+                    with patch("argus_overview.ui.main_tab.QLabel"):
+                        with patch(
+                            "argus_overview.ui.main_tab.QListWidget",
+                            return_value=mock_list_widget,
+                        ):
+                            with patch("argus_overview.ui.main_tab.QListWidgetItem"):
+                                with patch("argus_overview.ui.main_tab.QDialogButtonBox"):
+                                    mock_cls.DialogCode = RealQDialog.DialogCode
+                                    tab.show_add_window_dialog()
+
+                                    tab._add_window_to_preview.assert_not_called()
+                                    tab._update_status.assert_not_called()
+
+    def test_show_add_window_dialog_rejected(self):
+        """Test dialog rejection skips adding windows"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab._get_available_windows = MagicMock(return_value=[("0x111", "EVE - Pilot1")])
+            tab._add_window_to_preview = MagicMock()
+            tab._update_status = MagicMock()
+
+            mock_dialog = MagicMock()
+            mock_dialog.exec.return_value = 0  # Rejected
+
+            with patch("argus_overview.ui.main_tab.QDialog", return_value=mock_dialog):
+                with patch("argus_overview.ui.main_tab.QVBoxLayout"):
+                    with patch("argus_overview.ui.main_tab.QLabel"):
+                        with patch("argus_overview.ui.main_tab.QListWidget"):
+                            with patch("argus_overview.ui.main_tab.QListWidgetItem"):
+                                with patch("argus_overview.ui.main_tab.QDialogButtonBox"):
+                                    tab.show_add_window_dialog()
+
+                                    tab._add_window_to_preview.assert_not_called()
+
+
+# =============================================================================
+# Coverage Push: _on_window_removed exception paths (lines 1778-1785, ~4 lines)
+# =============================================================================
+
+
+class TestOnWindowRemovedExceptionPaths:
+    """Tests for _on_window_removed signal disconnect exception handling"""
+
+    def test_on_window_removed_disconnect_runtime_error(self):
+        """Test RuntimeError on signal disconnect is caught silently"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.window_manager = MagicMock()
+            tab._update_status = MagicMock()
+            tab._on_window_activated = MagicMock()
+            tab._on_window_removed = MainTab._on_window_removed.__get__(tab, MainTab)
+
+            # Frame with signals that raise RuntimeError on disconnect
+            mock_frame = MagicMock()
+            mock_frame.window_activated.disconnect.side_effect = RuntimeError("Not connected")
+            mock_frame.window_removed.disconnect.side_effect = RuntimeError("Not connected")
+            tab.window_manager.preview_frames = {"0x123": mock_frame}
+
+            # Should not raise
+            tab._on_window_removed("0x123")
+
+            # Timer still stopped, window still removed
+            mock_frame.session_timer.stop.assert_called_once()
+            tab.window_manager.remove_window.assert_called_with("0x123")
+            tab._update_status.assert_called_once()
+
+    def test_on_window_removed_disconnect_type_error(self):
+        """Test TypeError on signal disconnect is caught silently"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.window_manager = MagicMock()
+            tab._update_status = MagicMock()
+            tab._on_window_activated = MagicMock()
+            tab._on_window_removed = MainTab._on_window_removed.__get__(tab, MainTab)
+
+            mock_frame = MagicMock()
+            mock_frame.window_activated.disconnect.side_effect = TypeError("Wrong type")
+            mock_frame.window_removed.disconnect.side_effect = TypeError("Wrong type")
+            tab.window_manager.preview_frames = {"0x456": mock_frame}
+
+            tab._on_window_removed("0x456")
+
+            mock_frame.session_timer.stop.assert_called_once()
+            tab.window_manager.remove_window.assert_called_with("0x456")
+
+    def test_on_window_removed_no_frame_found(self):
+        """Test _on_window_removed when frame not in preview_frames"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.window_manager = MagicMock()
+            tab.window_manager.preview_frames = {}  # Empty — no frame
+            tab._update_status = MagicMock()
+
+            tab._on_window_removed("0x999")
+
+            # Still calls remove_window and _update_status
+            tab.window_manager.remove_window.assert_called_with("0x999")
+            tab._update_status.assert_called_once()
+
+
+# =============================================================================
+# Coverage Push: _refresh_layout_sources timer path (line 1402-1403)
+# =============================================================================
+
+
+class TestRefreshLayoutSourcesTimerPath:
+    """Tests for _refresh_layout_sources debounced timer path"""
+
+    def test_refresh_layout_sources_starts_timer(self):
+        """Test _refresh_layout_sources starts timer when it exists"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab._refresh_sources_timer = MagicMock()
+
+            tab._refresh_layout_sources()
+
+            tab._refresh_sources_timer.start.assert_called_once()
+
+    def test_refresh_layout_sources_no_timer_calls_direct(self):
+        """Test _refresh_layout_sources calls _do_refresh directly when no timer"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            # No _refresh_sources_timer attribute
+            tab.layout_source_combo = MagicMock()
+            tab.layout_source_combo.count.return_value = 0
+            tab.cycling_groups = {"Default": []}
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = {"Default": []}
+
+            tab._refresh_layout_sources()
+
+            # Should have called _do_refresh_layout_sources directly
+            tab.layout_source_combo.clear.assert_called_once()
+
+
+# =============================================================================
+# Coverage Push: minimize_inactive_windows counting (lines 1838-1846, ~7 lines)
+# =============================================================================
+
+
+class TestMinimizeInactiveCountingDetail:
+    """Tests for minimize_inactive_windows with correct counting via run_x11_subprocess"""
+
+    def test_minimize_counts_excludes_focused_window(self):
+        """Test minimize correctly counts non-focused windows"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab._windows_minimized = False
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = False  # Currently off, toggle to on
+            tab.capture_system = MagicMock()
+            tab.capture_system.minimize_window.return_value = True
+            tab.window_manager = MagicMock()
+            tab.window_manager.preview_frames = {
+                "0x111": MagicMock(),
+                "0x222": MagicMock(),
+                "0x333": MagicMock(),
+            }
+            tab.status_label = MagicMock()
+            tab._update_minimize_button_style = MagicMock()
+
+            # Mock run_x11_subprocess to return focused window
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = b"0x111"  # 0x111 is focused
+
+            with patch(
+                "argus_overview.utils.window_utils.run_x11_subprocess",
+                return_value=mock_result,
+            ):
+                tab.minimize_inactive_windows()
+
+            # Should minimize 2 windows (0x222 and 0x333, not 0x111)
+            assert tab.capture_system.minimize_window.call_count == 2
+            tab.logger.info.assert_called_with("Auto-minimize enabled, minimized 2 windows")
+            tab.status_label.setText.assert_called_with("Auto-minimize ON (2 minimized)")
+
+    def test_minimize_xdotool_exception_sets_none_result(self):
+        """Test run_x11_subprocess exception results in simple status"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab._windows_minimized = False
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = False
+            tab.capture_system = MagicMock()
+            tab.window_manager = MagicMock()
+            tab.window_manager.preview_frames = {"0x111": MagicMock()}
+            tab.status_label = MagicMock()
+            tab._update_minimize_button_style = MagicMock()
+
+            with patch(
+                "argus_overview.utils.window_utils.run_x11_subprocess",
+                side_effect=Exception("xdotool not found"),
+            ):
+                tab.minimize_inactive_windows()
+
+            # result is None, so simple status message
+            tab.status_label.setText.assert_called_with("Auto-minimize ON")
+
+
+# =============================================================================
+# Coverage Push: _on_window_activated auto-minimize success (line 1757-1758)
+# =============================================================================
+
+
+class TestOnWindowActivatedAutoMinimizeSuccess:
+    """Tests for _on_window_activated successful auto-minimize of previous window"""
+
+    def test_on_window_activated_auto_minimizes_previous(self):
+        """Test successful xdotool minimize logs info message"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = True  # auto_minimize enabled
+            tab.settings_manager.get_last_activated_window.return_value = "0xOLD"
+            tab.capture_system = MagicMock()
+            tab.capture_system.activate_window.return_value = True
+
+            with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_x11:
+                mock_x11.return_value = MagicMock(returncode=0)
+                tab._on_window_activated("0xNEW")
+
+                # Should have minimized old window
+                mock_x11.assert_called_once_with(["xdotool", "windowminimize", "0xOLD"], timeout=2)
+                # Should log success
+                tab.logger.info.assert_any_call("Auto-minimized previous EVE window: 0xOLD")
+
+            # Should track new window
+            tab.settings_manager.set_last_activated_window.assert_called_with("0xNEW")
+
+    def test_on_window_activated_auto_minimize_fails(self):
+        """Test xdotool failure logs warning, doesn't crash"""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = True
+            tab.settings_manager.get_last_activated_window.return_value = "0xOLD"
+            tab.capture_system = MagicMock()
+            tab.capture_system.activate_window.return_value = True
+
+            with patch(
+                "argus_overview.utils.window_utils.run_x11_subprocess",
+                side_effect=Exception("xdotool failed"),
+            ):
+                tab._on_window_activated("0xNEW")
+
+                tab.logger.warning.assert_called_once()
+                assert "Failed to auto-minimize" in str(tab.logger.warning.call_args)
