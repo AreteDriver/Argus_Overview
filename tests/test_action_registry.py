@@ -623,3 +623,20 @@ class TestRegistryActionCoverage:
         actions = registry.all_actions()
         # Allow some flexibility for future additions
         assert len(actions) >= 40, f"Expected ~42 actions, got {len(actions)}"
+
+
+class TestMainBlock:
+    """Tests for __main__ block."""
+
+    def test_main_runs_audit_and_exits(self):
+        """Lines 897-901: __main__ block runs audit and calls sys.exit."""
+        import runpy
+
+        with pytest.raises(SystemExit) as exc_info:
+            runpy.run_module(
+                "argus_overview.ui.action_registry",
+                run_name="__main__",
+                alter_sys=True,
+            )
+
+        assert exc_info.value.code == 0

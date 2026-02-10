@@ -1810,3 +1810,49 @@ class TestUISetupMethods:
                 tab.character_table.character_selected.connect.assert_called_once_with(
                     mock_team_builder.add_member
                 )
+
+
+class TestPopulateTableTimerPath:
+    """Tests for CharacterTable.populate_table debounce timer path."""
+
+    @patch("argus_overview.ui.characters_teams_tab.QTableWidget.__init__")
+    def test_populate_table_starts_timer(self, mock_widget):
+        """Line 83: populate_table starts timer when _populate_timer exists."""
+        mock_widget.return_value = None
+
+        from argus_overview.ui.characters_teams_tab import CharacterTable
+
+        table = CharacterTable.__new__(CharacterTable)
+        table.character_manager = MagicMock()
+        mock_timer = MagicMock()
+        table._populate_timer = mock_timer
+
+        table.populate_table()
+
+        mock_timer.start.assert_called_once()
+
+
+class TestRefreshTeamsTimerPath:
+    """Tests for CharactersTeamsTab._refresh_teams debounce timer path."""
+
+    @patch("argus_overview.ui.characters_teams_tab.QWidget.__init__")
+    def test_refresh_teams_starts_timer(self, mock_widget):
+        """Line 707: _refresh_teams starts timer when _refresh_teams_timer exists."""
+        mock_widget.return_value = None
+
+        from argus_overview.ui.characters_teams_tab import CharactersTeamsTab
+
+        mock_char_mgr = MagicMock()
+        mock_char_mgr.get_all_teams.return_value = []
+        mock_char_mgr.get_all_characters.return_value = []
+        mock_layout_mgr = MagicMock()
+        mock_layout_mgr.get_all_presets.return_value = []
+
+        with patch.object(CharactersTeamsTab, "_setup_ui"):
+            tab = CharactersTeamsTab(mock_char_mgr, mock_layout_mgr)
+            mock_timer = MagicMock()
+            tab._refresh_teams_timer = mock_timer
+
+            tab._refresh_teams()
+
+            mock_timer.start.assert_called_once()

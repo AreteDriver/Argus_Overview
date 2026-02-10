@@ -111,3 +111,24 @@ class TestRunX11SubprocessStub:
             # the behavior if is_linux() was False at import
             # For now, just verify the function exists
             assert hasattr(window_utils, "run_x11_subprocess")
+
+
+class TestRunX11SubprocessWindowsStub:
+    """Tests for run_x11_subprocess Windows stub."""
+
+    def test_windows_stub_raises_runtime_error(self):
+        """Lines 19-20: stub raises RuntimeError when is_linux() is False."""
+        import importlib
+        import sys
+
+        import pytest
+
+        mod = sys.modules["argus_overview.utils.window_utils"]
+
+        with patch("argus_overview.platform.is_linux", return_value=False):
+            importlib.reload(mod)
+            with pytest.raises(RuntimeError, match="only available on Linux"):
+                mod.run_x11_subprocess("test")
+
+        # Restore
+        importlib.reload(mod)

@@ -406,3 +406,22 @@ class TestStopCleansUp:
             with patch.object(watcher._debounce_timer, "stop") as mock_stop:
                 watcher.stop()
                 mock_stop.assert_called()
+
+
+class TestWatchdogImportFallback:
+    """Tests for watchdog import fallback path."""
+
+    def test_watchdog_unavailable_sets_flag_false(self):
+        """Lines 17-18: WATCHDOG_AVAILABLE=False when watchdog import fails."""
+        import importlib
+        import sys
+
+        mod = sys.modules["argus_overview.core.config_watcher"]
+
+        with patch.dict(sys.modules, {"watchdog.events": None, "watchdog.observers": None}):
+            importlib.reload(mod)
+            assert mod.WATCHDOG_AVAILABLE is False
+
+        # Restore
+        importlib.reload(mod)
+        assert mod.WATCHDOG_AVAILABLE is True

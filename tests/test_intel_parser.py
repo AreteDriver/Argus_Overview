@@ -450,3 +450,14 @@ class TestIntelParserEdgeCases:
         assert self.parser.is_likely_intel("HED-GP clr")
         assert self.parser.is_likely_intel("System clear now")
         assert self.parser.is_likely_intel("all clear in jita")
+
+    def test_threat_level_super_ships_not_in_capitals(self):
+        """Line 588: super_ships check reached when CAPITAL_SHIPS bypassed."""
+        from unittest.mock import patch
+
+        from argus_overview.intel.parser import IntelParser, ThreatLevel
+
+        parser = IntelParser()
+        with patch.object(type(parser), "CAPITAL_SHIPS", set()):
+            level = parser._assess_threat(1, ["avatar"])
+            assert level == ThreatLevel.CRITICAL

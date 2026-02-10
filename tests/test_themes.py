@@ -642,3 +642,20 @@ class TestEdgeCases:
 
         assert len(manager.custom_themes) == 1
         assert manager.custom_themes["custom"].colors.accent == "#222222"
+
+
+class TestApplyThemeFromInstance:
+    """Tests for apply_theme when app comes from QApplication.instance()."""
+
+    def test_apply_theme_gets_app_from_instance(self):
+        """Line 226: app = instance when QApplication.instance() is non-None."""
+        from argus_overview.ui.themes import BUILTIN_THEMES, ThemeManager
+
+        manager = ThemeManager()
+        mock_app = MagicMock()
+
+        with patch("argus_overview.ui.themes.QApplication.instance", return_value=mock_app):
+            with patch.object(manager, "_apply_palette"):
+                result = manager.apply_theme(list(BUILTIN_THEMES.keys())[0])
+
+        assert result is True

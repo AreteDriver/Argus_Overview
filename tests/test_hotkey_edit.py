@@ -345,3 +345,22 @@ class TestHotkeyEditPynputUnavailable:
 
             assert "not available" in widget.display.text()
             assert not widget._recording
+
+
+class TestPynputImportFallback:
+    """Tests for pynput import fallback path."""
+
+    def test_pynput_unavailable_sets_flag_false(self):
+        """Lines 18-19: PYNPUT_AVAILABLE=False when pynput import fails."""
+        import importlib
+        import sys
+
+        mod = sys.modules["argus_overview.ui.hotkey_edit"]
+
+        with patch.dict(sys.modules, {"pynput": None, "pynput.keyboard": None}):
+            importlib.reload(mod)
+            assert mod.PYNPUT_AVAILABLE is False
+
+        # Restore
+        importlib.reload(mod)
+        assert mod.PYNPUT_AVAILABLE is True

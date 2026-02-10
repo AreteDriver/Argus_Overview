@@ -982,3 +982,117 @@ class TestSettingsSyncTab:
             tab.log_text.append.assert_called_once()
             call_arg = tab.log_text.append.call_args[0][0]
             assert "Test message" in call_arg
+
+
+class TestSyncWorkerOuterException:
+    """Tests for SyncWorker.run() outer exception path."""
+
+    @patch("argus_overview.ui.settings_sync_tab.QThread.__init__")
+    def test_run_outer_exception_emits_error(self, mock_thread):
+        """Lines 113-115: outer exception emits sync_error signal."""
+        mock_thread.return_value = None
+
+        from argus_overview.ui.settings_sync_tab import SyncWorker
+
+        mock_sync = MagicMock()
+        mock_source = MagicMock()
+
+        worker = SyncWorker(mock_sync, mock_source, None, backup=True)
+        worker.sync_error = MagicMock()
+        worker.sync_progress = MagicMock()
+
+        # target_chars=None will cause len(None) to raise TypeError
+        worker.run()
+
+        worker.sync_error.emit.assert_called_once()
+        assert "Sync failed" not in ""  # Just verify emit was called
+
+
+class TestSyncSettingsNoTargets:
+    """Tests for _sync_settings when no targets selected."""
+
+    @patch("argus_overview.ui.settings_sync_tab.QWidget.__init__")
+    def test_no_targets_shows_warning(self, mock_widget):
+        """Lines 589-590: QMessageBox.warning when no target chars."""
+        mock_widget.return_value = None
+
+        from argus_overview.ui.settings_sync_tab import SettingsSyncTab
+
+        with patch.object(SettingsSyncTab, "_setup_ui"):
+            tab = SettingsSyncTab(MagicMock(), MagicMock())
+            tab.source_combo = MagicMock()
+            tab.source_combo.currentData.return_value = MagicMock()
+            tab.target_list = MagicMock()
+            tab.target_list.selectedItems.return_value = []
+            tab.scanned_characters = []
+
+            with patch("argus_overview.ui.settings_sync_tab.QMessageBox.warning") as mock_warn:
+                tab._sync_settings()
+                mock_warn.assert_called_once()
+
+
+class TestSyncSettingsUserCancels:
+    """Tests for _sync_settings when user cancels confirmation."""
+
+    @patch("argus_overview.ui.settings_sync_tab.QWidget.__init__")
+    def test_user_cancels_returns_early(self, mock_widget):
+        """Line 602: returns early when user clicks No."""
+        mock_widget.return_value = None
+
+        from PySide6.QtWidgets import QMessageBox as RealQMessageBox
+
+        from argus_overview.ui.settings_sync_tab import SettingsSyncTab
+
+        mock_char = MagicMock()
+        mock_char.character_name = "Source"
+        mock_item = MagicMock()
+        mock_item.text.return_value = "Target"
+
+        with patch.object(SettingsSyncTab, "_setup_ui"):
+            tab = SettingsSyncTab(MagicMock(), MagicMock())
+            tab.source_combo = MagicMock()
+            tab.source_combo.currentData.return_value = mock_char
+            tab.target_list = MagicMock()
+            tab.target_list.selectedItems.return_value = [mock_item]
+            tab.scanned_characters = [MagicMock(character_name="Target")]
+            tab.backup_checkbox = MagicMock()
+            tab.backup_checkbox.isChecked.return_value = True
+            tab.sync_btn = MagicMock()
+
+            with patch(
+                "argus_overview.ui.settings_sync_tab.QMessageBox.question",
+                return_value=RealQMessageBox.StandardButton.No,
+            ):
+                tab._sync_settings()
+                # sync_btn should NOT be disabled (returned early)
+                tab.sync_btn.setEnabled.assert_not_called()
+
+
+class TestAddCustomPathUserConfirms:
+    """Tests for _add_custom_path when user confirms rescan."""
+
+    @patch("argus_overview.ui.settings_sync_tab.QWidget.__init__")
+    def test_user_confirms_rescan(self, mock_widget):
+        """Line 689: _scan_settings called when user clicks Yes."""
+        mock_widget.return_value = None
+
+        from PySide6.QtWidgets import QMessageBox as RealQMessageBox
+
+        from argus_overview.ui.settings_sync_tab import SettingsSyncTab
+
+        with patch.object(SettingsSyncTab, "_setup_ui"):
+            tab = SettingsSyncTab(MagicMock(), MagicMock())
+            tab.log_text = MagicMock()
+
+            with patch(
+                "argus_overview.ui.settings_sync_tab.QFileDialog.getExistingDirectory",
+                return_value="/tmp/test_eve_path",
+            ):
+                with patch(
+                    "argus_overview.ui.settings_sync_tab.QMessageBox.question",
+                    return_value=RealQMessageBox.StandardButton.Yes,
+                ):
+                    with patch.object(tab, "_scan_settings") as mock_scan:
+                        with patch.object(tab, "_log"):
+                            tab._add_custom_path()
+                            mock_scan.assert_called_once()

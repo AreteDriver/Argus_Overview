@@ -786,3 +786,19 @@ class TestPauseResume:
         # Resume
         manager.resume()
         manager._restart_listeners.assert_called_once()
+
+
+class TestPauseKeyListenerException:
+    """Tests for pause() when key_listener.stop() raises."""
+
+    def test_key_listener_stop_exception_caught(self):
+        """Lines 252-253: Exception from key_listener.stop() is caught."""
+        manager = HotkeyManager()
+        mock_key = MagicMock()
+        mock_key.stop.side_effect = RuntimeError("listener already stopped")
+        manager.key_listener = mock_key
+
+        manager.pause()
+
+        assert manager.key_listener is None
+        mock_key.stop.assert_called_once()

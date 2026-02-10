@@ -1224,3 +1224,26 @@ class TestEdgeCases:
             assert "11111111" in char_ids
             assert "22222222" in char_ids
             assert "33333333" in char_ids
+
+
+class TestIterSettingsDirsOSError:
+    """Tests for _iter_settings_dirs OSError handling."""
+
+    def test_oserror_during_iteration_is_caught(self):
+        """Lines 132-133: OSError during directory iteration is logged and skipped."""
+        from unittest.mock import patch
+
+        from argus_overview.core.eve_settings_sync import EVESettingsSync
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sync = EVESettingsSync()
+            bad_path = Path(tmpdir) / "inaccessible"
+            bad_path.mkdir()
+
+            with patch.object(Path, "iterdir", side_effect=OSError("Permission denied")):
+                with patch.object(sync, "_is_path_accessible", return_value=True):
+                    sync.eve_paths = [bad_path]
+                    sync.custom_paths = []
+                    results = list(sync._iter_settings_dirs())
+
+            assert results == []

@@ -981,3 +981,35 @@ class TestMalformedEveSyncData:
         imported = manager.import_from_eve_sync([bad1, bad2, good])
         assert imported == 1
         assert "GoodPilot" in manager.characters
+
+
+class TestValidateTeamDataTypeCheck:
+    """Tests for _validate_team_data type validation edge cases."""
+
+    def test_returns_false_for_wrong_optional_type(self):
+        """Line 131: returns False when optional field has wrong type."""
+        data = {"name": "valid_team", "description": 123}
+        assert not CharacterManager._validate_team_data(data)
+
+    def test_returns_false_for_wrong_color_type(self):
+        """Line 131: returns False when color is not a string."""
+        data = {"name": "valid_team", "color": 999}
+        assert not CharacterManager._validate_team_data(data)
+
+
+class TestAutoAssignWindowsEdgeCases:
+    """Tests for auto_assign_windows edge cases."""
+
+    @pytest.fixture
+    def manager(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            m = CharacterManager(config_dir=Path(tmpdir))
+            m.add_character(Character(name="Pilot1"))
+            yield m
+
+    def test_skips_empty_char_name(self, manager):
+        """Line 458: skips window when char_name is empty after strip."""
+        windows = [("0x1", "EVE -"), ("0x2", "EVE - Pilot1")]
+        assignments = manager.auto_assign_windows(windows)
+        assert "0x1" not in assignments.values()
+        assert assignments.get("Pilot1") == "0x2"

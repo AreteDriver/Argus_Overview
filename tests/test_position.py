@@ -547,3 +547,32 @@ class TestApplyLayoutPreset:
 
         assert manager.positions["win1"].x == 500
         assert manager.positions["win2"] == original_win2
+
+
+class TestGetNextPositionUltimateFallback:
+    """Tests for get_next_position ultimate fallback path."""
+
+    def test_ultimate_fallback_reached(self):
+        """Line 135: ultimate fallback when positions drains between checks."""
+
+        class _DrainBoolDict(dict):
+            """Dict that's truthy only on first __bool__ call."""
+
+            def __init__(self, *a, **kw):
+                super().__init__(*a, **kw)
+                self._bool_count = 0
+
+            def __bool__(self):
+                self._bool_count += 1
+                return self._bool_count == 1
+
+        manager = PositionManager()
+        manager.positions = _DrainBoolDict(win1=ThumbnailPosition(0, 0, 100, 100))
+
+        with patch.object(manager, "_get_primary_screen", return_value=QRect(0, 0, 1920, 1080)):
+            pos = manager.get_next_position("new_win")
+
+        assert pos.x == manager.MARGIN
+        assert pos.y == manager.MARGIN
+        assert pos.width == manager.DEFAULT_WIDTH
+        assert pos.height == manager.DEFAULT_HEIGHT

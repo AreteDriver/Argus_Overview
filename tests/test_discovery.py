@@ -576,3 +576,22 @@ class TestForceScan:
 
             assert count == 2
             assert len(discovery.active_window_ids) == 2
+
+
+class TestClearWmctrlCacheWindowsStub:
+    """Tests for _clear_wmctrl_cache Windows stub."""
+
+    def test_stub_defined_when_not_linux(self):
+        """Lines 22-23: stub is a no-op when is_linux() returns False."""
+        import importlib
+        import sys
+
+        mod = sys.modules["argus_overview.core.discovery"]
+
+        with patch("argus_overview.platform.is_linux", return_value=False):
+            importlib.reload(mod)
+            # Stub should be a no-op function
+            mod._clear_wmctrl_cache()
+
+        # Restore original
+        importlib.reload(mod)
