@@ -8557,3 +8557,152 @@ class TestOnWindowActivatedAutoMinimizeSuccess:
 
                 tab.logger.warning.assert_called_once()
                 assert "Failed to auto-minimize" in str(tab.logger.warning.call_args)
+
+
+# =============================================================================
+# Coverage Push: MainTab.__init__ (lines 1121-1161) and stop_capture_loop (1919-1923)
+# Replaces skipif'd tests by patching QWidget.__init__ to avoid PySide6 segfault
+# =============================================================================
+
+
+class TestMainTabInitNoSkip:
+    """Tests for MainTab.__init__ without qapp/skipif — patches QWidget.__init__."""
+
+    def test_init_full_sequence(self):
+        """Test __init__ runs full initialization sequence"""
+        from contextlib import ExitStack
+
+        from argus_overview.ui.main_tab import MainTab
+
+        mock_capture = MagicMock()
+        mock_char_mgr = MagicMock()
+        mock_settings = MagicMock()
+        mock_settings.get.return_value = False
+        mock_timer = MagicMock()
+        mock_window_mgr = MagicMock()
+
+        mod = "argus_overview.ui.main_tab"
+        with ExitStack() as stack:
+            stack.enter_context(patch("PySide6.QtWidgets.QWidget.__init__", return_value=None))
+            stack.enter_context(patch(f"{mod}.QTimer", return_value=mock_timer))
+            stack.enter_context(patch(f"{mod}.GridApplier"))
+            stack.enter_context(patch(f"{mod}.WindowManager", return_value=mock_window_mgr))
+            stack.enter_context(patch.object(MainTab, "_setup_ui"))
+            stack.enter_context(patch.object(MainTab, "_load_cycling_groups"))
+            stack.enter_context(patch.object(MainTab, "setFocusPolicy"))
+
+            tab = MainTab(mock_capture, mock_char_mgr, mock_settings)
+
+            # Core attributes set
+            assert tab.capture_system is mock_capture
+            assert tab.character_manager is mock_char_mgr
+            assert tab.settings_manager is mock_settings
+            assert tab._thumbnails_visible is True
+            assert tab._positions_locked is False
+            assert tab._windows_minimized is False
+
+            # Timer configured
+            mock_timer.setSingleShot.assert_called_once_with(True)
+            mock_timer.setInterval.assert_called_once_with(150)
+
+            # Window manager created and capture loop started
+            assert tab.window_manager is mock_window_mgr
+            mock_window_mgr.start_capture_loop.assert_called_once()
+
+            # UI setup called
+            tab._setup_ui.assert_called_once()
+            tab.setFocusPolicy.assert_called_once()
+
+    def test_init_previews_disabled(self):
+        """Test __init__ skips capture loop when previews disabled"""
+        from contextlib import ExitStack
+
+        from argus_overview.ui.main_tab import MainTab
+
+        mock_capture = MagicMock()
+        mock_char_mgr = MagicMock()
+        mock_settings = MagicMock()
+        mock_settings.get.side_effect = lambda key, default=None: (
+            True if key == "performance.disable_previews" else default
+        )
+        mock_window_mgr = MagicMock()
+
+        mod = "argus_overview.ui.main_tab"
+        with ExitStack() as stack:
+            stack.enter_context(patch("PySide6.QtWidgets.QWidget.__init__", return_value=None))
+            stack.enter_context(patch(f"{mod}.QTimer"))
+            stack.enter_context(patch(f"{mod}.GridApplier"))
+            stack.enter_context(patch(f"{mod}.WindowManager", return_value=mock_window_mgr))
+            stack.enter_context(patch.object(MainTab, "_setup_ui"))
+            stack.enter_context(patch.object(MainTab, "_load_cycling_groups"))
+            stack.enter_context(patch.object(MainTab, "setFocusPolicy"))
+
+            MainTab(mock_capture, mock_char_mgr, mock_settings)
+
+            # Capture loop NOT started
+            mock_window_mgr.start_capture_loop.assert_not_called()
+
+    def test_init_no_settings_manager(self):
+        """Test __init__ works without settings_manager"""
+        from contextlib import ExitStack
+
+        from argus_overview.ui.main_tab import MainTab
+
+        mock_capture = MagicMock()
+        mock_char_mgr = MagicMock()
+        mock_window_mgr = MagicMock()
+
+        mod = "argus_overview.ui.main_tab"
+        with ExitStack() as stack:
+            stack.enter_context(patch("PySide6.QtWidgets.QWidget.__init__", return_value=None))
+            stack.enter_context(patch(f"{mod}.QTimer"))
+            stack.enter_context(patch(f"{mod}.GridApplier"))
+            stack.enter_context(patch(f"{mod}.WindowManager", return_value=mock_window_mgr))
+            stack.enter_context(patch.object(MainTab, "_setup_ui"))
+            stack.enter_context(patch.object(MainTab, "_load_cycling_groups"))
+            stack.enter_context(patch.object(MainTab, "setFocusPolicy"))
+
+            tab = MainTab(mock_capture, mock_char_mgr, None)
+
+            assert tab.settings_manager is None
+            assert tab._windows_minimized is False
+            mock_window_mgr.start_capture_loop.assert_called_once()
+
+
+class TestStopCaptureLoopNoSkip:
+    """Tests for stop_capture_loop without qapp/skipif."""
+
+    def test_stop_capture_loop_stops_everything(self):
+        """Test stop_capture_loop stops capture, status timer, and frame timers"""
+        from contextlib import ExitStack
+
+        from argus_overview.ui.main_tab import MainTab
+
+        mock_capture = MagicMock()
+        mock_char_mgr = MagicMock()
+        mock_settings = MagicMock()
+        mock_settings.get.return_value = False
+        mock_window_mgr = MagicMock()
+        mock_frame1 = MagicMock()
+        mock_frame2 = MagicMock()
+        mock_window_mgr.preview_frames = {"0x1": mock_frame1, "0x2": mock_frame2}
+
+        mod = "argus_overview.ui.main_tab"
+        with ExitStack() as stack:
+            stack.enter_context(patch("PySide6.QtWidgets.QWidget.__init__", return_value=None))
+            stack.enter_context(patch(f"{mod}.QTimer"))
+            stack.enter_context(patch(f"{mod}.GridApplier"))
+            stack.enter_context(patch(f"{mod}.WindowManager", return_value=mock_window_mgr))
+            stack.enter_context(patch.object(MainTab, "_setup_ui"))
+            stack.enter_context(patch.object(MainTab, "_load_cycling_groups"))
+            stack.enter_context(patch.object(MainTab, "setFocusPolicy"))
+
+            tab = MainTab(mock_capture, mock_char_mgr, mock_settings)
+            tab.status_timer = MagicMock()
+
+            tab.stop_capture_loop()
+
+            mock_window_mgr.stop_capture_loop.assert_called_once()
+            tab.status_timer.stop.assert_called_once()
+            mock_frame1.session_timer.stop.assert_called_once()
+            mock_frame2.session_timer.stop.assert_called_once()
