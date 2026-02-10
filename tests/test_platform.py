@@ -1273,3 +1273,101 @@ class TestHotkeyHelperEmptyParts:
         result = helper.normalize_combo("<ctrl>  +  a")
 
         assert result == "<ctrl>+a"
+
+
+# =============================================================================
+# Coverage Push: _worker loop (lines 332-339) and normalize_combo empty part (553)
+# =============================================================================
+
+
+class TestWindowCaptureLinuxWorker:
+    """Tests for WindowCaptureLinux._worker processing and error paths."""
+
+    def test_worker_processes_task_and_puts_result(self):
+        """Test _worker picks up a task, captures, and puts result in queue."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        mock_image = MagicMock()
+        capture.capture_window_sync = MagicMock(return_value=mock_image)
+
+        # Put a task then None to break the loop
+        capture.capture_queue.put(("0x123", 0.5, "req1"))
+        capture.capture_queue.put(None)
+
+        # Run worker (not as thread — direct call after clearing stop event)
+        capture._stop_event.clear()
+        capture._worker()
+
+        capture.capture_window_sync.assert_called_once_with("0x123", 0.5)
+        result = capture.result_queue.get_nowait()
+        assert result == ("req1", "0x123", mock_image)
+
+    def test_worker_handles_empty_queue_timeout(self):
+        """Test _worker continues on Empty (queue timeout) then exits on None."""
+        import threading
+
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        capture._stop_event.clear()
+
+        # Start worker in a thread with empty queue — it will hit Empty timeout
+        # Then feed None after a brief delay to let it loop at least once
+        def feed_stop():
+            import time
+
+            time.sleep(0.6)  # Just past the 0.5s queue timeout
+            capture.capture_queue.put(None)
+
+        feeder = threading.Thread(target=feed_stop)
+        feeder.start()
+        capture._worker()  # Blocks until None received
+        feeder.join()
+
+        # Worker exited cleanly after hitting Empty at least once
+        assert capture.result_queue.empty()
+
+    def test_worker_handles_capture_exception(self):
+        """Test _worker catches exceptions from capture_window_sync."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        capture.capture_window_sync = MagicMock(side_effect=RuntimeError("X11 error"))
+
+        # Put a task then None to stop
+        capture.capture_queue.put(("0x123", 0.5, "req1"))
+        capture.capture_queue.put(None)
+
+        capture._stop_event.clear()
+
+        with patch("argus_overview.platform.linux.logger") as mock_logger:
+            capture._worker()
+            mock_logger.error.assert_called_once()
+            assert "Worker error" in str(mock_logger.error.call_args)
+
+        # Result queue should be empty (capture failed)
+        assert capture.result_queue.empty()
+
+
+class TestNormalizeComboEmptyPart:
+    """Test normalize_combo with empty parts from consecutive + signs (line 553)."""
+
+    def test_normalize_combo_consecutive_plus(self):
+        """Test normalize_combo skips empty parts from '++' in combo."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+
+        # "ctrl++a" splits to ["ctrl", "", "a"] — empty part should be skipped
+        result = helper.normalize_combo("<ctrl>++a")
+        assert result == "<ctrl>+a"
+
+    def test_normalize_combo_trailing_plus(self):
+        """Test normalize_combo with trailing +."""
+        from argus_overview.platform.linux import HotkeyHelperLinux
+
+        helper = HotkeyHelperLinux()
+
+        result = helper.normalize_combo("<ctrl>+a+")
+        assert result == "<ctrl>+a"

@@ -781,3 +781,160 @@ class TestIntelTabUI:
         with patch.object(tab.intel_table, "get_selected_report", return_value=None):
             tab._show_context_menu(QPoint(0, 0))
             # If we get here, the early return worked
+
+
+# =============================================================================
+# Coverage Push: _on_chat_message intel path (lines 572-589)
+# and _show_context_menu with report (lines 636-653)
+# =============================================================================
+
+
+class TestOnChatMessageIntelPath:
+    """Tests for _on_chat_message when a valid intel report is parsed."""
+
+    def test_chat_message_parses_and_dispatches_intel(self):
+        """Test _on_chat_message parses intel, adds to table, dispatches, emits."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        with patch.object(IntelTab, "__init__", return_value=None):
+            tab = IntelTab.__new__(IntelTab)
+            tab.logger = MagicMock()
+            tab.log_watcher = MagicMock()
+            tab.log_watcher.monitored_channels = set()  # Allow all channels
+
+            mock_report = MagicMock()
+            mock_report.system = "HED-GP"
+            mock_report.threat_level.value = "warning"
+
+            tab.intel_parser = MagicMock()
+            tab.intel_parser.parse.return_value = mock_report
+            tab.intel_table = MagicMock()
+            tab.alert_dispatcher = MagicMock()
+            tab.intel_received = MagicMock()
+
+            from argus_overview.intel.log_watcher import ChatMessage
+
+            msg = ChatMessage(
+                timestamp=MagicMock(),
+                channel="Intel",
+                speaker="Scout",
+                message="HED-GP +5 hostiles",
+                raw_line="test",
+            )
+
+            tab._on_chat_message(msg)
+
+            # Parser called with correct args
+            tab.intel_parser.parse.assert_called_once_with(
+                "HED-GP +5 hostiles",
+                timestamp=msg.timestamp,
+                channel="Intel",
+                reporter="Scout",
+            )
+
+            # Report processed
+            tab.intel_table.add_report.assert_called_once_with(mock_report)
+            tab.alert_dispatcher.dispatch.assert_called_once_with(mock_report)
+            tab.intel_received.emit.assert_called_once_with(mock_report)
+
+    def test_chat_message_no_report_skips_dispatch(self):
+        """Test _on_chat_message does nothing when parser returns None."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        with patch.object(IntelTab, "__init__", return_value=None):
+            tab = IntelTab.__new__(IntelTab)
+            tab.logger = MagicMock()
+            tab.log_watcher = MagicMock()
+            tab.log_watcher.monitored_channels = set()
+
+            tab.intel_parser = MagicMock()
+            tab.intel_parser.parse.return_value = None
+            tab.intel_table = MagicMock()
+            tab.alert_dispatcher = MagicMock()
+            tab.intel_received = MagicMock()
+
+            from argus_overview.intel.log_watcher import ChatMessage
+
+            msg = ChatMessage(
+                timestamp=MagicMock(),
+                channel="Intel",
+                speaker="Scout",
+                message="just chatting",
+                raw_line="test",
+            )
+
+            tab._on_chat_message(msg)
+
+            tab.intel_table.add_report.assert_not_called()
+            tab.alert_dispatcher.dispatch.assert_not_called()
+            tab.intel_received.emit.assert_not_called()
+
+
+class TestShowContextMenuWithReport:
+    """Tests for _show_context_menu when a report is selected (lines 636-653)."""
+
+    def test_show_context_menu_with_system(self):
+        """Test context menu creates actions for report with system name."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        with patch.object(IntelTab, "__init__", return_value=None):
+            tab = IntelTab.__new__(IntelTab)
+            tab.logger = MagicMock()
+            tab.intel_table = MagicMock()
+            tab._copy_to_clipboard = MagicMock()
+            tab._delete_selected_entry = MagicMock()
+
+            mock_report = MagicMock()
+            mock_report.system = "Jita"
+            mock_report.raw_message = "Jita +5 neutrals"
+            tab.intel_table.get_selected_report.return_value = mock_report
+
+            mock_menu = MagicMock()
+            mock_action_system = MagicMock()
+            mock_action_msg = MagicMock()
+            mock_action_delete = MagicMock()
+            mock_menu.addAction.side_effect = [
+                mock_action_system,
+                mock_action_msg,
+                mock_action_delete,
+            ]
+
+            from PySide6.QtCore import QPoint
+
+            with patch("argus_overview.ui.intel_tab.QMenu", return_value=mock_menu):
+                tab._show_context_menu(QPoint(0, 0))
+
+                # Should create 3 actions: copy system, copy message, delete
+                assert mock_menu.addAction.call_count == 3
+                mock_menu.addSeparator.assert_called_once()
+                mock_menu.exec.assert_called_once()
+
+    def test_show_context_menu_without_system(self):
+        """Test context menu omits 'Copy System' when report has no system."""
+        from argus_overview.ui.intel_tab import IntelTab
+
+        with patch.object(IntelTab, "__init__", return_value=None):
+            tab = IntelTab.__new__(IntelTab)
+            tab.logger = MagicMock()
+            tab.intel_table = MagicMock()
+            tab._copy_to_clipboard = MagicMock()
+            tab._delete_selected_entry = MagicMock()
+
+            mock_report = MagicMock()
+            mock_report.system = None  # No system
+            mock_report.raw_message = "some message"
+            tab.intel_table.get_selected_report.return_value = mock_report
+
+            mock_menu = MagicMock()
+            mock_action_msg = MagicMock()
+            mock_action_delete = MagicMock()
+            mock_menu.addAction.side_effect = [mock_action_msg, mock_action_delete]
+
+            from PySide6.QtCore import QPoint
+
+            with patch("argus_overview.ui.intel_tab.QMenu", return_value=mock_menu):
+                tab._show_context_menu(QPoint(0, 0))
+
+                # Only 2 actions: copy message, delete (no copy system)
+                assert mock_menu.addAction.call_count == 2
+                mock_menu.exec.assert_called_once()
