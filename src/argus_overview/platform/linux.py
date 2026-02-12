@@ -197,17 +197,19 @@ class WindowManagerLinux(WindowManager):
                 )
                 time.sleep(0.1)
 
-            try:
-                run_x11_subprocess(
-                    ["xdotool", "windowsize", "--sync", window_id, str(w), str(h)],
-                    timeout=timeout,
-                )
-            except subprocess.TimeoutExpired:
-                run_x11_subprocess(
-                    ["xdotool", "windowsize", window_id, str(w), str(h)],
-                    timeout=timeout,
-                )
-                time.sleep(0.1)
+            # Skip resize when w/h <= 0 (position-only move)
+            if w > 0 and h > 0:
+                try:
+                    run_x11_subprocess(
+                        ["xdotool", "windowsize", "--sync", window_id, str(w), str(h)],
+                        timeout=timeout,
+                    )
+                except subprocess.TimeoutExpired:
+                    run_x11_subprocess(
+                        ["xdotool", "windowsize", window_id, str(w), str(h)],
+                        timeout=timeout,
+                    )
+                    time.sleep(0.1)
 
             return True
 

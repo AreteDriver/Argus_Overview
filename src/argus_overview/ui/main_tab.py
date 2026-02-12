@@ -6,7 +6,6 @@ v2.3: Merged layouts functionality - group-based window arrangement
 """
 
 import logging
-import subprocess
 import threading
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
@@ -497,52 +496,18 @@ class GridApplier:
             return False
 
     def _move_window(self, window_id: str, x: int, y: int, w: int, h: int):
-        """Move and resize a window, with validation, retry, and Wine/Proton fallback"""
-        import time
+        """Move and resize a window via platform abstraction layer."""
+        from argus_overview.platform import get_window_manager
 
-        from argus_overview.utils.window_utils import is_valid_window_id, run_x11_subprocess
-
-        if not is_valid_window_id(window_id):
-            self.logger.warning("Invalid window ID format for move: %s", window_id)
-            return
-
-        # Try with --sync first, fallback to no-sync for Wine/Proton windows
-        try:
-            run_x11_subprocess(
-                ["xdotool", "windowmove", "--sync", window_id, str(x), str(y)],
-                timeout=2,
-            )
-        except subprocess.TimeoutExpired:
-            run_x11_subprocess(["xdotool", "windowmove", window_id, str(x), str(y)], timeout=2)
-            time.sleep(0.1)  # Brief pause for window to settle
-
-        try:
-            run_x11_subprocess(
-                ["xdotool", "windowsize", "--sync", window_id, str(w), str(h)],
-                timeout=2,
-            )
-        except subprocess.TimeoutExpired:
-            run_x11_subprocess(["xdotool", "windowsize", window_id, str(w), str(h)], timeout=2)
-            time.sleep(0.1)
+        wm = get_window_manager()
+        wm.move_window(window_id, x, y, w, h)
 
     def _move_window_position_only(self, window_id: str, x: int, y: int):
-        """Move a window without resizing, with validation, retry, and Wine/Proton fallback"""
-        import time
+        """Move a window without resizing (w=0, h=0 convention)."""
+        from argus_overview.platform import get_window_manager
 
-        from argus_overview.utils.window_utils import is_valid_window_id, run_x11_subprocess
-
-        if not is_valid_window_id(window_id):
-            self.logger.warning("Invalid window ID format for position move: %s", window_id)
-            return
-
-        try:
-            run_x11_subprocess(
-                ["xdotool", "windowmove", "--sync", window_id, str(x), str(y)],
-                timeout=2,
-            )
-        except subprocess.TimeoutExpired:
-            run_x11_subprocess(["xdotool", "windowmove", window_id, str(x), str(y)], timeout=2)
-            time.sleep(0.1)
+        wm = get_window_manager()
+        wm.move_window(window_id, x, y, 0, 0)
 
 
 def pil_to_qimage(pil_image: Image.Image) -> QImage:

@@ -1627,60 +1627,45 @@ class TestGridApplierExtended:
         assert geom.is_primary is True
 
     def test_move_window_success(self):
-        """Test _move_window with xdotool"""
+        """Test _move_window delegates to platform window manager"""
         from argus_overview.ui.main_tab import GridApplier
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch("argus_overview.platform.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_get_wm.return_value = mock_wm
 
-            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
-                mock_wm = MagicMock()
-                mock_wm.is_valid_window_id.return_value = True
-                mock_get_wm.return_value = mock_wm
+            applier._move_window("0x03800003", 0, 0, 960, 540)
 
-                applier._move_window("0x03800003", 0, 0, 960, 540)
-
-            assert mock_run.called
-            call_args = mock_run.call_args[0][0]
-            assert "xdotool" in call_args
+            mock_wm.move_window.assert_called_once_with("0x03800003", 0, 0, 960, 540)
 
     def test_move_window_rejects_invalid_id(self):
-        """Test _move_window rejects invalid window ID."""
+        """Test _move_window delegates to platform (validation is in platform layer)."""
         from argus_overview.ui.main_tab import GridApplier
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
-            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
-                mock_wm = MagicMock()
-                mock_wm.is_valid_window_id.return_value = False
-                mock_get_wm.return_value = mock_wm
+        with patch("argus_overview.platform.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_get_wm.return_value = mock_wm
 
-                applier._move_window("12345", 0, 0, 960, 540)
-            mock_run.assert_not_called()
+            applier._move_window("12345", 0, 0, 960, 540)
+            mock_wm.move_window.assert_called_once_with("12345", 0, 0, 960, 540)
 
     def test_move_window_position_only(self):
-        """Test _move_window_position_only"""
+        """Test _move_window_position_only uses w=0,h=0 convention"""
         from argus_overview.ui.main_tab import GridApplier
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
-            mock_run.return_value = MagicMock(returncode=0)
+        with patch("argus_overview.platform.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_get_wm.return_value = mock_wm
 
-            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
-                mock_wm = MagicMock()
-                mock_wm.is_valid_window_id.return_value = True
-                mock_get_wm.return_value = mock_wm
+            applier._move_window_position_only("0x03800003", 100, 200)
 
-                applier._move_window_position_only("0x03800003", 100, 200)
-
-            assert mock_run.called
-            call_args = mock_run.call_args[0][0]
-            assert "xdotool" in call_args
-            assert "windowmove" in call_args
+            mock_wm.move_window.assert_called_once_with("0x03800003", 100, 200, 0, 0)
 
 
 # =============================================================================
@@ -3311,81 +3296,50 @@ class TestArrangementGridDragDrop:
 
 
 class TestGridApplierTimeout:
-    """Tests for GridApplier timeout handling"""
+    """Tests for GridApplier platform delegation"""
 
-    def test_move_window_timeout_fallback(self):
-        """Test _move_window uses fallback on timeout"""
-        import subprocess
-
+    def test_move_window_delegates_to_platform(self):
+        """Test _move_window delegates to platform window manager"""
         from argus_overview.ui.main_tab import GridApplier
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
-            # First call raises timeout (caught by _move_window, triggers fallback),
-            # second is fallback, third and fourth are size calls
-            mock_run.side_effect = [
-                subprocess.TimeoutExpired("xdotool", 2),  # windowmove --sync timeout
-                MagicMock(returncode=0),  # windowmove fallback (no --sync)
-                MagicMock(returncode=0),  # windowsize with sync
-            ]
+        with patch("argus_overview.platform.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_get_wm.return_value = mock_wm
 
-            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
-                mock_wm = MagicMock()
-                mock_wm.is_valid_window_id.return_value = True
-                mock_get_wm.return_value = mock_wm
+            applier._move_window("0x03800003", 100, 100, 800, 600)
 
-                applier._move_window("0x03800003", 100, 100, 800, 600)
+            mock_wm.move_window.assert_called_once_with("0x03800003", 100, 100, 800, 600)
 
-            assert mock_run.call_count >= 2
-
-    def test_move_window_size_timeout_fallback(self):
-        """Test _move_window size uses fallback on timeout"""
-        import subprocess
-
+    def test_move_window_platform_failure(self):
+        """Test _move_window when platform move_window returns False"""
         from argus_overview.ui.main_tab import GridApplier
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
-            # Move succeeds, size times out then retry succeeds
-            mock_run.side_effect = [
-                MagicMock(returncode=0),  # windowmove with sync
-                subprocess.TimeoutExpired("xdotool", 2),  # windowsize timeout
-                MagicMock(returncode=0),  # windowsize fallback
-            ]
+        with patch("argus_overview.platform.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_wm.move_window.return_value = False
+            mock_get_wm.return_value = mock_wm
 
-            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
-                mock_wm = MagicMock()
-                mock_wm.is_valid_window_id.return_value = True
-                mock_get_wm.return_value = mock_wm
+            applier._move_window("0x03800003", 100, 100, 800, 600)
 
-                applier._move_window("0x03800003", 100, 100, 800, 600)
+            mock_wm.move_window.assert_called_once()
 
-            assert mock_run.call_count >= 2
-
-    def test_move_window_position_only_timeout(self):
-        """Test _move_window_position_only timeout fallback"""
-        import subprocess
-
+    def test_move_window_position_only_uses_zero_size(self):
+        """Test _move_window_position_only passes w=0, h=0"""
         from argus_overview.ui.main_tab import GridApplier
 
         applier = GridApplier()
 
-        with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
-            mock_run.side_effect = [
-                subprocess.TimeoutExpired("xdotool", 2),  # windowmove --sync timeout
-                MagicMock(returncode=0),  # windowmove fallback
-            ]
+        with patch("argus_overview.platform.get_window_manager") as mock_get_wm:
+            mock_wm = MagicMock()
+            mock_get_wm.return_value = mock_wm
 
-            with patch("argus_overview.utils.window_utils._get_window_mgr") as mock_get_wm:
-                mock_wm = MagicMock()
-                mock_wm.is_valid_window_id.return_value = True
-                mock_get_wm.return_value = mock_wm
+            applier._move_window_position_only("0x03800003", 100, 100)
 
-                applier._move_window_position_only("0x03800003", 100, 100)
-
-            assert mock_run.call_count == 2
+            mock_wm.move_window.assert_called_once_with("0x03800003", 100, 100, 0, 0)
 
 
 # =============================================================================
@@ -7125,8 +7079,11 @@ class TestMinimizeInactiveWindows:
             tab._windows_minimized = False
             tab._update_minimize_button_style = MagicMock()
 
-            with patch("argus_overview.ui.main_tab.subprocess.run") as mock_run:
-                mock_run.return_value = MagicMock(returncode=0, stdout="win1\n")
+            with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
+                mock_result = MagicMock()
+                mock_result.returncode = 0
+                mock_result.stdout = b"win1\n"
+                mock_run.return_value = mock_result
                 tab.minimize_inactive_windows()
                 tab.settings_manager.set.assert_called_with(
                     "performance.auto_minimize_inactive", True

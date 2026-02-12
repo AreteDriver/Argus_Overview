@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 try:
     from ctypes import windll
 
+    import win32api
     import win32con
     import win32gui
     import win32ui
@@ -36,6 +37,7 @@ try:
     HAS_WIN32 = True
 except ImportError:
     HAS_WIN32 = False
+    win32api = None
     win32con = None
     win32gui = None
     win32ui = None
@@ -126,8 +128,10 @@ class WindowManagerWindows(WindowManager):
 
         try:
             hwnd = int(window_id, 16)
-            # SWP_NOZORDER = don't change Z order
-            win32gui.SetWindowPos(hwnd, 0, x, y, w, h, win32con.SWP_NOZORDER)
+            flags = win32con.SWP_NOZORDER
+            if w <= 0 or h <= 0:
+                flags |= win32con.SWP_NOSIZE
+            win32gui.SetWindowPos(hwnd, 0, x, y, w, h, flags)
             return True
         except Exception as e:
             logger.warning("Failed to move window %s: %s", window_id, e)
@@ -389,7 +393,7 @@ class ScreenManagerWindows(ScreenManager):
             return True
 
         try:
-            win32gui.EnumDisplayMonitors(None, None, monitor_enum_callback, None)
+            win32api.EnumDisplayMonitors(None, None, monitor_enum_callback, None)
         except Exception as e:
             logger.error(f"Failed to enumerate monitors: {e}")
 
