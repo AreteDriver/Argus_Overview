@@ -1319,7 +1319,7 @@ class TestActivateWindow:
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = False  # auto_minimize off
 
-        mock_run.side_effect = Exception("xdotool not found")
+        mock_run.side_effect = OSError("xdotool not found")
 
         MainWindowV21._activate_window(window, "0x12345")
 

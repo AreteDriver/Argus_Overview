@@ -5,7 +5,6 @@ Allows setting any key combination including F13-F20, special keys, etc.
 """
 
 import logging
-from typing import Optional, Set
 
 from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import QHBoxLayout, QLineEdit, QPushButton, QWidget
@@ -32,14 +31,14 @@ class HotkeyEdit(QWidget):
     recordingStarted = Signal()  # noqa: N815
     recordingStopped = Signal()  # noqa: N815
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
 
         self._hotkey = ""
         self._recording = False
-        self._pressed_keys: Set[str] = set()
-        self._listener: Optional[keyboard.Listener] = None
+        self._pressed_keys: set[str] = set()
+        self._listener: keyboard.Listener | None = None
         self._timeout_timer = QTimer(self)
         self._timeout_timer.setSingleShot(True)
         self._timeout_timer.timeout.connect(self._stop_recording)
@@ -149,7 +148,7 @@ class HotkeyEdit(QWidget):
         if self._pressed_keys:
             self._finalize_hotkey()
 
-    def _key_to_string(self, key) -> Optional[str]:
+    def _key_to_string(self, key) -> str | None:
         """Convert pynput key to string format."""
         # Modifier keys
         if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r or key == keyboard.Key.ctrl:

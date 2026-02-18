@@ -7,7 +7,6 @@ Each abstract class represents a category of platform-specific operations.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 from PIL import Image
 
@@ -40,7 +39,7 @@ class WindowManager(ABC):
     """
 
     @abstractmethod
-    def get_window_list(self) -> List[Tuple[str, str]]:
+    def get_window_list(self) -> list[tuple[str, str]]:
         """Get list of all visible windows.
 
         Returns:
@@ -48,7 +47,7 @@ class WindowManager(ABC):
         """
 
     @abstractmethod
-    def get_eve_windows(self) -> List[Tuple[str, str]]:
+    def get_eve_windows(self) -> list[tuple[str, str]]:
         """Get list of EVE Online windows.
 
         Returns:
@@ -108,7 +107,7 @@ class WindowManager(ABC):
         """
 
     @abstractmethod
-    def get_focused_window(self) -> Optional[str]:
+    def get_focused_window(self) -> str | None:
         """Get the currently focused window ID.
 
         Returns:
@@ -171,7 +170,7 @@ class WindowCapture(ABC):
         """
 
     @abstractmethod
-    def get_result(self, timeout: float = 0.1) -> Optional[Tuple[str, str, Image.Image]]:
+    def get_result(self, timeout: float = 0.1) -> tuple[str, str, Image.Image] | None:
         """Get capture result if available.
 
         Args:
@@ -182,7 +181,7 @@ class WindowCapture(ABC):
         """
 
     @abstractmethod
-    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Optional[Image.Image]:
+    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Image.Image | None:
         """Synchronous window capture.
 
         Args:
@@ -213,7 +212,7 @@ class ScreenManager(ABC):
         """
 
     @abstractmethod
-    def get_all_monitors(self) -> List[ScreenGeometry]:
+    def get_all_monitors(self) -> list[ScreenGeometry]:
         """Get geometry for all connected monitors.
 
         Returns:
@@ -229,7 +228,7 @@ class EVEPathResolver(ABC):
     """
 
     @abstractmethod
-    def get_eve_settings_paths(self) -> List[Path]:
+    def get_eve_settings_paths(self) -> list[Path]:
         """Get list of candidate EVE settings paths.
 
         Returns:
@@ -237,7 +236,7 @@ class EVEPathResolver(ABC):
         """
 
     @abstractmethod
-    def get_eve_logs_paths(self) -> List[Path]:
+    def get_eve_logs_paths(self) -> list[Path]:
         """Get list of candidate EVE game logs paths.
 
         Returns:

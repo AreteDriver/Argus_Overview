@@ -5,7 +5,6 @@ v2.2 Feature: Dark, Light, EVE, and Custom themes
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, Optional
 
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QApplication
@@ -56,7 +55,7 @@ class Theme:
         self.name = name
         self.colors = colors
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Serialize theme to dict"""
         return {
             "name": self.name,
@@ -82,7 +81,7 @@ class Theme:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Theme":
+    def from_dict(cls, data: dict) -> "Theme":
         """Create theme from dict"""
         colors = ThemeColors(**data.get("colors", {}))
         return cls(data.get("name", "custom"), colors)
@@ -178,10 +177,10 @@ class ThemeManager:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.current_theme: Optional[Theme] = None
-        self.custom_themes: Dict[str, Theme] = {}
+        self.current_theme: Theme | None = None
+        self.custom_themes: dict[str, Theme] = {}
 
-    def get_available_themes(self) -> Dict[str, str]:
+    def get_available_themes(self) -> dict[str, str]:
         """
         Get list of available theme names.
 
@@ -199,7 +198,7 @@ class ThemeManager:
 
         return themes
 
-    def apply_theme(self, theme_name: str, app: Optional[QApplication] = None) -> bool:
+    def apply_theme(self, theme_name: str, app: QApplication | None = None) -> bool:
         """
         Apply a theme to the application.
 
@@ -236,7 +235,7 @@ class ThemeManager:
             self.logger.info(f"Applied theme: {theme_name}")
             return True
 
-        except Exception as e:
+        except (ValueError, AttributeError, RuntimeError) as e:
             self.logger.error(f"Failed to apply theme: {e}")
             return False
 
@@ -287,7 +286,7 @@ class ThemeManager:
         self.custom_themes[theme.name] = theme
         self.logger.info(f"Registered custom theme: {theme.name}")
 
-    def get_current_theme(self) -> Optional[Theme]:
+    def get_current_theme(self) -> Theme | None:
         """Get currently applied theme"""
         return self.current_theme
 
@@ -297,7 +296,7 @@ class ThemeManager:
             return self.current_theme.colors.accent
         return DARK_THEME.colors.accent
 
-    def get_alert_colors(self) -> Dict[str, str]:
+    def get_alert_colors(self) -> dict[str, str]:
         """Get current theme's alert colors"""
         if self.current_theme:
             return {
@@ -313,7 +312,7 @@ class ThemeManager:
 
 
 # Global theme manager instance
-_theme_manager: Optional[ThemeManager] = None
+_theme_manager: ThemeManager | None = None
 
 
 def get_theme_manager() -> ThemeManager:

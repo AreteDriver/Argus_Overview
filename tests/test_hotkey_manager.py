@@ -643,7 +643,7 @@ class TestOnKeyReleaseAdvanced:
         """Handles exception during key release processing"""
         mock_key = MagicMock()
         # Create a key that will cause issues when accessing .name
-        type(mock_key).name = property(lambda self: (_ for _ in ()).throw(RuntimeError()))
+        type(mock_key).name = property(lambda self: (_ for _ in ()).throw(AttributeError()))
 
         # Should not raise
         manager._on_key_release(mock_key)

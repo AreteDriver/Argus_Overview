@@ -5,7 +5,6 @@ v2.4: Refactored to use ActionRegistry for menu construction
 """
 
 import logging
-from typing import List, Optional
 
 from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
@@ -47,8 +46,8 @@ class SystemTray(QObject):
 
         # State
         self._visible = True
-        self._profiles: List[str] = []
-        self._current_profile: Optional[str] = None
+        self._profiles: list[str] = []
+        self._current_profile: str | None = None
 
         # Action registry and menu builder
         self.registry = ActionRegistry.get_instance()
@@ -181,7 +180,7 @@ class SystemTray(QObject):
         self.tray_icon.hide()
         self.logger.debug("Tray icon hidden")
 
-    def set_profiles(self, profiles: List[str], current: Optional[str] = None):
+    def set_profiles(self, profiles: list[str], current: str | None = None):
         """
         Update available profiles
 

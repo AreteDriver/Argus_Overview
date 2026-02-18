@@ -873,7 +873,7 @@ class TestAdvancedPanelInteraction:
 
         mock_settings = MagicMock()
         mock_settings.get.return_value = "INFO"
-        mock_settings.export_config.side_effect = Exception("Write error")
+        mock_settings.export_config.side_effect = OSError("Write error")
 
         mock_filedialog.getSaveFileName.return_value = ("/tmp/settings.json", "JSON Files (*.json)")
 
@@ -938,7 +938,7 @@ class TestAdvancedPanelInteraction:
 
         mock_settings = MagicMock()
         mock_settings.get.return_value = "INFO"
-        mock_settings.import_config.side_effect = Exception("Read error")
+        mock_settings.import_config.side_effect = OSError("Read error")
 
         mock_filedialog.getOpenFileName.return_value = ("/tmp/settings.json", "JSON Files (*.json)")
 

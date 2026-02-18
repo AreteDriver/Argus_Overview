@@ -327,7 +327,7 @@ class TestScanCycle:
 
     def test_scan_callback_error_handled(self, discovery):
         """Handles callback errors gracefully"""
-        callback = MagicMock(side_effect=Exception("Test error"))
+        callback = MagicMock(side_effect=RuntimeError("Test error"))
         discovery.set_on_new_callback(callback)
 
         with patch.object(discovery, "_get_eve_windows", return_value=[("0x1", "EVE - Test")]):
@@ -390,7 +390,7 @@ class TestScanEveWindowsFunction:
         """Handles window manager failure"""
         with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
             mock_wm = MagicMock()
-            mock_wm.get_eve_windows.side_effect = Exception("wmctrl failed")
+            mock_wm.get_eve_windows.side_effect = OSError("wmctrl failed")
             mock_get_wm.return_value = mock_wm
 
             result = scan_eve_windows()
@@ -496,7 +496,7 @@ class TestScanCycleEdgeCases:
         """Handles exceptions during scan gracefully"""
         discovery = AutoDiscovery()
 
-        with patch.object(discovery, "_get_eve_windows", side_effect=Exception("Scan failed")):
+        with patch.object(discovery, "_get_eve_windows", side_effect=OSError("Scan failed")):
             # Should not raise
             discovery._scan_cycle()
 
@@ -523,7 +523,7 @@ class TestGetEVEWindows:
         """Handles window manager exception"""
         with patch("argus_overview.core.discovery.get_window_manager") as mock_get_wm:
             mock_wm = MagicMock()
-            mock_wm.get_eve_windows.side_effect = Exception("window manager failed")
+            mock_wm.get_eve_windows.side_effect = OSError("window manager failed")
             mock_get_wm.return_value = mock_wm
 
             discovery = AutoDiscovery()

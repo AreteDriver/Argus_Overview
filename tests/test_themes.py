@@ -485,7 +485,7 @@ class TestThemeManager:
         manager = ThemeManager()
 
         mock_app = MagicMock()
-        mock_app.setStyle.side_effect = Exception("Style error")
+        mock_app.setStyle.side_effect = RuntimeError("Style error")
 
         result = manager.apply_theme("dark", app=mock_app)
 

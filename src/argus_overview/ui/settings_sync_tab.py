@@ -61,7 +61,7 @@ class ScanWorker(QThread):
             self.scan_progress.emit(100, "Scan complete")
             self.scan_complete.emit(characters)
 
-        except Exception as e:
+        except (OSError, KeyError, TypeError, ValueError) as e:
             self.logger.error(f"Scan failed: {e}")
             self.scan_error.emit(str(e))
 
@@ -104,13 +104,13 @@ class SyncWorker(QThread):
                     progress = int((idx + 1) / total * 100)
                     self.sync_progress.emit(target_char.character_name, progress)
 
-                except Exception as e:
+                except (OSError, KeyError, TypeError, ValueError) as e:
                     self.logger.error(f"Failed to sync {target_char.character_name}: {e}")
                     results[target_char.character_name] = False
 
             self.sync_complete.emit(results)
 
-        except Exception as e:
+        except (OSError, KeyError, TypeError, ValueError) as e:
             self.logger.error(f"Sync failed: {e}")
             self.sync_error.emit(str(e))
 

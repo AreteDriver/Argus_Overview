@@ -9,7 +9,6 @@ import os
 import subprocess
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -30,8 +29,8 @@ class DisplayInfo:
     server: DisplayServer
     has_x11_access: bool  # Can use X11 tools (wmctrl, xdotool, etc.)
     session_type: str  # Raw XDG_SESSION_TYPE value
-    wayland_display: Optional[str]  # WAYLAND_DISPLAY if set
-    x11_display: Optional[str]  # DISPLAY if set
+    wayland_display: str | None  # WAYLAND_DISPLAY if set
+    x11_display: str | None  # DISPLAY if set
 
 
 def detect_display_server() -> DisplayInfo:

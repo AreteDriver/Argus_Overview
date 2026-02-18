@@ -6,9 +6,10 @@ v3.0: Cross-platform support via platform abstraction layer
 
 import logging
 import re
+import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Callable, Dict, List, Optional, Set, Tuple
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
@@ -75,11 +76,11 @@ class AutoDiscovery(QObject):
         self.enabled = True
 
         # State
-        self.known_characters: Dict[str, DiscoveredCharacter] = {}
-        self.active_window_ids: Set[str] = set()
+        self.known_characters: dict[str, DiscoveredCharacter] = {}
+        self.active_window_ids: set[str] = set()
 
         # Callbacks
-        self._on_new_callback: Optional[Callable] = None
+        self._on_new_callback: Callable | None = None
 
         # Timer for background scanning
         self.scan_timer = QTimer(self)
@@ -172,7 +173,7 @@ class AutoDiscovery(QObject):
                     if self._on_new_callback:
                         try:
                             self._on_new_callback(char_name, window_id, window_title)
-                        except Exception as e:
+                        except (RuntimeError, TypeError, ValueError) as e:
                             self.logger.error(f"Callback error: {e}")
 
                 elif window_id in self.known_characters:
@@ -193,10 +194,10 @@ class AutoDiscovery(QObject):
             # Emit scan completed
             self.scan_completed.emit(len(windows))
 
-        except Exception as e:
+        except (OSError, RuntimeError, TypeError) as e:
             self.logger.error(f"Scan cycle error: {e}")
 
-    def _get_eve_windows(self) -> List[Tuple[str, str]]:
+    def _get_eve_windows(self) -> list[tuple[str, str]]:
         """
         Get all EVE Online windows using platform abstraction.
 
@@ -205,7 +206,7 @@ class AutoDiscovery(QObject):
         """
         try:
             return self._window_mgr.get_eve_windows()
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             self.logger.error(f"Failed to get EVE windows: {e}")
             return []
 
@@ -226,7 +227,7 @@ class AutoDiscovery(QObject):
 
         return False
 
-    def _extract_character_name(self, title: str) -> Optional[str]:
+    def _extract_character_name(self, title: str) -> str | None:
         """
         Extract character name from window title
 
@@ -243,7 +244,7 @@ class AutoDiscovery(QObject):
 
         return None
 
-    def get_known_characters(self) -> List[DiscoveredCharacter]:
+    def get_known_characters(self) -> list[DiscoveredCharacter]:
         """
         Get list of all known characters
 
@@ -252,7 +253,7 @@ class AutoDiscovery(QObject):
         """
         return list(self.known_characters.values())
 
-    def get_active_characters(self) -> List[DiscoveredCharacter]:
+    def get_active_characters(self) -> list[DiscoveredCharacter]:
         """
         Get list of currently active characters
 
@@ -279,7 +280,7 @@ class AutoDiscovery(QObject):
         self.active_window_ids.clear()
         self.logger.info("Character history cleared")
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """
         Serialize known characters to dict for config storage
 
@@ -298,7 +299,7 @@ class AutoDiscovery(QObject):
             ]
         }
 
-    def from_dict(self, data: Dict):
+    def from_dict(self, data: dict):
         """
         Load known characters from dict
 
@@ -320,11 +321,11 @@ class AutoDiscovery(QObject):
                         ),
                     )
                     self.known_characters[char.window_id] = char
-                except Exception as e:
+                except (KeyError, TypeError, ValueError) as e:
                     self.logger.error(f"Failed to load character: {e}")
 
 
-def scan_eve_windows() -> List[Tuple[str, str, str]]:
+def scan_eve_windows() -> list[tuple[str, str, str]]:
     """
     One-shot scan for all EVE windows.
     Convenience function for one-click import.
@@ -349,7 +350,7 @@ def scan_eve_windows() -> List[Tuple[str, str, str]]:
                         results.append((window_id, window_title, char_name))
                     break
 
-    except Exception as e:
+    except (OSError, subprocess.SubprocessError) as e:
         logger.error(f"scan_eve_windows failed: {e}")
 
     return results

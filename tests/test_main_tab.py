@@ -1372,7 +1372,7 @@ class TestWindowPreviewWidgetAdditional:
             img = Image.new("RGB", (100, 100), (255, 0, 0))
 
             with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_convert:
-                mock_convert.side_effect = Exception("Conversion error")
+                mock_convert.side_effect = ValueError("Conversion error")
 
                 widget.update_frame(img)
 
@@ -1419,6 +1419,9 @@ class TestMainTabAutoMinimize:
             tab.logger = MagicMock()
 
             with patch("subprocess.run") as mock_run:
+                mock_result = MagicMock()
+                mock_result.returncode = 0
+                mock_run.return_value = mock_result
                 tab._on_window_activated("0x123")
 
                 # Should minimize previous window
@@ -1769,7 +1772,7 @@ class TestWindowManagerCaptureCycle:
             manager = WindowManager.__new__(WindowManager)
             manager.logger = MagicMock()
             manager.capture_system = MagicMock()
-            manager.capture_system.capture_window_async.side_effect = Exception("Capture failed")
+            manager.capture_system.capture_window_async.side_effect = OSError("Capture failed")
             manager.pending_requests = {}
             manager._process_capture_results = MagicMock()
 
@@ -2194,7 +2197,7 @@ class TestGridApplierApplyArrangement:
 
         applier = GridApplier()
         applier.logger = MagicMock()
-        applier._move_window = MagicMock(side_effect=Exception("xdotool failed"))
+        applier._move_window = MagicMock(side_effect=OSError("xdotool failed"))
 
         screen = ScreenGeometry(0, 0, 1920, 1080, True)
         arrangement = {"char1": (0, 0)}
@@ -2488,7 +2491,7 @@ class TestWindowPreviewWidgetActions:
 
                 with patch(
                     "argus_overview.utils.window_utils.run_x11_subprocess",
-                    side_effect=Exception("wmctrl failed"),
+                    side_effect=OSError("wmctrl failed"),
                 ):
                     widget._close_window()
 
@@ -2533,7 +2536,7 @@ class TestWindowPreviewWidgetActions:
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
             widget.window_id = "12345"
             widget.capture_system = MagicMock()
-            widget.capture_system.minimize_window.side_effect = Exception("error")
+            widget.capture_system.minimize_window.side_effect = OSError("error")
             widget.logger = MagicMock()
 
             widget._minimize_window()
@@ -3555,7 +3558,7 @@ class TestGridApplierApplyArrangement:
         with patch.object(GridApplier, "__init__", return_value=None):
             applier = GridApplier.__new__(GridApplier)
             applier.logger = MagicMock()
-            applier._move_window = MagicMock(side_effect=Exception("xdotool error"))
+            applier._move_window = MagicMock(side_effect=OSError("xdotool error"))
 
             screen = ScreenGeometry(0, 0, 1920, 1080, True)
             arrangement = {"Char1": (0, 0)}
@@ -4023,6 +4026,7 @@ class TestMainTabWindowMethods:
             tab.logger = MagicMock()
             tab.settings_manager = MagicMock()
             tab.settings_manager.get.return_value = False  # auto_minimize off
+            tab.capture_system = MagicMock()
 
             tab._on_window_activated("12345")
 
@@ -4101,7 +4105,7 @@ class TestMainTabMinimize:
 
             mock_result = MagicMock()
             mock_result.returncode = 0
-            mock_result.stdout = "12345"
+            mock_result.stdout = b"12345"
             with patch("subprocess.run", return_value=mock_result):
                 tab.minimize_inactive_windows()
 
@@ -4122,6 +4126,7 @@ class TestMainTabMinimize:
             tab.logger = MagicMock()
             tab.settings_manager = MagicMock()
             tab.settings_manager.get.return_value = True  # Current state is on
+            tab.capture_system = MagicMock()
             tab._update_minimize_button_style = MagicMock()
 
             tab.minimize_inactive_windows()
@@ -5627,7 +5632,7 @@ class TestWindowManagerCaptureCycleException:
             wm._pending_lock = threading.Lock()
             wm.pending_requests = {}
             wm.capture_system = MagicMock()
-            wm.capture_system.capture_window_async.side_effect = Exception("Capture failed")
+            wm.capture_system.capture_window_async.side_effect = OSError("Capture failed")
             wm._process_capture_results = MagicMock()
 
             mock_frame = MagicMock()
@@ -7120,7 +7125,7 @@ class TestMinimizeInactiveWindows:
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
             tab.settings_manager = MagicMock()
-            tab.settings_manager.get.side_effect = Exception("Settings error")
+            tab.settings_manager.get.side_effect = OSError("Settings error")
             tab._windows_minimized = False
 
             tab.minimize_inactive_windows()
@@ -7281,9 +7286,9 @@ class TestGetAvailableWindows:
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
             tab.capture_system = MagicMock()
-            tab.capture_system.get_window_list.side_effect = Exception("X11 error")
+            tab.capture_system.get_window_list.side_effect = OSError("X11 error")
 
-            with pytest.raises(Exception):
+            with pytest.raises(OSError):
                 tab._get_available_windows()
 
             tab.logger.error.assert_called()
@@ -7418,7 +7423,7 @@ class TestShowAddWindowDialog:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab._get_available_windows = MagicMock(side_effect=Exception("Test error"))
+            tab._get_available_windows = MagicMock(side_effect=OSError("Test error"))
 
             with patch("argus_overview.ui.main_tab.QMessageBox") as mock_msgbox:
                 tab.show_add_window_dialog()
@@ -8452,7 +8457,7 @@ class TestMinimizeInactiveCountingDetail:
 
             with patch(
                 "argus_overview.utils.window_utils.run_x11_subprocess",
-                side_effect=Exception("xdotool not found"),
+                side_effect=OSError("xdotool not found"),
             ):
                 tab.minimize_inactive_windows()
 
@@ -8508,7 +8513,7 @@ class TestOnWindowActivatedAutoMinimizeSuccess:
 
             with patch(
                 "argus_overview.utils.window_utils.run_x11_subprocess",
-                side_effect=Exception("xdotool failed"),
+                side_effect=OSError("xdotool failed"),
             ):
                 tab._on_window_activated("0xNEW")
 

@@ -44,7 +44,6 @@ Lifecycle:
 
 import logging
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import Qt, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
@@ -271,7 +270,7 @@ class MainWindowV21(QMainWindow):
 
         return members
 
-    def _get_window_id_for_character(self, char_name: str) -> Optional[str]:
+    def _get_window_id_for_character(self, char_name: str) -> str | None:
         """Get window ID for a character name"""
         if hasattr(self, "main_tab") and hasattr(self.main_tab, "window_manager"):
             for window_id, frame in self.main_tab.window_manager.preview_frames.items():
@@ -355,7 +354,7 @@ class MainWindowV21(QMainWindow):
             subprocess.run(
                 ["xdotool", "windowactivate", "--sync", window_id], capture_output=True, timeout=2
             )
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             self.logger.error(f"Failed to activate window {window_id}: {e}")
 
     @Slot(str)

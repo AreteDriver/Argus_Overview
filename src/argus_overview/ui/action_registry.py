@@ -16,9 +16,10 @@ but must not create duplicate clickable UI.
 """
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Any, Callable, Dict, List, Optional, Set
+from typing import Any
 
 
 class ActionScope(Enum):
@@ -97,10 +98,10 @@ class ActionSpec:
     scope: ActionScope
     primary_home: PrimaryHome
     tooltip: str = ""
-    shortcut: Optional[str] = None
-    icon: Optional[str] = None
-    handler_name: Optional[str] = None
-    enabled_when: Optional[str] = None  # Condition name, evaluated at runtime
+    shortcut: str | None = None
+    icon: str | None = None
+    handler_name: str | None = None
+    enabled_when: str | None = None  # Condition name, evaluated at runtime
     checkable: bool = False
 
 
@@ -118,9 +119,9 @@ class ActionRegistry:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self._actions: Dict[str, ActionSpec] = {}
-        self._by_home: Dict[PrimaryHome, List[str]] = {home: [] for home in PrimaryHome}
-        self._handlers: Dict[str, Callable] = {}
+        self._actions: dict[str, ActionSpec] = {}
+        self._by_home: dict[PrimaryHome, list[str]] = {home: [] for home in PrimaryHome}
+        self._handlers: dict[str, Callable] = {}
 
         # Register all actions
         self._register_all_actions()
@@ -754,19 +755,19 @@ class ActionRegistry:
         self._by_home[action.primary_home].append(action.id)
         self.logger.debug(f"Registered action: {action.id} -> {action.primary_home.value}")
 
-    def get(self, action_id: str) -> Optional[ActionSpec]:
+    def get(self, action_id: str) -> ActionSpec | None:
         """Get action by ID"""
         return self._actions.get(action_id)
 
-    def get_by_home(self, home: PrimaryHome) -> List[ActionSpec]:
+    def get_by_home(self, home: PrimaryHome) -> list[ActionSpec]:
         """Get all actions for a specific home"""
         return [self._actions[aid] for aid in self._by_home.get(home, [])]
 
-    def get_by_scope(self, scope: ActionScope) -> List[ActionSpec]:
+    def get_by_scope(self, scope: ActionScope) -> list[ActionSpec]:
         """Get all actions for a specific scope"""
         return [a for a in self._actions.values() if a.scope == scope]
 
-    def all_actions(self) -> List[ActionSpec]:
+    def all_actions(self) -> list[ActionSpec]:
         """Get all registered actions"""
         return list(self._actions.values())
 
@@ -777,7 +778,7 @@ class ActionRegistry:
             return
         self._handlers[action_id] = handler
 
-    def get_handler(self, action_id: str) -> Optional[Callable]:
+    def get_handler(self, action_id: str) -> Callable | None:
         """Get bound handler for an action"""
         return self._handlers.get(action_id)
 
@@ -790,7 +791,7 @@ class ActionRegistry:
             self.logger.warning(f"No handler bound for action: {action_id}")
 
 
-def _count_actions_by_home_and_scope(actions, results: Dict[str, Any]):
+def _count_actions_by_home_and_scope(actions, results: dict[str, Any]):
     """Count actions by their primary home and scope."""
     for action in actions:
         home = action.primary_home.value
@@ -805,9 +806,9 @@ def _count_actions_by_home_and_scope(actions, results: Dict[str, Any]):
         results["by_scope"][scope].append(action.id)
 
 
-def _find_duplicate_homes(actions, results: Dict[str, Any]):
+def _find_duplicate_homes(actions, results: dict[str, Any]):
     """Find actions that appear in multiple primary homes."""
-    action_homes: Dict[str, Set[str]] = {}
+    action_homes: dict[str, set[str]] = {}
     for action in actions:
         if action.id not in action_homes:
             action_homes[action.id] = set()
@@ -819,7 +820,7 @@ def _find_duplicate_homes(actions, results: Dict[str, Any]):
             results["passed"] = False
 
 
-def audit_actions(registry: Optional[ActionRegistry] = None) -> Dict[str, Any]:
+def audit_actions(registry: ActionRegistry | None = None) -> dict[str, Any]:
     """
     Audit the action registry for duplicates and issues.
 
@@ -829,7 +830,7 @@ def audit_actions(registry: Optional[ActionRegistry] = None) -> Dict[str, Any]:
     if registry is None:
         registry = ActionRegistry.get_instance()
 
-    results: Dict[str, Any] = {
+    results: dict[str, Any] = {
         "total_actions": 0,
         "by_home": {},
         "by_scope": {},
@@ -852,7 +853,7 @@ def audit_actions(registry: Optional[ActionRegistry] = None) -> Dict[str, Any]:
     return results
 
 
-def print_audit_report(results: Optional[Dict] = None):
+def print_audit_report(results: dict | None = None):
     """Print a human-readable audit report"""
     if results is None:
         results = audit_actions()
