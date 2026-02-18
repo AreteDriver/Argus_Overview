@@ -101,6 +101,7 @@ class ConfigWatcher(QObject):
         try:
             handler = ConfigFileHandler(self._on_file_changed)
             self._observer = Observer()
+            self._observer.daemon = True
             self._observer.schedule(handler, str(self.config_path.parent), recursive=False)
             self._observer.start()
             self.logger.info("Using watchdog for config monitoring")
