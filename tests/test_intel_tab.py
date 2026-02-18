@@ -178,8 +178,8 @@ class TestIntelTabIntegration:
     """Integration tests for IntelTab."""
 
     @pytest.mark.skipif(
-        sys.version_info >= (3, 12),
-        reason="PySide6 segfault on Python 3.12 in CI - Qt signal/slot issue",
+        sys.version_info >= (3, 11),
+        reason="PySide6 segfault on Python 3.11+ in CI - Qt signal/slot issue",
     )
     def test_process_message(self, qapp, mock_settings_manager):
         """Test processing a chat message."""
@@ -732,8 +732,8 @@ class TestIntelTabUI:
         assert tab.log_watcher.monitored_channels == initial_channels
 
     @pytest.mark.skipif(
-        sys.version_info >= (3, 12),
-        reason="PySide6 segfault on Python 3.12 in CI - Qt signal/slot issue",
+        sys.version_info >= (3, 11),
+        reason="PySide6 segfault on Python 3.11+ in CI - Qt signal/slot issue",
     )
     def test_chat_message_with_valid_intel(self, qapp, mock_settings_manager):
         """Test chat message that produces valid intel report (lines 572-589)."""
