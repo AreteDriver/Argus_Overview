@@ -10,7 +10,7 @@ import threading
 import uuid
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 from PIL import Image
 
@@ -60,7 +60,7 @@ class WindowManagerWindows(WindowManager):
         if not HAS_WIN32:
             logger.warning("pywin32 not available - window management disabled")
 
-    def get_window_list(self) -> List[Tuple[str, str]]:
+    def get_window_list(self) -> list[tuple[str, str]]:
         """Get list of all visible windows using EnumWindows."""
         if not HAS_WIN32:
             return []
@@ -79,12 +79,12 @@ class WindowManagerWindows(WindowManager):
 
         try:
             win32gui.EnumWindows(enum_callback, None)
-        except Exception as e:
-            logger.error(f"Failed to enumerate windows: {e}")
+        except OSError as e:
+            logger.warning("Failed to enumerate windows: %s", e)
 
         return windows
 
-    def get_eve_windows(self) -> List[Tuple[str, str]]:
+    def get_eve_windows(self) -> list[tuple[str, str]]:
         """Get list of EVE Online windows."""
         if not HAS_WIN32:
             return []
@@ -103,15 +103,15 @@ class WindowManagerWindows(WindowManager):
                             window_id = f"0x{hwnd:x}"
                             eve_windows.append((window_id, title))
                             break
-            except Exception:
-                pass
+            except OSError:
+                pass  # Window may have closed between visibility check and title read
 
             return True
 
         try:
             win32gui.EnumWindows(enum_callback, None)
-        except Exception as e:
-            logger.error(f"Failed to enumerate EVE windows: {e}")
+        except OSError as e:
+            logger.warning("Failed to enumerate EVE windows: %s", e)
 
         return eve_windows
 
@@ -180,7 +180,7 @@ class WindowManagerWindows(WindowManager):
             logger.warning("Failed to restore window %s: %s", window_id, e)
             return False
 
-    def get_focused_window(self) -> Optional[str]:
+    def get_focused_window(self) -> str | None:
         """Get the currently focused window ID."""
         if not HAS_WIN32:
             return None
@@ -215,7 +215,8 @@ class WindowManagerWindows(WindowManager):
         try:
             hwnd = int(window_id, 16)
             return win32gui.GetWindowText(hwnd)
-        except Exception:
+        except (OSError, ValueError) as e:
+            logger.debug("Failed to get window title for %s: %s", window_id, e)
             return "Unknown"
 
 
@@ -226,7 +227,7 @@ class WindowCaptureWindows(WindowCapture):
         self.max_workers = max_workers
         self.request_queue: Queue[Any] = Queue()
         self.result_queue: Queue[Any] = Queue()
-        self.workers: List[threading.Thread] = []
+        self.workers: list[threading.Thread] = []
         self._running = False
         self._window_mgr = WindowManagerWindows()
 
@@ -290,14 +291,14 @@ class WindowCaptureWindows(WindowCapture):
             logger.warning(f"Invalid window ID for capture: {window_id}")
             return ""
 
-    def get_result(self, timeout: float = 0.1) -> Optional[Tuple[str, str, Image.Image]]:
+    def get_result(self, timeout: float = 0.1) -> tuple[str, str, Image.Image] | None:
         """Get capture result if available."""
         try:
             return self.result_queue.get(timeout=timeout)
         except Empty:
             return None
 
-    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Optional[Image.Image]:
+    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Image.Image | None:
         """Synchronous window capture using Windows GDI."""
         if not HAS_WIN32:
             return None
@@ -327,36 +328,37 @@ class WindowCaptureWindows(WindowCapture):
             saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
             saveDC.SelectObject(saveBitMap)
 
-            # Copy window content to bitmap (PW_RENDERFULLCONTENT = 3)
-            windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 3)
+            try:
+                # Copy window content to bitmap (PW_RENDERFULLCONTENT = 3)
+                windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 3)
 
-            # Convert to PIL Image
-            bmpinfo = saveBitMap.GetInfo()
-            bmpstr = saveBitMap.GetBitmapBits(True)
+                # Convert to PIL Image
+                bmpinfo = saveBitMap.GetInfo()
+                bmpstr = saveBitMap.GetBitmapBits(True)
 
-            image = Image.frombuffer(
-                "RGB",
-                (bmpinfo["bmWidth"], bmpinfo["bmHeight"]),
-                bmpstr,
-                "raw",
-                "BGRX",
-                0,
-                1,
-            )
+                image = Image.frombuffer(
+                    "RGB",
+                    (bmpinfo["bmWidth"], bmpinfo["bmHeight"]),
+                    bmpstr,
+                    "raw",
+                    "BGRX",
+                    0,
+                    1,
+                )
 
-            # Scale if requested
-            if scale < 1.0:
-                new_width = int(width * scale)
-                new_height = int(height * scale)
-                image = image.resize((new_width, new_height), Image.LANCZOS)
+                # Scale if requested
+                if scale < 1.0:
+                    new_width = int(width * scale)
+                    new_height = int(height * scale)
+                    image = image.resize((new_width, new_height), Image.LANCZOS)
 
-            # Cleanup
-            win32gui.DeleteObject(saveBitMap.GetHandle())
-            saveDC.DeleteDC()
-            mfcDC.DeleteDC()
-            win32gui.ReleaseDC(hwnd, hwndDC)
-
-            return image
+                return image
+            finally:
+                # Always clean up GDI resources
+                win32gui.DeleteObject(saveBitMap.GetHandle())
+                saveDC.DeleteDC()
+                mfcDC.DeleteDC()
+                win32gui.ReleaseDC(hwnd, hwndDC)
 
         except Exception as e:
             logger.error(f"Failed to capture window {window_id}: {e}")
@@ -375,12 +377,12 @@ class ScreenManagerWindows(ScreenManager):
             return monitors[0]
         return ScreenGeometry(0, 0, 1920, 1080, True)
 
-    def get_all_monitors(self) -> List[ScreenGeometry]:
+    def get_all_monitors(self) -> list[ScreenGeometry]:
         """Get geometry for all connected monitors."""
         if not HAS_WIN32:
             return [ScreenGeometry(0, 0, 1920, 1080, True)]
 
-        monitors: List[ScreenGeometry] = []
+        monitors: list[ScreenGeometry] = []
 
         def monitor_enum_callback(hMonitor, hdcMonitor, lprcMonitor, dwData):
             # lprcMonitor is a tuple (left, top, right, bottom)
@@ -403,7 +405,7 @@ class ScreenManagerWindows(ScreenManager):
 class EVEPathResolverWindows(EVEPathResolver):
     """Windows EVE path resolution using LOCALAPPDATA."""
 
-    def get_eve_settings_paths(self) -> List[Path]:
+    def get_eve_settings_paths(self) -> list[Path]:
         """Get candidate EVE settings paths for Windows."""
         local_appdata = Path(os.environ.get("LOCALAPPDATA", ""))
 
@@ -411,7 +413,7 @@ class EVEPathResolverWindows(EVEPathResolver):
             local_appdata / "CCP" / "EVE",
         ]
 
-    def get_eve_logs_paths(self) -> List[Path]:
+    def get_eve_logs_paths(self) -> list[Path]:
         """Get candidate EVE game logs paths for Windows."""
         documents = Path(os.environ.get("USERPROFILE", "")) / "Documents"
 

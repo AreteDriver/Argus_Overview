@@ -1,7 +1,7 @@
 """Global hotkey management - supports both modifier combos and single keys"""
 
 import logging
-from typing import Callable, Dict, Optional, Set
+from collections.abc import Callable
 
 from pynput import keyboard
 from PySide6.QtCore import QObject, Signal
@@ -14,17 +14,17 @@ class HotkeyManager(QObject):
 
     def __init__(self):
         super().__init__()
-        self.hotkeys: Dict[str, Dict] = {}
-        self.combo_listener: Optional[keyboard.GlobalHotKeys] = None
-        self.key_listener: Optional[keyboard.Listener] = None
+        self.hotkeys: dict[str, dict] = {}
+        self.combo_listener: keyboard.GlobalHotKeys | None = None
+        self.key_listener: keyboard.Listener | None = None
         self.logger = logging.getLogger(__name__)
 
         # Track single-key hotkeys separately
-        self.single_key_hotkeys: Dict[str, Dict] = {}  # key_char -> {name, callback}
-        self.combo_hotkeys: Dict[str, Dict] = {}  # combo_string -> {name, callback}
+        self.single_key_hotkeys: dict[str, dict] = {}  # key_char -> {name, callback}
+        self.combo_hotkeys: dict[str, dict] = {}  # combo_string -> {name, callback}
 
         # Track currently pressed modifiers
-        self.pressed_modifiers: Set[str] = set()
+        self.pressed_modifiers: set[str] = set()
 
     def _normalize_combo(self, key_combo: str) -> str:
         """Normalize hotkey combo for pynput compatibility.

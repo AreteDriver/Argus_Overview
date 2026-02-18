@@ -34,7 +34,7 @@ import logging
 import os
 import sys
 from pathlib import Path
-from typing import Optional, TextIO
+from typing import TextIO
 
 # Platform-specific imports for single-instance locking
 if sys.platform == "win32":
@@ -63,7 +63,7 @@ class SingleInstance:
 
     def __init__(self, app_name: str = "argus-overview"):
         self.app_name = app_name
-        self.lock_file: Optional[TextIO] = None
+        self.lock_file: TextIO | None = None
 
         # Platform-specific lock file location
         if sys.platform == "win32":
@@ -95,8 +95,8 @@ class SingleInstance:
                 self.lock_file.write(str(os.getpid()))
                 self.lock_file.flush()
                 return True
-            except Exception:
-                # Lock failed or other error - clean up file handle
+            except OSError:
+                # Lock failed - clean up file handle
                 self.lock_file.close()
                 self.lock_file = None
                 raise

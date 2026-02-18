@@ -7,7 +7,7 @@ source of truth.
 """
 
 import logging
-from typing import Callable, Dict, List, Optional
+from collections.abc import Callable
 
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QMenu, QPushButton
@@ -45,7 +45,7 @@ class MenuBuilder:
         tray_menu = builder.build_tray_menu(parent_widget, handlers)
     """
 
-    def __init__(self, registry: Optional[ActionRegistry] = None):
+    def __init__(self, registry: ActionRegistry | None = None):
         self.logger = logging.getLogger(__name__)
         self.registry = registry or ActionRegistry.get_instance()
 
@@ -53,8 +53,8 @@ class MenuBuilder:
         self,
         home: PrimaryHome,
         parent=None,
-        handlers: Optional[Dict[str, Callable]] = None,
-        menu: Optional[QMenu] = None,
+        handlers: dict[str, Callable] | None = None,
+        menu: QMenu | None = None,
     ) -> QMenu:
         """
         Build a QMenu from actions registered for a specific home.
@@ -83,10 +83,10 @@ class MenuBuilder:
     def build_tray_menu(
         self,
         parent=None,
-        handlers: Optional[Dict[str, Callable]] = None,
-        profile_handler: Optional[Callable] = None,
-        profiles: Optional[List[str]] = None,
-        current_profile: Optional[str] = None,
+        handlers: dict[str, Callable] | None = None,
+        profile_handler: Callable | None = None,
+        profiles: list[str] | None = None,
+        current_profile: str | None = None,
     ) -> QMenu:
         """
         Build the system tray context menu.
@@ -143,7 +143,7 @@ class MenuBuilder:
     def build_help_menu(
         self,
         parent=None,
-        handlers: Optional[Dict[str, Callable]] = None,
+        handlers: dict[str, Callable] | None = None,
     ) -> QMenu:
         """
         Build the Help menu for the menu bar.
@@ -183,7 +183,7 @@ class MenuBuilder:
         self,
         spec: ActionSpec,
         parent=None,
-        handler: Optional[Callable] = None,
+        handler: Callable | None = None,
     ) -> QAction:
         """
         Create a QAction from an ActionSpec.
@@ -217,9 +217,9 @@ class MenuBuilder:
     def _populate_profiles_menu(
         self,
         menu: QMenu,
-        profiles: List[str],
-        current_profile: Optional[str],
-        handler: Optional[Callable],
+        profiles: list[str],
+        current_profile: str | None,
+        handler: Callable | None,
     ):
         """
         Populate profiles submenu.
@@ -255,9 +255,9 @@ class MenuBuilder:
 
 def build_toolbar_actions(
     home: PrimaryHome,
-    handlers: Optional[Dict[str, Callable]] = None,
-    registry: Optional[ActionRegistry] = None,
-) -> List[QAction]:
+    handlers: dict[str, Callable] | None = None,
+    registry: ActionRegistry | None = None,
+) -> list[QAction]:
     """
     Build a list of QActions for a toolbar.
 
@@ -286,12 +286,12 @@ class ContextMenuBuilder:
     Context menus are for object-level actions (right-click on items).
     """
 
-    def __init__(self, registry: Optional[ActionRegistry] = None):
+    def __init__(self, registry: ActionRegistry | None = None):
         self.logger = logging.getLogger(__name__)
         self.registry = registry or ActionRegistry.get_instance()
 
     def _build_zoom_submenu(
-        self, menu: QMenu, zoom_handler: Optional[Callable], current_zoom: float
+        self, menu: QMenu, zoom_handler: Callable | None, current_zoom: float
     ):
         """Build the zoom level submenu with checkmark for current level."""
         zoom_menu = menu.addMenu("Zoom Level")
@@ -308,7 +308,7 @@ class ContextMenuBuilder:
                 zoom_action.triggered.connect(make_zoom_callback())
             zoom_menu.addAction(zoom_action)
 
-    def _add_registry_action(self, menu: QMenu, action_id: str, handlers: Dict[str, Callable]):
+    def _add_registry_action(self, menu: QMenu, action_id: str, handlers: dict[str, Callable]):
         """Add an action from registry to the menu."""
         spec = self.registry.get(action_id)
         if spec:
@@ -323,8 +323,8 @@ class ContextMenuBuilder:
 
     def build_window_context_menu(
         self,
-        handlers: Dict[str, Callable],
-        zoom_handler: Optional[Callable] = None,
+        handlers: dict[str, Callable],
+        zoom_handler: Callable | None = None,
         current_zoom: float = 0.3,
         parent=None,
     ) -> QMenu:
@@ -406,17 +406,17 @@ class ToolbarBuilder:
     SUCCESS_ACTIONS = {"scan_eve_folder", "new_group", "load_active_windows", "new_team"}
     DANGER_ACTIONS = {"delete_group", "delete_character", "remove_all_windows"}
 
-    def __init__(self, registry: Optional[ActionRegistry] = None):
+    def __init__(self, registry: ActionRegistry | None = None):
         self.logger = logging.getLogger(__name__)
         self.registry = registry or ActionRegistry.get_instance()
 
     def build_toolbar_buttons(
         self,
         home: PrimaryHome,
-        handlers: Dict[str, Callable],
-        action_order: Optional[List[str]] = None,
+        handlers: dict[str, Callable],
+        action_order: list[str] | None = None,
         parent=None,
-    ) -> Dict[str, QPushButton]:
+    ) -> dict[str, QPushButton]:
         """
         Build toolbar buttons from the registry.
 
@@ -472,9 +472,9 @@ class ToolbarBuilder:
     def create_button(
         self,
         action_id: str,
-        handler: Optional[Callable] = None,
+        handler: Callable | None = None,
         parent=None,
-    ) -> Optional[QPushButton]:
+    ) -> QPushButton | None:
         """
         Create a single button from a registry action.
 

@@ -6,7 +6,6 @@ Supports grid patterns, stacking, and custom positioning
 import logging
 import re
 import subprocess
-from typing import Dict, List, Tuple
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
@@ -131,7 +130,7 @@ class ArrangementGrid(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.tiles: Dict[str, DraggableTile] = {}
+        self.tiles: dict[str, DraggableTile] = {}
         self.grid_rows = 3
         self.grid_cols = 4
 
@@ -225,7 +224,7 @@ class ArrangementGrid(QWidget):
         self.tiles[char_name] = tile
         self.grid_layout.addWidget(tile, row, col)
 
-    def get_arrangement(self) -> Dict[str, Tuple[int, int]]:
+    def get_arrangement(self) -> dict[str, tuple[int, int]]:
         """Get current arrangement as dict"""
         return {name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()}
 
@@ -269,8 +268,8 @@ class GridApplier:
 
     def apply_arrangement(
         self,
-        arrangement: Dict[str, Tuple[int, int]],
-        window_map: Dict[str, str],
+        arrangement: dict[str, tuple[int, int]],
+        window_map: dict[str, str],
         screen: ScreenGeometry,
         grid_rows: int,
         grid_cols: int,
@@ -371,7 +370,7 @@ class LayoutsTab(QWidget):
         self.logger = logging.getLogger(__name__)
 
         self.grid_applier = GridApplier(layout_manager)
-        self.cycling_groups: Dict[str, List[str]] = {}
+        self.cycling_groups: dict[str, list[str]] = {}
 
         self._load_groups()
         self._setup_ui()

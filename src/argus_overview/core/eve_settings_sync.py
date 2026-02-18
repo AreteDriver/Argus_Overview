@@ -12,7 +12,6 @@ import shutil
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 from argus_overview.platform import get_eve_path_resolver
 
@@ -25,10 +24,10 @@ class EVECharacterSettings:
     character_id: str
     settings_dir: Path
     core_char_file: Path
-    core_user_file: Optional[Path] = None
-    user_id: Optional[str] = None
+    core_user_file: Path | None = None
+    user_id: str | None = None
     has_settings: bool = False
-    last_login: Optional[datetime] = None
+    last_login: datetime | None = None
 
 
 @dataclass
@@ -37,9 +36,9 @@ class EVECharacterInfo:
 
     character_id: str
     character_name: str
-    user_id: Optional[str] = None
-    settings_path: Optional[Path] = None
-    last_seen: Optional[datetime] = None
+    user_id: str | None = None
+    settings_path: Path | None = None
+    last_seen: datetime | None = None
     has_settings: bool = False
 
 
@@ -56,9 +55,9 @@ class EVESettingsSync:
         self.eve_paths = path_resolver.get_eve_settings_paths()
         self.eve_logs_paths = path_resolver.get_eve_logs_paths()
 
-        self.custom_paths: List[Path] = []
-        self.character_settings: Dict[str, EVECharacterSettings] = {}
-        self.character_id_to_name: Dict[str, str] = {}  # Cache of ID -> name mappings
+        self.custom_paths: list[Path] = []
+        self.character_settings: dict[str, EVECharacterSettings] = {}
+        self.character_id_to_name: dict[str, str] = {}  # Cache of ID -> name mappings
         self._load_character_names_from_logs()
 
     def add_custom_path(self, path: Path):
@@ -132,7 +131,7 @@ class EVESettingsSync:
             except OSError as e:
                 self.logger.debug(f"Error iterating {base_path}: {e}")
 
-    def _parse_log_for_char_name(self, log_file: Path) -> Optional[str]:
+    def _parse_log_for_char_name(self, log_file: Path) -> str | None:
         """Parse a log file to extract the character name from Listener line."""
         try:
             with open(log_file, encoding="utf-8", errors="replace") as f:
@@ -146,7 +145,7 @@ class EVESettingsSync:
             self.logger.debug(f"Error reading log {log_file}: {e}")
         return None
 
-    def _create_char_info(self, char_file: Path, settings_dir: Path) -> Optional[EVECharacterInfo]:
+    def _create_char_info(self, char_file: Path, settings_dir: Path) -> EVECharacterInfo | None:
         """Create EVECharacterInfo from a core_char_*.dat file."""
         match = re.search(r"core_char_(\d+)\.dat$", char_file.name)
         if not match:
@@ -169,7 +168,7 @@ class EVESettingsSync:
             has_settings=True,
         )
 
-    def get_all_known_characters(self) -> List[EVECharacterInfo]:
+    def get_all_known_characters(self) -> list[EVECharacterInfo]:
         """Get all known characters from EVE installation (even logged off ones)
 
         This scans the EVE settings directory for core_char_*.dat files
@@ -197,7 +196,7 @@ class EVESettingsSync:
         self.logger.info(f"Found {len(characters)} characters in EVE settings")
         return characters
 
-    def scan_for_characters(self) -> List[EVECharacterSettings]:
+    def scan_for_characters(self) -> list[EVECharacterSettings]:
         """Scan for EVE character settings
 
         Scans settings directories for core_char_*.dat files and returns
@@ -225,7 +224,7 @@ class EVESettingsSync:
 
     def _parse_char_file(
         self, char_file: Path, settings_dir: Path
-    ) -> Optional[EVECharacterSettings]:
+    ) -> EVECharacterSettings | None:
         """Parse a core_char_*.dat file to extract character settings
 
         Args:
@@ -264,8 +263,8 @@ class EVESettingsSync:
             return None
 
     def sync_settings(
-        self, source_char: str, target_chars: List[str], backup: bool = True
-    ) -> Dict[str, bool]:
+        self, source_char: str, target_chars: list[str], backup: bool = True
+    ) -> dict[str, bool]:
         """Synchronize settings from source to target characters
 
         Args:
@@ -276,7 +275,7 @@ class EVESettingsSync:
         Returns:
             Dict mapping target character names to success status
         """
-        results: Dict[str, bool] = {}
+        results: dict[str, bool] = {}
 
         if source_char not in self.character_settings:
             self.logger.error(f"Source character '{source_char}' not found")
@@ -369,7 +368,7 @@ class EVESettingsSync:
             self.logger.error(f"Settings copy error: {e}")
             return False
 
-    def get_settings_summary(self, char_name: str) -> Optional[Dict]:
+    def get_settings_summary(self, char_name: str) -> dict | None:
         """Get summary of character's settings
 
         Args:
@@ -398,7 +397,7 @@ class EVESettingsSync:
             else 0,
         }
 
-    def list_available_characters(self) -> List[str]:
+    def list_available_characters(self) -> list[str]:
         """Get list of characters with available settings
 
         Returns:

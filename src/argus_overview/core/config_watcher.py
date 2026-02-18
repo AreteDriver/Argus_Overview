@@ -4,8 +4,9 @@ v2.2 Feature: Automatically detect and apply config changes without restart
 """
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
@@ -57,13 +58,13 @@ class ConfigWatcher(QObject):
         self._debounce_timer.timeout.connect(self._emit_change)
 
         # Watchdog observer (Any type to handle conditional import)
-        self._observer: Optional[Any] = None
+        self._observer: Any | None = None
         self._running = False
 
         # Fallback polling timer
         self._poll_timer = QTimer(self)
         self._poll_timer.timeout.connect(self._check_file)
-        self._last_mtime: Optional[float] = None
+        self._last_mtime: float | None = None
 
     def start(self):
         """Start watching for config changes"""
@@ -101,6 +102,7 @@ class ConfigWatcher(QObject):
         try:
             handler = ConfigFileHandler(self._on_file_changed)
             self._observer = Observer()
+            self._observer.daemon = True
             self._observer.schedule(handler, str(self.config_path.parent), recursive=False)
             self._observer.start()
             self.logger.info("Using watchdog for config monitoring")
@@ -130,8 +132,8 @@ class ConfigWatcher(QObject):
                 if self._last_mtime and current_mtime > self._last_mtime:
                     self._on_file_changed()
                 self._last_mtime = current_mtime
-        except Exception as e:
-            self.logger.debug(f"Error checking config file: {e}")
+        except OSError as e:
+            self.logger.debug("Error checking config file: %s", e)
 
     def _on_file_changed(self):
         """Handle file change - debounced"""

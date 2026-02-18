@@ -28,7 +28,6 @@ v3.0: Cross-platform support via platform abstraction layer.
 """
 
 import logging
-from typing import List, Optional, Tuple
 
 from PIL import Image
 
@@ -72,7 +71,7 @@ class WindowCaptureThreaded:
         """
         return self._capture.capture_window_async(window_id, scale)
 
-    def get_result(self, timeout: float = 0.1) -> Optional[Tuple[str, str, Image.Image]]:
+    def get_result(self, timeout: float = 0.1) -> tuple[str, str, Image.Image] | None:
         """Get capture result if available.
 
         Returns:
@@ -80,7 +79,7 @@ class WindowCaptureThreaded:
         """
         return self._capture.get_result(timeout)
 
-    def get_window_list(self) -> List[Tuple[str, str]]:
+    def get_window_list(self) -> list[tuple[str, str]]:
         """Get list of all windows."""
         return self._window_mgr.get_window_list()
 

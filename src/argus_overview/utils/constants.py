@@ -8,6 +8,11 @@ TIMEOUT_SHORT = 1  # Quick operations (getwindowfocus)
 TIMEOUT_MEDIUM = 2  # Window move/resize operations
 TIMEOUT_LONG = 5  # Slower operations (wmctrl -l)
 
+# X11 subprocess retry defaults
+X11_MAX_ATTEMPTS = 3
+X11_BACKOFF_SECONDS = 0.15
+X11_DEFAULT_TIMEOUT = 2.0
+
 # Window capture settings
 DEFAULT_CAPTURE_WORKERS = 4
 DEFAULT_REFRESH_RATE = 30  # FPS

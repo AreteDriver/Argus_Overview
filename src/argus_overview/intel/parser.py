@@ -14,7 +14,6 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional, Set
 
 
 class ThreatLevel(Enum):
@@ -31,16 +30,16 @@ class ThreatLevel(Enum):
 class IntelReport:
     """Represents parsed intel from a chat message."""
 
-    system: Optional[str]
+    system: str | None
     threat_level: ThreatLevel
-    hostile_count: Optional[int]
-    ship_types: List[str]
-    player_names: List[str]
+    hostile_count: int | None
+    ship_types: list[str]
+    player_names: list[str]
     raw_message: str
     timestamp: datetime = field(default_factory=datetime.now)
     channel: str = ""
     reporter: str = ""
-    jumps_from_current: Optional[int] = None
+    jumps_from_current: int | None = None
 
 
 class IntelParser:
@@ -55,7 +54,7 @@ class IntelParser:
     """
 
     # Common EVE ship types for detection (lowercase)
-    SHIP_TYPES: Set[str] = {
+    SHIP_TYPES: set[str] = {
         # Frigates
         "atron",
         "tristan",
@@ -218,7 +217,7 @@ class IntelParser:
     }
 
     # Capital ship types (subset for threat escalation)
-    CAPITAL_SHIPS: Set[str] = {
+    CAPITAL_SHIPS: set[str] = {
         "carrier",
         "dreadnought",
         "fax",
@@ -248,7 +247,7 @@ class IntelParser:
     }
 
     # Intel keywords
-    HOSTILE_KEYWORDS: Set[str] = {
+    HOSTILE_KEYWORDS: set[str] = {
         "hostile",
         "hostiles",
         "neut",
@@ -279,7 +278,7 @@ class IntelParser:
         "contacts",
     }
 
-    CLEAR_KEYWORDS: Set[str] = {
+    CLEAR_KEYWORDS: set[str] = {
         "clear",
         "clr",
         "empty",
@@ -291,7 +290,7 @@ class IntelParser:
         "all clear",
     }
 
-    MOVEMENT_KEYWORDS: Set[str] = {
+    MOVEMENT_KEYWORDS: set[str] = {
         "jumping",
         "jumped",
         "holding",
@@ -303,7 +302,7 @@ class IntelParser:
         "moving",
     }
 
-    def __init__(self, known_systems: Optional[Set[str]] = None):
+    def __init__(self, known_systems: set[str] | None = None):
         """
         Initialize the intel parser.
 
@@ -311,9 +310,9 @@ class IntelParser:
             known_systems: Optional set of known system names (lowercase)
         """
         self.logger = logging.getLogger(__name__)
-        self.known_systems: Set[str] = known_systems or self._load_default_systems()
+        self.known_systems: set[str] = known_systems or self._load_default_systems()
 
-    def _load_default_systems(self) -> Set[str]:
+    def _load_default_systems(self) -> set[str]:
         """
         Load a default set of known EVE system names.
 
@@ -356,10 +355,10 @@ class IntelParser:
     def parse(
         self,
         message: str,
-        timestamp: Optional[datetime] = None,
+        timestamp: datetime | None = None,
         channel: str = "",
         reporter: str = "",
-    ) -> Optional[IntelReport]:
+    ) -> IntelReport | None:
         """
         Parse a message for intel content.
 
@@ -438,7 +437,7 @@ class IntelParser:
 
         return None
 
-    def _extract_system(self, message: str) -> Optional[str]:
+    def _extract_system(self, message: str) -> str | None:
         """
         Extract system name from message.
 
@@ -469,7 +468,7 @@ class IntelParser:
 
         return None
 
-    def _extract_ships(self, message: str) -> List[str]:
+    def _extract_ships(self, message: str) -> list[str]:
         """
         Extract ship types from message.
 
@@ -489,7 +488,7 @@ class IntelParser:
 
         return found
 
-    def _extract_count(self, message: str) -> Optional[int]:
+    def _extract_count(self, message: str) -> int | None:
         """
         Extract hostile count from message.
 
@@ -525,7 +524,7 @@ class IntelParser:
 
         return None
 
-    def _extract_players(self, message: str) -> List[str]:
+    def _extract_players(self, message: str) -> list[str]:
         """
         Extract player names from message (basic heuristic).
 
@@ -556,7 +555,7 @@ class IntelParser:
 
         return players[:5]  # Limit to 5 names
 
-    def _assess_threat(self, count: Optional[int], ships: List[str]) -> ThreatLevel:
+    def _assess_threat(self, count: int | None, ships: list[str]) -> ThreatLevel:
         """
         Assess threat level based on intel.
 

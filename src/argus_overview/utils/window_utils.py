@@ -5,7 +5,6 @@ This module now serves as a compatibility layer, delegating to platform implemen
 """
 
 import logging
-from typing import Optional
 
 from argus_overview.platform import get_window_manager, is_linux
 
@@ -73,7 +72,7 @@ def activate_window(window_id: str, timeout: float = 2.0) -> bool:
     return _get_window_mgr().activate_window(window_id, timeout)
 
 
-def get_focused_window() -> Optional[str]:
+def get_focused_window() -> str | None:
     """Get the currently focused window ID.
 
     Returns:

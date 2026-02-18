@@ -8,7 +8,6 @@ v2.3: Merged layouts functionality - group-based window arrangement
 import logging
 import threading
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
 
 from PIL import Image
 from PySide6.QtCore import (
@@ -33,6 +32,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLayout,
+    QLayoutItem,
     QLineEdit,
     QListWidget,
     QListWidgetItem,
@@ -56,52 +56,52 @@ class FlowLayout(QLayout):
     when the available width is exceeded. Perfect for thumbnail grids.
     """
 
-    def __init__(self, parent=None, margin=10, spacing=10):
+    def __init__(self, parent: QWidget | None = None, margin: int = 10, spacing: int = 10):
         super().__init__(parent)
-        self._item_list = []
+        self._item_list: list[QLayoutItem] = []
         self._margin = margin
         self._spacing = spacing
 
-    def addItem(self, item):
+    def addItem(self, item: QLayoutItem) -> None:
         self._item_list.append(item)
 
-    def count(self):
+    def count(self) -> int:
         return len(self._item_list)
 
-    def itemAt(self, index):
+    def itemAt(self, index: int) -> QLayoutItem | None:
         if 0 <= index < len(self._item_list):
             return self._item_list[index]
         return None
 
-    def takeAt(self, index):
+    def takeAt(self, index: int) -> QLayoutItem | None:
         if 0 <= index < len(self._item_list):
             return self._item_list.pop(index)
         return None
 
-    def expandingDirections(self):
+    def expandingDirections(self) -> Qt.Orientation:
         return Qt.Orientation(0)
 
-    def hasHeightForWidth(self):
+    def hasHeightForWidth(self) -> bool:
         return True
 
-    def heightForWidth(self, width):
+    def heightForWidth(self, width: int) -> int:
         return self._do_layout(QRect(0, 0, width, 0), test_only=True)
 
-    def setGeometry(self, rect):
+    def setGeometry(self, rect: QRect) -> None:
         super().setGeometry(rect)
         self._do_layout(rect, test_only=False)
 
-    def sizeHint(self):
+    def sizeHint(self) -> QSize:
         return self.minimumSize()
 
-    def minimumSize(self):
+    def minimumSize(self) -> QSize:
         size = QSize()
         for item in self._item_list:
             size = size.expandedTo(item.minimumSize())
         size += QSize(2 * self._margin, 2 * self._margin)
         return size
 
-    def _do_layout(self, rect, test_only):
+    def _do_layout(self, rect: QRect, test_only: bool) -> int:
         x = rect.x() + self._margin
         y = rect.y() + self._margin
         line_height = 0
@@ -138,7 +138,7 @@ class FlowLayout(QLayout):
 
         return y + line_height - rect.y() + self._margin
 
-    def _center_row(self, row_items, rect, y, line_height):
+    def _center_row(self, row_items: list, rect: QRect, y: int, line_height: int) -> None:
         """Center items in a row"""
         if not row_items:
             return
@@ -184,7 +184,7 @@ PATTERN_POSITIONS = {
 }
 
 
-def get_pattern_positions(pattern: str, count: int, grid_cols: int = 4) -> List[Tuple[int, int]]:
+def get_pattern_positions(pattern: str, count: int, grid_cols: int = 4) -> list[tuple[int, int]]:
     """Get grid positions for a layout pattern.
 
     Args:
@@ -274,7 +274,7 @@ class ArrangementGrid(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.tiles: Dict[str, DraggableTile] = {}
+        self.tiles: dict[str, DraggableTile] = {}
         self.grid_rows = 2
         self.grid_cols = 3
 
@@ -363,7 +363,7 @@ class ArrangementGrid(QWidget):
         self.tiles[char_name] = tile
         self.grid_layout.addWidget(tile, row, col)
 
-    def get_arrangement(self) -> Dict[str, Tuple[int, int]]:
+    def get_arrangement(self) -> dict[str, tuple[int, int]]:
         return {name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()}
 
     def auto_arrange_grid(self, pattern: str):
@@ -452,8 +452,8 @@ class GridApplier:
 
     def apply_arrangement(
         self,
-        arrangement: Dict[str, Tuple[int, int]],
-        window_map: Dict[str, str],
+        arrangement: dict[str, tuple[int, int]],
+        window_map: dict[str, str],
         screen: ScreenGeometry,
         grid_rows: int,
         grid_cols: int,
@@ -588,11 +588,11 @@ class WindowPreviewWidget(QWidget):
         self.settings_manager = settings_manager
 
         # State
-        self.current_pixmap: Optional[QPixmap] = None
+        self.current_pixmap: QPixmap | None = None
         self.zoom_factor = 0.3  # 30% scale
 
         # v2.2 State
-        self.custom_label: Optional[str] = None
+        self.custom_label: str | None = None
         self.session_start: datetime = datetime.now()
         self.last_activity: datetime = datetime.now()
         self.is_focused: bool = False
@@ -723,7 +723,7 @@ class WindowPreviewWidget(QWidget):
         else:
             self.timer_label.setText(f"{minutes}m")
 
-    def set_custom_label(self, label: Optional[str]):
+    def set_custom_label(self, label: str | None):
         """
         Set a custom label for this thumbnail
 
@@ -941,8 +941,8 @@ class WindowManager:
         self.settings_manager = settings_manager
 
         # State
-        self.preview_frames: Dict[str, WindowPreviewWidget] = {}
-        self.pending_requests: Dict[str, str] = {}  # request_id -> window_id
+        self.preview_frames: dict[str, WindowPreviewWidget] = {}
+        self.pending_requests: dict[str, str] = {}  # request_id -> window_id
         self._pending_lock = threading.Lock()  # Protect pending_requests access
         # Read refresh rate from settings (default 5 FPS for efficiency)
         if settings_manager:
@@ -979,7 +979,7 @@ class WindowManager:
             self.stop_capture_loop()
             self.start_capture_loop()
 
-    def add_window(self, window_id: str, character_name: str) -> Optional[WindowPreviewWidget]:
+    def add_window(self, window_id: str, character_name: str) -> WindowPreviewWidget | None:
         """
         Add window to preview
 
@@ -1106,7 +1106,7 @@ class MainTab(QWidget):
         self._refresh_sources_timer.timeout.connect(self._do_refresh_layout_sources)
 
         self.grid_applier = GridApplier()
-        self.cycling_groups: Dict[str, List[str]] = {}
+        self.cycling_groups: dict[str, list[str]] = {}
         self._load_cycling_groups()
 
         # Create window manager

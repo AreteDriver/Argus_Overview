@@ -5,7 +5,6 @@ v2.2 Feature: Automatically position new thumbnails relative to existing ones
 
 import logging
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 from PySide6.QtCore import QRect
 from PySide6.QtWidgets import QApplication
@@ -52,7 +51,7 @@ class PositionManager:
         self.logger = logging.getLogger(__name__)
 
         # Current positions of thumbnails
-        self.positions: Dict[str, ThumbnailPosition] = {}
+        self.positions: dict[str, ThumbnailPosition] = {}
 
         # Grid snapping enabled
         self.snap_to_grid = True
@@ -61,7 +60,7 @@ class PositionManager:
         self.locked = False
 
     def get_next_position(
-        self, window_id: str, preset_positions: Optional[Dict[str, ThumbnailPosition]] = None
+        self, window_id: str, preset_positions: dict[str, ThumbnailPosition] | None = None
     ) -> ThumbnailPosition:
         """
         Calculate position for a new thumbnail.
@@ -220,14 +219,14 @@ class PositionManager:
             x=snapped_x, y=snapped_y, width=position.width, height=position.height
         )
 
-    def _get_rightmost(self) -> Optional[ThumbnailPosition]:
+    def _get_rightmost(self) -> ThumbnailPosition | None:
         """Get the rightmost thumbnail position"""
         if not self.positions:
             return None
 
         return max(self.positions.values(), key=lambda p: p.x + p.width)
 
-    def _get_bottommost(self) -> Optional[ThumbnailPosition]:
+    def _get_bottommost(self) -> ThumbnailPosition | None:
         """Get the bottommost thumbnail position"""
         if not self.positions:
             return None
@@ -245,11 +244,11 @@ class PositionManager:
         # Fallback
         return QRect(0, 0, 1920, 1080)
 
-    def get_all_positions(self) -> Dict[str, ThumbnailPosition]:
+    def get_all_positions(self) -> dict[str, ThumbnailPosition]:
         """Get all current positions"""
         return self.positions.copy()
 
-    def apply_layout_preset(self, positions: Dict[str, ThumbnailPosition]):
+    def apply_layout_preset(self, positions: dict[str, ThumbnailPosition]):
         """
         Apply a layout preset to current thumbnails.
 
@@ -264,11 +263,11 @@ class PositionManager:
 
     def calculate_grid_positions(
         self,
-        window_ids: List[str],
+        window_ids: list[str],
         columns: int = 3,
-        start_x: Optional[int] = None,
-        start_y: Optional[int] = None,
-    ) -> Dict[str, ThumbnailPosition]:
+        start_x: int | None = None,
+        start_y: int | None = None,
+    ) -> dict[str, ThumbnailPosition]:
         """
         Calculate grid positions for thumbnails.
 

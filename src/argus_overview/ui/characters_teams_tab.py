@@ -4,7 +4,6 @@ Implements character database, team building with drag-drop, and layout linking
 """
 
 import logging
-from typing import List, Optional
 
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor
@@ -127,7 +126,7 @@ class CharacterTable(QTableWidget):
         self.setSortingEnabled(True)
         self.logger.info(f"Populated table with {len(characters)} characters")
 
-    def update_character_status(self, char_name: str, window_id: Optional[str]):
+    def update_character_status(self, char_name: str, window_id: str | None):
         """
         Update character status in table
 
@@ -156,7 +155,7 @@ class CharacterTable(QTableWidget):
                 self.logger.debug(f"Updated status for {char_name}: {status}")
                 break
 
-    def get_selected_characters(self) -> List[str]:
+    def get_selected_characters(self) -> list[str]:
         """Get names of selected characters"""
         names = []
         for item in self.selectedItems():
@@ -174,7 +173,7 @@ class CharacterTable(QTableWidget):
 class CharacterDialog(QDialog):
     """Dialog for adding/editing characters"""
 
-    def __init__(self, character_manager, character: Optional[Character] = None, parent=None):
+    def __init__(self, character_manager, character: Character | None = None, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.character_manager = character_manager
@@ -310,7 +309,7 @@ class TeamBuilder(QWidget):
         self.character_manager = character_manager
         self.layout_manager = layout_manager
 
-        self.current_team: Optional[Team] = None
+        self.current_team: Team | None = None
 
         self._setup_ui()
 
@@ -848,6 +847,6 @@ class CharactersTeamsTab(QWidget):
         self._refresh_teams()
         self.logger.info("Team modified")
 
-    def update_character_status(self, char_name: str, window_id: Optional[str]):
+    def update_character_status(self, char_name: str, window_id: str | None):
         """Update character status (called from main window)"""
         self.character_table.update_character_status(char_name, window_id)

@@ -7,7 +7,6 @@ visual and audio alerts.
 
 import logging
 from pathlib import Path
-from typing import List, Optional
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QBrush, QColor, QFont
@@ -58,7 +57,7 @@ class IntelLogTable(QTableWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.reports: List[IntelReport] = []
+        self.reports: list[IntelReport] = []
 
         self._setup_table()
 
@@ -153,7 +152,7 @@ class IntelLogTable(QTableWidget):
             if row < len(self.reports):
                 self.entry_selected.emit(self.reports[row])
 
-    def get_selected_report(self) -> Optional[IntelReport]:
+    def get_selected_report(self) -> IntelReport | None:
         """Get currently selected report."""
         items = self.selectedItems()
         if items:

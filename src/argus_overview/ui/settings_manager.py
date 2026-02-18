@@ -8,7 +8,7 @@ import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 class SettingsManager:
@@ -97,7 +97,7 @@ class SettingsManager:
         },
     }
 
-    def __init__(self, config_dir: Optional[Path] = None):
+    def __init__(self, config_dir: Path | None = None):
         """
         Initialize SettingsManager
 
@@ -113,15 +113,15 @@ class SettingsManager:
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
         self.settings_file = self.config_dir / "settings.json"
-        self.settings: Dict = {}
+        self.settings: dict = {}
 
         # Runtime state (not persisted)
-        self._last_activated_window: Optional[str] = None
+        self._last_activated_window: str | None = None
 
         # Load settings or create defaults
         self.load_settings()
 
-    def load_settings(self) -> Dict:
+    def load_settings(self) -> dict:
         """
         Load settings from JSON file
 
@@ -139,16 +139,19 @@ class SettingsManager:
                 self.logger.info(f"Loaded settings from {self.settings_file}")
                 return self.settings
 
-            except Exception as e:
-                self.logger.error(f"Failed to load settings: {e}")
-                self.logger.info("Using default settings")
+            except json.JSONDecodeError as e:
+                self.logger.error("Settings file is corrupted (%s): %s", self.settings_file, e)
+                self.logger.info("Falling back to default settings")
+            except OSError as e:
+                self.logger.error("Failed to read settings file (%s): %s", self.settings_file, e)
+                self.logger.info("Falling back to default settings")
 
         # Use defaults if file doesn't exist or load failed
         self.settings = copy.deepcopy(self.DEFAULT_SETTINGS)
         self.save_settings(self.settings)
         return self.settings
 
-    def save_settings(self, settings: Optional[Dict] = None) -> bool:
+    def save_settings(self, settings: dict | None = None) -> bool:
         """
         Save settings to JSON file
 
@@ -308,7 +311,7 @@ class SettingsManager:
             self.logger.error(f"Failed to import settings: {e}")
             return False
 
-    def _merge_settings(self, base: Dict, overlay: Dict) -> Dict:
+    def _merge_settings(self, base: dict, overlay: dict) -> dict:
         """
         Recursively merge overlay settings into base settings
         Preserves structure from base, updates values from overlay
@@ -328,7 +331,7 @@ class SettingsManager:
 
         return base
 
-    def get_all(self) -> Dict:
+    def get_all(self) -> dict:
         """
         Get all settings
 
@@ -363,10 +366,10 @@ class SettingsManager:
             self.logger.error(f"Settings validation failed: {e}")
             return False
 
-    def get_last_activated_window(self) -> Optional[str]:
+    def get_last_activated_window(self) -> str | None:
         """Get the last activated EVE window ID (runtime state, not persisted)"""
         return self._last_activated_window
 
-    def set_last_activated_window(self, window_id: Optional[str]) -> None:
+    def set_last_activated_window(self, window_id: str | None) -> None:
         """Set the last activated EVE window ID (runtime state, not persisted)"""
         self._last_activated_window = window_id

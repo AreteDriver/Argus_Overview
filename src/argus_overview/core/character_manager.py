@@ -9,7 +9,6 @@ import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 def sanitize_character_name(name: str) -> str:
@@ -40,15 +39,15 @@ class Character:
     role: str = "DPS"  # Miner, Scout, DPS, Logi, Hauler, etc.
     notes: str = ""
     is_main: bool = False
-    window_id: Optional[str] = None  # Assigned when logged in
-    last_seen: Optional[str] = None
+    window_id: str | None = None  # Assigned when logged in
+    last_seen: str | None = None
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary"""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Character":
+    def from_dict(cls, data: dict) -> "Character":
         """Create from dictionary"""
         return cls(**data)
 
@@ -59,17 +58,17 @@ class Team:
 
     name: str
     description: str = ""
-    characters: List[str] = field(default_factory=list)  # Character names
+    characters: list[str] = field(default_factory=list)  # Character names
     layout_name: str = "Default"  # Associated layout preset
     color: str = "#4287f5"  # Team color for UI
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary"""
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "Team":
+    def from_dict(cls, data: dict) -> "Team":
         """Create from dictionary"""
         return cls(**data)
 
@@ -77,7 +76,7 @@ class Team:
 class CharacterManager:
     """Manages character database and teams"""
 
-    def __init__(self, config_dir: Optional[Path] = None):
+    def __init__(self, config_dir: Path | None = None):
         self.logger = logging.getLogger(__name__)
 
         if config_dir is None:
@@ -89,8 +88,8 @@ class CharacterManager:
         self.characters_file = self.config_dir / "characters.json"
         self.teams_file = self.config_dir / "teams.json"
 
-        self.characters: Dict[str, Character] = {}
-        self.teams: Dict[str, Team] = {}
+        self.characters: dict[str, Character] = {}
+        self.teams: dict[str, Team] = {}
 
         self._load_data()
 
@@ -242,19 +241,19 @@ class CharacterManager:
         self.save_data()
         return True
 
-    def get_character(self, char_name: str) -> Optional[Character]:
+    def get_character(self, char_name: str) -> Character | None:
         """Get character by name"""
         return self.characters.get(char_name)
 
-    def get_all_characters(self) -> List[Character]:
+    def get_all_characters(self) -> list[Character]:
         """Get all characters"""
         return list(self.characters.values())
 
-    def get_characters_by_account(self, account: str) -> List[Character]:
+    def get_characters_by_account(self, account: str) -> list[Character]:
         """Get all characters in an account"""
         return [char for char in self.characters.values() if char.account == account]
 
-    def get_accounts(self) -> List[str]:
+    def get_accounts(self) -> list[str]:
         """Get all account names"""
         accounts = set()
         for char in self.characters.values():
@@ -321,15 +320,15 @@ class CharacterManager:
             return True
         return False
 
-    def get_team(self, team_name: str) -> Optional[Team]:
+    def get_team(self, team_name: str) -> Team | None:
         """Get team by name"""
         return self.teams.get(team_name)
 
-    def get_all_teams(self) -> List[Team]:
+    def get_all_teams(self) -> list[Team]:
         """Get all teams"""
         return list(self.teams.values())
 
-    def get_teams_for_character(self, char_name: str) -> List[Team]:
+    def get_teams_for_character(self, char_name: str) -> list[Team]:
         """Get all teams containing a character"""
         return [team for team in self.teams.values() if char_name in team.characters]
 
@@ -353,19 +352,19 @@ class CharacterManager:
         self.save_data()
         return True
 
-    def get_character_by_window(self, window_id: str) -> Optional[Character]:
+    def get_character_by_window(self, window_id: str) -> Character | None:
         """Find character by window ID"""
         for char in self.characters.values():
             if char.window_id == window_id:
                 return char
         return None
 
-    def get_active_characters(self) -> List[Character]:
+    def get_active_characters(self) -> list[Character]:
         """Get characters currently logged in (with window IDs)"""
         return [char for char in self.characters.values() if char.window_id]
 
     # Import from EVE files
-    def import_from_eve_sync(self, eve_characters: List) -> int:
+    def import_from_eve_sync(self, eve_characters: list) -> int:
         """Import characters discovered from EVE installation files
 
         Args:
@@ -439,7 +438,7 @@ class CharacterManager:
         return imported
 
     # Auto-detection
-    def auto_assign_windows(self, windows: List[tuple]) -> Dict[str, str]:
+    def auto_assign_windows(self, windows: list[tuple]) -> dict[str, str]:
         """Auto-assign windows to characters based on window titles
 
         Args:

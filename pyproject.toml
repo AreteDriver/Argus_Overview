@@ -56,7 +56,7 @@ argus-overview = "main:main"
 
 [tool.ruff]
 line-length = 100
-target-version = "py38"
+target-version = "py310"
 exclude = ["windows/", "build/", "dist/", ".venv/"]
 
 [tool.ruff.lint]
