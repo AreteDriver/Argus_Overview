@@ -59,7 +59,10 @@ def _get_wmctrl_window_list() -> str:
     """Get wmctrl -l output with caching (1 second TTL)."""
     now = time.monotonic()
     with _wmctrl_cache_lock:
-        if _wmctrl_cache["result"] is not None and now - _wmctrl_cache["timestamp"] < _WMCTRL_CACHE_TTL:
+        if (
+            _wmctrl_cache["result"] is not None
+            and now - _wmctrl_cache["timestamp"] < _WMCTRL_CACHE_TTL
+        ):
             return _wmctrl_cache["result"]
 
     try:
