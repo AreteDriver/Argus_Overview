@@ -5,10 +5,12 @@ v2.2: Added one-click import, hover effects, activity indicators, session timers
 v2.3: Merged layouts functionality - group-based window arrangement
 """
 
+from __future__ import annotations
+
 import logging
+import subprocess
 import threading
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
 
 from PIL import Image
 from PySide6.QtCore import (
@@ -184,7 +186,7 @@ PATTERN_POSITIONS = {
 }
 
 
-def get_pattern_positions(pattern: str, count: int, grid_cols: int = 4) -> List[Tuple[int, int]]:
+def get_pattern_positions(pattern: str, count: int, grid_cols: int = 4) -> list[tuple[int, int]]:
     """Get grid positions for a layout pattern.
 
     Args:
@@ -193,7 +195,7 @@ def get_pattern_positions(pattern: str, count: int, grid_cols: int = 4) -> List[
         grid_cols: Number of columns for default grid (used for fallback)
 
     Returns:
-        List of (row, col) tuples for each item position
+        list of (row, col) tuples for each item position
     """
     if pattern in PATTERN_POSITIONS:
         return PATTERN_POSITIONS[pattern]
@@ -274,7 +276,7 @@ class ArrangementGrid(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
-        self.tiles: Dict[str, DraggableTile] = {}
+        self.tiles: dict[str, DraggableTile] = {}
         self.grid_rows = 2
         self.grid_cols = 3
 
@@ -363,7 +365,7 @@ class ArrangementGrid(QWidget):
         self.tiles[char_name] = tile
         self.grid_layout.addWidget(tile, row, col)
 
-    def get_arrangement(self) -> Dict[str, Tuple[int, int]]:
+    def get_arrangement(self) -> dict[str, tuple[int, int]]:
         return {name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()}
 
     def auto_arrange_grid(self, pattern: str):
@@ -452,8 +454,8 @@ class GridApplier:
 
     def apply_arrangement(
         self,
-        arrangement: Dict[str, Tuple[int, int]],
-        window_map: Dict[str, str],
+        arrangement: dict[str, tuple[int, int]],
+        window_map: dict[str, str],
         screen: ScreenGeometry,
         grid_rows: int,
         grid_cols: int,
@@ -491,7 +493,7 @@ class GridApplier:
             self.logger.info(f"Applied arrangement to {len(window_map)} windows")
             return True
 
-        except Exception as e:
+        except (AttributeError, OSError, RuntimeError, ValueError) as e:
             self.logger.error(f"Failed to apply arrangement: {e}")
             return False
 
@@ -588,11 +590,11 @@ class WindowPreviewWidget(QWidget):
         self.settings_manager = settings_manager
 
         # State
-        self.current_pixmap: Optional[QPixmap] = None
+        self.current_pixmap: QPixmap | None = None
         self.zoom_factor = 0.3  # 30% scale
 
         # v2.2 State
-        self.custom_label: Optional[str] = None
+        self.custom_label: str | None = None
         self.session_start: datetime = datetime.now()
         self.last_activity: datetime = datetime.now()
         self.is_focused: bool = False
@@ -706,7 +708,7 @@ class WindowPreviewWidget(QWidget):
 
             self.image_label.setPixmap(scaled_pixmap)
 
-        except Exception as e:
+        except (ValueError, AttributeError, RuntimeError) as e:
             self.logger.error(f"Failed to update frame for {self.window_id}: {e}")
 
     def _update_session_timer(self):
@@ -723,7 +725,7 @@ class WindowPreviewWidget(QWidget):
         else:
             self.timer_label.setText(f"{minutes}m")
 
-    def set_custom_label(self, label: Optional[str]):
+    def set_custom_label(self, label: str | None):
         """
         Set a custom label for this thumbnail
 
@@ -908,7 +910,7 @@ class WindowPreviewWidget(QWidget):
                 run_x11_subprocess(["wmctrl", "-i", "-c", self.window_id], timeout=2)
                 self.logger.info(f"Closed window: {self.window_id}")
                 self.window_removed.emit(self.window_id)
-            except Exception as e:
+            except (OSError, subprocess.SubprocessError) as e:
                 self.logger.warning(f"Failed to close window after retries: {e}")
 
     def _minimize_window(self):
@@ -919,7 +921,7 @@ class WindowPreviewWidget(QWidget):
                 self.logger.info(f"Minimized window: {self.window_id}")
             else:
                 self.logger.warning(f"Failed to minimize window: {self.window_id}")
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             self.logger.error(f"Error minimizing window: {e}")
 
     def _set_zoom(self, zoom: float):
@@ -941,8 +943,8 @@ class WindowManager:
         self.settings_manager = settings_manager
 
         # State
-        self.preview_frames: Dict[str, WindowPreviewWidget] = {}
-        self.pending_requests: Dict[str, str] = {}  # request_id -> window_id
+        self.preview_frames: dict[str, WindowPreviewWidget] = {}
+        self.pending_requests: dict[str, str] = {}  # request_id -> window_id
         self._pending_lock = threading.Lock()  # Protect pending_requests access
         # Read refresh rate from settings (default 5 FPS for efficiency)
         if settings_manager:
@@ -979,7 +981,7 @@ class WindowManager:
             self.stop_capture_loop()
             self.start_capture_loop()
 
-    def add_window(self, window_id: str, character_name: str) -> Optional[WindowPreviewWidget]:
+    def add_window(self, window_id: str, character_name: str) -> WindowPreviewWidget | None:
         """
         Add window to preview
 
@@ -1032,7 +1034,7 @@ class WindowManager:
                     )
                     with self._pending_lock:
                         self.pending_requests[request_id] = window_id
-                except Exception as e:
+                except (OSError, RuntimeError) as e:
                     self.logger.error(f"Failed to request capture for {window_id}: {e}")
 
         # Poll for results (non-blocking)
@@ -1056,7 +1058,7 @@ class WindowManager:
             if window_id in self.preview_frames:
                 try:
                     self.preview_frames[window_id].update_frame(image)
-                except Exception as e:
+                except (ValueError, AttributeError, RuntimeError) as e:
                     self.logger.error(f"Failed to process frame for {window_id}: {e}")
 
             # Remove from pending
@@ -1106,7 +1108,7 @@ class MainTab(QWidget):
         self._refresh_sources_timer.timeout.connect(self._do_refresh_layout_sources)
 
         self.grid_applier = GridApplier()
-        self.cycling_groups: Dict[str, List[str]] = {}
+        self.cycling_groups: dict[str, list[str]] = {}
         self._load_cycling_groups()
 
         # Create window manager
@@ -1612,7 +1614,7 @@ class MainTab(QWidget):
         """Get windows not already in preview. Returns list of (window_id, title) tuples."""
         try:
             windows = self.capture_system.get_window_list()
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             self.logger.error(f"Failed to get window list: {e}")
             raise
 
@@ -1653,7 +1655,7 @@ class MainTab(QWidget):
         """Show dialog to add windows"""
         try:
             available = self._get_available_windows()
-        except Exception as e:
+        except (OSError, RuntimeError) as e:
             QMessageBox.critical(self, "Error", f"Failed to get window list:\n{e}")
             return
 
@@ -1721,7 +1723,7 @@ class MainTab(QWidget):
                     try:
                         run_x11_subprocess(["xdotool", "windowminimize", last_window], timeout=2)
                         self.logger.info(f"Auto-minimized previous EVE window: {last_window}")
-                    except Exception as e:
+                    except (OSError, subprocess.SubprocessError) as e:
                         self.logger.warning(f"Failed to auto-minimize window {last_window}: {e}")
 
             # Track this as the last activated EVE window
@@ -1733,7 +1735,7 @@ class MainTab(QWidget):
                 self.logger.info(f"Activated window: {window_id}")
             else:
                 self.logger.warning(f"Failed to activate window: {window_id}")
-        except Exception as e:
+        except (OSError, RuntimeError, ValueError) as e:
             self.logger.error(f"Error activating window: {e}")
 
     def _on_window_removed(self, window_id: str):
@@ -1798,7 +1800,7 @@ class MainTab(QWidget):
                     result = run_x11_subprocess(
                         ["xdotool", "getwindowfocus"], timeout=2, max_attempts=2
                     )
-                except Exception:
+                except (OSError, subprocess.SubprocessError):
                     result = None
                 if result and result.returncode == 0:
                     focused_id = result.stdout.decode("utf-8", errors="replace").strip()
@@ -1820,7 +1822,7 @@ class MainTab(QWidget):
                 self.logger.info(f"Auto-minimize disabled, restored {restored_count} windows")
                 self.status_label.setText(f"Auto-minimize OFF ({restored_count} restored)")
 
-        except Exception as e:
+        except (OSError, RuntimeError, ValueError) as e:
             self.logger.error(f"Error toggling auto-minimize: {e}")
 
     def _update_minimize_button_style(self):

@@ -13,7 +13,7 @@ import time
 import uuid
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 from PIL import Image
 
@@ -44,35 +44,40 @@ _DEFAULT_TIMEOUT = 2.0
 
 # Module-level cache for wmctrl results
 _wmctrl_cache: dict = {"result": None, "timestamp": 0.0}
+_wmctrl_cache_lock = threading.Lock()
 _WMCTRL_CACHE_TTL = 1.0
 
 
 def _clear_wmctrl_cache() -> None:
     """Clear wmctrl cache (for testing)."""
-    _wmctrl_cache["result"] = None
-    _wmctrl_cache["timestamp"] = 0.0
+    with _wmctrl_cache_lock:
+        _wmctrl_cache["result"] = None
+        _wmctrl_cache["timestamp"] = 0.0
 
 
 def _get_wmctrl_window_list() -> str:
     """Get wmctrl -l output with caching (1 second TTL)."""
     now = time.monotonic()
-    if _wmctrl_cache["result"] is not None and now - _wmctrl_cache["timestamp"] < _WMCTRL_CACHE_TTL:
-        return _wmctrl_cache["result"]
+    with _wmctrl_cache_lock:
+        if _wmctrl_cache["result"] is not None and now - _wmctrl_cache["timestamp"] < _WMCTRL_CACHE_TTL:
+            return _wmctrl_cache["result"]
 
     try:
         result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, timeout=2)
         if result.returncode == 0:
-            _wmctrl_cache["result"] = result.stdout
-            _wmctrl_cache["timestamp"] = now
+            with _wmctrl_cache_lock:
+                _wmctrl_cache["result"] = result.stdout
+                _wmctrl_cache["timestamp"] = now
             return result.stdout
     except (subprocess.TimeoutExpired, OSError):
         pass
 
-    return _wmctrl_cache["result"] or ""
+    with _wmctrl_cache_lock:
+        return _wmctrl_cache["result"] or ""
 
 
 def run_x11_subprocess(
-    cmd: List[str],
+    cmd: list[str],
     timeout: float = _DEFAULT_TIMEOUT,
     max_attempts: int = _DEFAULT_MAX_ATTEMPTS,
     backoff: float = _DEFAULT_BACKOFF_SECONDS,
@@ -97,7 +102,7 @@ def run_x11_subprocess(
         subprocess.SubprocessError: If all attempts fail
     """
     max_attempts = max(1, min(5, max_attempts))
-    last_error: Optional[Exception] = None
+    last_error: Exception | None = None
     cmd_str = " ".join(cmd)
 
     for attempt in range(1, max_attempts + 1):
@@ -134,7 +139,7 @@ def run_x11_subprocess(
 class WindowManagerLinux(WindowManager):
     """Linux window management using wmctrl and xdotool."""
 
-    def get_window_list(self) -> List[Tuple[str, str]]:
+    def get_window_list(self) -> list[tuple[str, str]]:
         """Get list of all windows using wmctrl."""
         try:
             result = run_x11_subprocess(["wmctrl", "-l"], timeout=2)
@@ -150,11 +155,11 @@ class WindowManagerLinux(WindowManager):
                         windows.append((window_id, window_title))
 
             return windows
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.warning(f"Failed to get window list: {e}")
             return []
 
-    def get_eve_windows(self) -> List[Tuple[str, str]]:
+    def get_eve_windows(self) -> list[tuple[str, str]]:
         """Get list of EVE Online windows."""
         eve_windows = []
         output = _get_wmctrl_window_list()
@@ -213,7 +218,7 @@ class WindowManagerLinux(WindowManager):
 
             return True
 
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.warning("Failed to move window %s after retries: %s", window_id, e)
             return False
 
@@ -225,7 +230,7 @@ class WindowManagerLinux(WindowManager):
         try:
             run_x11_subprocess(["wmctrl", "-i", "-a", window_id], timeout=timeout)
             return True
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.warning("Failed to activate window %s: %s", window_id, e)
             return False
 
@@ -237,7 +242,7 @@ class WindowManagerLinux(WindowManager):
         try:
             run_x11_subprocess(["xdotool", "windowminimize", window_id], timeout=2)
             return True
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.warning("Failed to minimize window %s: %s", window_id, e)
             return False
 
@@ -249,11 +254,11 @@ class WindowManagerLinux(WindowManager):
         try:
             run_x11_subprocess(["xdotool", "windowactivate", window_id], timeout=2)
             return True
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.warning("Failed to restore window %s: %s", window_id, e)
             return False
 
-    def get_focused_window(self) -> Optional[str]:
+    def get_focused_window(self) -> str | None:
         """Get the currently focused window ID."""
         try:
             result = run_x11_subprocess(
@@ -267,7 +272,7 @@ class WindowManagerLinux(WindowManager):
                 return hex(int(window_id))
             except ValueError:
                 return window_id if self.is_valid_window_id(window_id) else None
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.debug("Failed to get focused window: %s", e)
         return None
 
@@ -284,7 +289,7 @@ class WindowManagerLinux(WindowManager):
                 ["xdotool", "getwindowname", window_id], timeout=2, max_attempts=2
             )
             return result.stdout.decode("utf-8", errors="replace").strip()
-        except Exception:
+        except (OSError, subprocess.SubprocessError):
             return "Unknown"
 
 
@@ -295,7 +300,7 @@ class WindowCaptureLinux(WindowCapture):
         self.max_workers = max_workers
         self.capture_queue: Queue[Any] = Queue()
         self.result_queue: Queue[Any] = Queue()
-        self.workers: List[threading.Thread] = []
+        self.workers: list[threading.Thread] = []
         self._stop_event = threading.Event()
         self._stop_event.set()  # Start in stopped state
         self._window_mgr = WindowManagerLinux()
@@ -337,7 +342,7 @@ class WindowCaptureLinux(WindowCapture):
 
             except Empty:
                 continue
-            except Exception as e:
+            except (OSError, subprocess.SubprocessError, ValueError) as e:
                 logger.error(f"Worker error: {e}")
 
     def capture_window_async(self, window_id: str, scale: float = 1.0) -> str:
@@ -349,14 +354,14 @@ class WindowCaptureLinux(WindowCapture):
         self.capture_queue.put((window_id, scale, request_id))
         return request_id
 
-    def get_result(self, timeout: float = 0.1) -> Optional[Tuple[str, str, Image.Image]]:
+    def get_result(self, timeout: float = 0.1) -> tuple[str, str, Image.Image] | None:
         """Get capture result if available."""
         try:
             return self.result_queue.get(timeout=timeout)
         except Empty:
             return None
 
-    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Optional[Image.Image]:
+    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Image.Image | None:
         """Synchronous window capture using ImageMagick."""
         try:
             result = subprocess.run(
@@ -373,7 +378,7 @@ class WindowCaptureLinux(WindowCapture):
                     img = img.resize(new_size, Image.Resampling.LANCZOS)
 
                 return img
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.debug(f"Capture failed for {window_id}: {e}")
 
         return None
@@ -403,11 +408,11 @@ class ScreenManagerLinux(ScreenManager):
             logger.warning("Could not parse xrandr output, using default geometry")
             return ScreenGeometry(0, 0, 1920, 1080, True)
 
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.error(f"Failed to get screen geometry: {e}")
             return ScreenGeometry(0, 0, 1920, 1080, True)
 
-    def get_all_monitors(self) -> List[ScreenGeometry]:
+    def get_all_monitors(self) -> list[ScreenGeometry]:
         """Get geometry for all connected monitors."""
         try:
             result = subprocess.run(
@@ -420,13 +425,13 @@ class ScreenManagerLinux(ScreenManager):
             monitors = self._parse_xrandr_output(result.stdout)
             return monitors if monitors else [ScreenGeometry(0, 0, 1920, 1080, True)]
 
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             logger.error(f"Failed to get monitors: {e}")
             return [ScreenGeometry(0, 0, 1920, 1080, True)]
 
-    def _parse_xrandr_output(self, output: str) -> List[ScreenGeometry]:
+    def _parse_xrandr_output(self, output: str) -> list[ScreenGeometry]:
         """Parse xrandr output to extract monitor geometries."""
-        monitors: List[ScreenGeometry] = []
+        monitors: list[ScreenGeometry] = []
         for line in output.split("\n"):
             if " connected" in line:
                 match = re.search(r"(\d+)x(\d+)\+(\d+)\+(\d+)", line)
@@ -440,7 +445,7 @@ class ScreenManagerLinux(ScreenManager):
 class EVEPathResolverLinux(EVEPathResolver):
     """Linux EVE path resolution for Steam/Proton and Wine installations."""
 
-    def get_eve_settings_paths(self) -> List[Path]:
+    def get_eve_settings_paths(self) -> list[Path]:
         """Get candidate EVE settings paths for Linux."""
         home = Path.home()
 
@@ -499,7 +504,7 @@ class EVEPathResolverLinux(EVEPathResolver):
 
         return eve_steam_paths + legacy_paths
 
-    def get_eve_logs_paths(self) -> List[Path]:
+    def get_eve_logs_paths(self) -> list[Path]:
         """Get candidate EVE game logs paths for Linux."""
         home = Path.home()
         steam_base = home / ".steam" / "debian-installation" / "steamapps" / "compatdata"

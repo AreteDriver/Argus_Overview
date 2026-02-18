@@ -4,7 +4,6 @@ Drag-and-drop interface for creating cycling groups and assigning hotkeys
 """
 
 import logging
-from typing import Dict, List, Optional
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent
@@ -107,7 +106,7 @@ class CyclingGroupList(QListWidget):
         else:
             event.ignore()
 
-    def get_members(self) -> List[str]:
+    def get_members(self) -> list[str]:
         """Get ordered list of member names"""
         return [self.item(i).text() for i in range(self.count())]
 
@@ -133,8 +132,8 @@ class HotkeysTab(QWidget):
         self.main_tab = main_tab  # Reference to main tab for getting active windows
 
         # Cycling groups data: {group_name: [char_names in order]}
-        self.cycling_groups: Dict[str, List[str]] = {}
-        self.current_group: Optional[str] = None
+        self.cycling_groups: dict[str, list[str]] = {}
+        self.current_group: str | None = None
 
         self._load_groups()
         self._setup_ui()
@@ -543,11 +542,11 @@ class HotkeysTab(QWidget):
         )
         self.logger.info(f"Saved hotkeys: forward={forward}, backward={backward}")
 
-    def get_cycling_group(self, name: str) -> List[str]:
+    def get_cycling_group(self, name: str) -> list[str]:
         """Get members of a cycling group"""
         return self.cycling_groups.get(name, [])
 
-    def get_all_groups(self) -> Dict[str, List[str]]:
+    def get_all_groups(self) -> dict[str, list[str]]:
         """Get all cycling groups"""
         return self.cycling_groups.copy()
 

@@ -33,8 +33,8 @@ v2.2 Features:
 import logging
 import os
 import sys
+from io import TextIOWrapper
 from pathlib import Path
-from typing import Optional, TextIO
 
 # Platform-specific imports for single-instance locking
 if sys.platform == "win32":
@@ -63,7 +63,7 @@ class SingleInstance:
 
     def __init__(self, app_name: str = "argus-overview"):
         self.app_name = app_name
-        self.lock_file: Optional[TextIO] = None
+        self.lock_file: TextIOWrapper | None = None
 
         # Platform-specific lock file location
         if sys.platform == "win32":

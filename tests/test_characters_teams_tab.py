@@ -1414,7 +1414,7 @@ class TestCharactersTeamsTabMethods:
             tab = CharactersTeamsTab.__new__(CharactersTeamsTab)
             tab.logger = MagicMock()
             tab.settings_sync = MagicMock()
-            tab.settings_sync.get_all_known_characters.side_effect = Exception("Test error")
+            tab.settings_sync.get_all_known_characters.side_effect = OSError("Test error")
 
             with patch("argus_overview.ui.characters_teams_tab.QMessageBox") as mock_msg:
                 tab._scan_eve_folder()

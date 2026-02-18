@@ -784,7 +784,7 @@ class TestExceptionHandling:
             manager = SettingsManager(config_dir=Path(tmpdir))
 
             # Make get() raise an exception
-            with patch.object(manager, "get", side_effect=Exception("get failed")):
+            with patch.object(manager, "get", side_effect=KeyError("get failed")):
                 result = manager.validate()
 
             assert result is False

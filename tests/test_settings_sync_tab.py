@@ -59,7 +59,7 @@ class TestScanWorker:
         from argus_overview.ui.settings_sync_tab import ScanWorker
 
         mock_settings_sync = MagicMock()
-        mock_settings_sync.scan_for_characters.side_effect = Exception("Scan failed")
+        mock_settings_sync.scan_for_characters.side_effect = OSError("Scan failed")
 
         worker = ScanWorker(mock_settings_sync)
         worker.scan_progress = MagicMock()
@@ -155,7 +155,7 @@ class TestSyncWorker:
             if targets[0] == "Target1":
                 return {"Target1": True}
             else:
-                raise Exception("Sync failed")
+                raise OSError("Sync failed")
 
         mock_settings_sync.sync_settings.side_effect = sync_side_effect
 

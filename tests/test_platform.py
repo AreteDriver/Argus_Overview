@@ -927,7 +927,7 @@ class TestWindowManagerLinuxGetWindowListEdgeCases:
 
         with patch(
             "argus_overview.platform.linux.run_x11_subprocess",
-            side_effect=Exception("test error"),
+            side_effect=OSError("test error"),
         ):
             result = wm.get_window_list()
 
@@ -1333,7 +1333,7 @@ class TestWindowCaptureLinuxWorker:
         from argus_overview.platform.linux import WindowCaptureLinux
 
         capture = WindowCaptureLinux(max_workers=1)
-        capture.capture_window_sync = MagicMock(side_effect=RuntimeError("X11 error"))
+        capture.capture_window_sync = MagicMock(side_effect=OSError("X11 error"))
 
         # Put a task then None to stop
         capture.capture_queue.put(("0x123", 0.5, "req1"))

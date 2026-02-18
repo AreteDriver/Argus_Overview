@@ -284,7 +284,7 @@ class TestWatchdogFallback:
 
             # Make Observer raise an exception
             with patch("argus_overview.core.config_watcher.Observer") as mock_observer:
-                mock_observer.side_effect = Exception("Observer failed")
+                mock_observer.side_effect = RuntimeError("Observer failed")
 
                 with patch.object(watcher, "_start_polling") as mock_polling:
                     watcher._start_watchdog()

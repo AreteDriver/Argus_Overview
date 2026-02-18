@@ -14,7 +14,6 @@ import threading
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import Optional
 
 from PySide6.QtCore import QObject, Signal
 
@@ -38,7 +37,7 @@ class AlertConfig:
     visual_border: bool = True
     visual_overlay: bool = True
     audio: bool = True
-    audio_file: Optional[Path] = None
+    audio_file: Path | None = None
     system_notification: bool = False
 
     # Thresholds
@@ -81,7 +80,7 @@ class AlertDispatcher(QObject):
     overlay_requested = Signal(object)  # IntelReport
     alert_triggered = Signal(object, object)  # IntelReport, AlertType
 
-    def __init__(self, config: Optional[AlertConfig] = None, parent: Optional[QObject] = None):
+    def __init__(self, config: AlertConfig | None = None, parent: QObject | None = None):
         """
         Initialize the alert dispatcher.
 
@@ -231,10 +230,10 @@ class AlertDispatcher(QObject):
             self.logger.warning("No audio player found (paplay/aplay)")
         except subprocess.TimeoutExpired:
             self.logger.warning("Audio playback timed out")
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             self.logger.error(f"Error playing audio: {e}")
 
-    def _default_audio(self, threat_level: ThreatLevel) -> Optional[Path]:
+    def _default_audio(self, threat_level: ThreatLevel) -> Path | None:
         """
         Get default audio file for threat level.
 
@@ -293,7 +292,7 @@ class AlertDispatcher(QObject):
             self.logger.warning("notify-send not found")
         except subprocess.TimeoutExpired:
             self.logger.warning("Notification timed out")
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError) as e:
             self.logger.error(f"Error sending notification: {e}")
 
     def test_alert(self, threat_level: ThreatLevel = ThreatLevel.WARNING):

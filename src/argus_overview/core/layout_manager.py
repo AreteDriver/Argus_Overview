@@ -10,7 +10,6 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
 
 
 def sanitize_filename(name: str) -> str:
@@ -66,20 +65,20 @@ class LayoutPreset:
 
     name: str
     description: str = ""
-    windows: List[WindowLayout] = field(default_factory=list)
+    windows: list[WindowLayout] = field(default_factory=list)
     refresh_rate: int = 30
     grid_pattern: str = "custom"
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     modified_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         """Convert to dictionary"""
         data = asdict(self)
         data["windows"] = [asdict(w) for w in self.windows]
         return data
 
     @classmethod
-    def from_dict(cls, data: Dict) -> "LayoutPreset":
+    def from_dict(cls, data: dict) -> "LayoutPreset":
         """Create from dictionary"""
         windows_data = data.pop("windows", [])
         preset = cls(**data)
@@ -90,7 +89,7 @@ class LayoutPreset:
 class LayoutManager:
     """Manages layout presets and grid patterns"""
 
-    def __init__(self, config_dir: Optional[Path] = None):
+    def __init__(self, config_dir: Path | None = None):
         self.logger = logging.getLogger(__name__)
 
         if config_dir is None:
@@ -102,7 +101,7 @@ class LayoutManager:
         self.layouts_dir = self.config_dir / "layouts"
         self.layouts_dir.mkdir(exist_ok=True)
 
-        self.presets: Dict[str, LayoutPreset] = {}
+        self.presets: dict[str, LayoutPreset] = {}
         self._load_presets()
 
     @staticmethod
@@ -146,7 +145,7 @@ class LayoutManager:
                         continue
                     preset = LayoutPreset.from_dict(data)
                     self.presets[preset.name] = preset
-            except Exception as e:
+            except (json.JSONDecodeError, OSError, KeyError, TypeError) as e:
                 self.logger.error(f"Failed to load preset {preset_file}: {e}")
 
         self.logger.info(f"Loaded {len(self.presets)} layout presets")
@@ -172,7 +171,7 @@ class LayoutManager:
         except ValueError as e:
             self.logger.error(f"Invalid preset name '{preset.name}': {e}")
             return False
-        except Exception as e:
+        except OSError as e:
             self.logger.error(f"Failed to save preset '{preset.name}': {e}")
             return False
 
@@ -195,20 +194,20 @@ class LayoutManager:
             del self.presets[preset_name]
             self.logger.info(f"Deleted preset '{preset_name}'")
             return True
-        except Exception as e:
+        except (OSError, ValueError) as e:
             self.logger.error(f"Failed to delete preset '{preset_name}': {e}")
             return False
 
-    def get_preset(self, preset_name: str) -> Optional[LayoutPreset]:
+    def get_preset(self, preset_name: str) -> LayoutPreset | None:
         """Get a layout preset by name"""
         return self.presets.get(preset_name)
 
-    def get_all_presets(self) -> List[LayoutPreset]:
+    def get_all_presets(self) -> list[LayoutPreset]:
         """Get all layout presets"""
         return list(self.presets.values())
 
     def create_preset_from_current(
-        self, name: str, description: str, current_windows: Dict
+        self, name: str, description: str, current_windows: dict
     ) -> LayoutPreset:
         """Create a preset from current window positions
 
@@ -242,7 +241,7 @@ class LayoutManager:
     # Grid Pattern Calculations - Helper methods
     def _calc_uniform_grid(
         self,
-        windows: List[str],
+        windows: list[str],
         cols: int,
         rows: int,
         max_windows: int,
@@ -251,7 +250,7 @@ class LayoutManager:
         screen_width: int,
         screen_height: int,
         spacing: int,
-    ) -> Dict[str, Dict]:
+    ) -> dict[str, dict]:
         """Calculate uniform grid layout (2x2, etc.)"""
         win_width = (screen_width - spacing * (cols + 1)) // cols
         win_height = (screen_height - spacing * (rows + 1)) // rows
@@ -268,14 +267,14 @@ class LayoutManager:
 
     def _calc_horizontal_row(
         self,
-        windows: List[str],
+        windows: list[str],
         count: int,
         screen_x: int,
         screen_y: int,
         screen_width: int,
         screen_height: int,
         spacing: int,
-    ) -> Dict[str, Dict]:
+    ) -> dict[str, dict]:
         """Calculate horizontal row layout (3x1, 4x1)"""
         win_width = (screen_width - spacing * (count + 1)) // count
         win_height = screen_height - spacing * 2
@@ -291,14 +290,14 @@ class LayoutManager:
 
     def _calc_vertical_column(
         self,
-        windows: List[str],
+        windows: list[str],
         count: int,
         screen_x: int,
         screen_y: int,
         screen_width: int,
         screen_height: int,
         spacing: int,
-    ) -> Dict[str, Dict]:
+    ) -> dict[str, dict]:
         """Calculate vertical column layout (1x3)"""
         win_width = screen_width - spacing * 2
         win_height = (screen_height - spacing * (count + 1)) // count
@@ -313,8 +312,8 @@ class LayoutManager:
         }
 
     def calculate_grid_layout(
-        self, pattern: GridPattern, windows: List[str], screen_geometry: Dict, spacing: int = 10
-    ) -> Dict[str, Dict]:
+        self, pattern: GridPattern, windows: list[str], screen_geometry: dict, spacing: int = 10
+    ) -> dict[str, dict]:
         """Calculate grid layout positions
 
         Args:
@@ -350,13 +349,13 @@ class LayoutManager:
 
     def _calc_main_plus_sides(
         self,
-        windows: List[str],
+        windows: list[str],
         screen_x: int,
         screen_y: int,
         screen_width: int,
         screen_height: int,
         spacing: int,
-    ) -> Dict[str, Dict]:
+    ) -> dict[str, dict]:
         """Calculate main + sides layout"""
         layouts = {}
         num_windows = len(windows)
@@ -382,8 +381,8 @@ class LayoutManager:
         return layouts
 
     def _calc_cascade(
-        self, windows: List[str], screen_x: int, screen_y: int, spacing: int
-    ) -> Dict[str, Dict]:
+        self, windows: list[str], screen_x: int, screen_y: int, spacing: int
+    ) -> dict[str, dict]:
         """Calculate cascade layout"""
         return {
             window_id: {
@@ -396,8 +395,8 @@ class LayoutManager:
         }
 
     def auto_arrange(
-        self, windows: List[str], pattern: GridPattern, screen_geometry: Dict, spacing: int = 10
-    ) -> Dict[str, Dict]:
+        self, windows: list[str], pattern: GridPattern, screen_geometry: dict, spacing: int = 10
+    ) -> dict[str, dict]:
         """Auto-arrange windows in a grid pattern
 
         Args:

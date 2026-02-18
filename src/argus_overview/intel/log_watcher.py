@@ -16,7 +16,6 @@ import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
@@ -55,9 +54,9 @@ class ChatLogWatcher(QObject):
 
     def __init__(
         self,
-        log_paths: Optional[List[Path]] = None,
+        log_paths: list[Path] | None = None,
         poll_interval_ms: int = 1000,
-        parent: Optional[QObject] = None,
+        parent: QObject | None = None,
     ):
         """
         Initialize the chat log watcher.
@@ -73,19 +72,19 @@ class ChatLogWatcher(QObject):
         self.poll_interval_ms = poll_interval_ms
 
         # Track file positions for tailing
-        self.file_positions: Dict[Path, int] = {}
+        self.file_positions: dict[Path, int] = {}
 
         # Currently monitored channels (filenames without date suffix)
-        self.monitored_channels: Set[str] = set()
+        self.monitored_channels: set[str] = set()
 
         # Polling timer
         self.poll_timer = QTimer(self)
         self.poll_timer.timeout.connect(self._poll_files)
 
         self._running = False
-        self._log_directory: Optional[Path] = None
+        self._log_directory: Path | None = None
 
-    def find_log_directory(self) -> Optional[Path]:
+    def find_log_directory(self) -> Path | None:
         """
         Auto-detect EVE log directory.
 
@@ -139,7 +138,7 @@ class ChatLogWatcher(QObject):
         self.logger.warning("Could not find EVE chat log directory")
         return None
 
-    def get_active_channels(self) -> List[Path]:
+    def get_active_channels(self) -> list[Path]:
         """
         Get today's log files (channels currently open).
 
@@ -180,7 +179,7 @@ class ChatLogWatcher(QObject):
             return parts[0]
         return name
 
-    def parse_line(self, line: str, channel_name: str) -> Optional[ChatMessage]:
+    def parse_line(self, line: str, channel_name: str) -> ChatMessage | None:
         """
         Parse a single chat log line.
 
@@ -215,7 +214,7 @@ class ChatLogWatcher(QObject):
             raw_line=line,
         )
 
-    def tail_file(self, filepath: Path) -> List[ChatMessage]:
+    def tail_file(self, filepath: Path) -> list[ChatMessage]:
         """
         Read new lines from a log file.
 
@@ -262,13 +261,13 @@ class ChatLogWatcher(QObject):
 
         except PermissionError:
             self.logger.warning(f"Permission denied reading: {filepath}")
-        except Exception as e:
+        except (OSError, UnicodeDecodeError) as e:
             self.logger.error(f"Error reading {filepath}: {e}")
             self.error_occurred.emit(str(e))
 
         return messages
 
-    def set_monitored_channels(self, channels: List[str]):
+    def set_monitored_channels(self, channels: list[str]):
         """
         Set which channels to monitor.
 
@@ -319,7 +318,7 @@ class ChatLogWatcher(QObject):
         """Check if watcher is running."""
         return self._running
 
-    def get_log_directory(self) -> Optional[Path]:
+    def get_log_directory(self) -> Path | None:
         """Get the currently monitored log directory."""
         return self._log_directory
 

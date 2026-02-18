@@ -4,7 +4,6 @@ v3.0: Cross-platform support via platform abstraction layer.
 """
 
 import logging
-from typing import List
 
 from argus_overview.platform import get_screen_manager
 from argus_overview.platform.base import ScreenGeometry
@@ -30,7 +29,7 @@ def get_screen_geometry(monitor: int = 0) -> ScreenGeometry:
     return screen_mgr.get_screen_geometry(monitor)
 
 
-def get_all_monitors() -> List[ScreenGeometry]:
+def get_all_monitors() -> list[ScreenGeometry]:
     """Get geometry for all connected monitors.
 
     Uses platform-specific methods (xrandr on Linux, EnumDisplayMonitors on Windows).

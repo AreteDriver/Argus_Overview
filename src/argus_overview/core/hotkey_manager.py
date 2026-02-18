@@ -1,7 +1,7 @@
 """Global hotkey management - supports both modifier combos and single keys"""
 
 import logging
-from typing import Callable, Dict, Optional, Set
+from collections.abc import Callable
 
 from pynput import keyboard
 from PySide6.QtCore import QObject, Signal
@@ -14,17 +14,17 @@ class HotkeyManager(QObject):
 
     def __init__(self):
         super().__init__()
-        self.hotkeys: Dict[str, Dict] = {}
-        self.combo_listener: Optional[keyboard.GlobalHotKeys] = None
-        self.key_listener: Optional[keyboard.Listener] = None
+        self.hotkeys: dict[str, dict] = {}
+        self.combo_listener: keyboard.GlobalHotKeys | None = None
+        self.key_listener: keyboard.Listener | None = None
         self.logger = logging.getLogger(__name__)
 
         # Track single-key hotkeys separately
-        self.single_key_hotkeys: Dict[str, Dict] = {}  # key_char -> {name, callback}
-        self.combo_hotkeys: Dict[str, Dict] = {}  # combo_string -> {name, callback}
+        self.single_key_hotkeys: dict[str, dict] = {}  # key_char -> {name, callback}
+        self.combo_hotkeys: dict[str, dict] = {}  # combo_string -> {name, callback}
 
         # Track currently pressed modifiers
-        self.pressed_modifiers: Set[str] = set()
+        self.pressed_modifiers: set[str] = set()
 
     def _normalize_combo(self, key_combo: str) -> str:
         """Normalize hotkey combo for pynput compatibility.
@@ -67,7 +67,7 @@ class HotkeyManager(QObject):
             self._restart_listeners()
             self.logger.info(f"Registered hotkey '{name}': {normalized_combo}")
             return True
-        except Exception as e:
+        except (ValueError, RuntimeError, OSError) as e:
             self.logger.error(f"Failed to register hotkey: {e}")
             return False
 
@@ -119,14 +119,14 @@ class HotkeyManager(QObject):
         if self.combo_listener:
             try:
                 self.combo_listener.stop()
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 self.logger.debug(f"Error stopping combo listener: {e}")
             self.combo_listener = None
 
         if self.key_listener:
             try:
                 self.key_listener.stop()
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 self.logger.debug(f"Error stopping key listener: {e}")
             self.key_listener = None
 
@@ -157,7 +157,7 @@ class HotkeyManager(QObject):
         try:
             self.combo_listener = keyboard.GlobalHotKeys(hotkey_map)
             self.combo_listener.start()
-        except Exception as e:
+        except (RuntimeError, OSError) as e:
             self.logger.error(f"Failed to start combo listener: {e}")
 
     def _start_key_listener(self):
@@ -167,7 +167,7 @@ class HotkeyManager(QObject):
                 on_press=self._on_key_press, on_release=self._on_key_release
             )
             self.key_listener.start()
-        except Exception as e:
+        except (RuntimeError, OSError) as e:
             self.logger.error(f"Failed to start key listener: {e}")
 
     # Modifier key name mappings
@@ -213,10 +213,10 @@ class HotkeyManager(QObject):
                 try:
                     info["callback"]()
                     self.hotkey_triggered.emit(info["name"])
-                except Exception as e:
+                except (RuntimeError, TypeError, ValueError) as e:
                     self.logger.error(f"Error in hotkey callback: {e}")
 
-        except Exception as e:
+        except (AttributeError, TypeError, RuntimeError) as e:
             self.logger.debug(f"Key press handling error: {e}")
 
     def _on_key_release(self, key):
@@ -229,7 +229,7 @@ class HotkeyManager(QObject):
                     self.pressed_modifiers.discard("alt")
                 elif key.name in ("shift", "shift_l", "shift_r"):
                     self.pressed_modifiers.discard("shift")
-        except Exception as e:
+        except (AttributeError, TypeError) as e:
             self.logger.debug(f"Key release handling error: {e}")
 
     def start(self):
@@ -242,14 +242,14 @@ class HotkeyManager(QObject):
         if self.combo_listener:
             try:
                 self.combo_listener.stop()
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 self.logger.debug(f"Error stopping combo listener: {e}")
             self.combo_listener = None
 
         if self.key_listener:
             try:
                 self.key_listener.stop()
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 self.logger.debug(f"Error stopping key listener: {e}")
             self.key_listener = None
 
@@ -264,7 +264,7 @@ class HotkeyManager(QObject):
             try:
                 self.combo_listener.stop()
                 self.combo_listener = None
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 self.logger.debug(f"Error stopping combo listener: {e}")
                 self.combo_listener = None
 
@@ -272,7 +272,7 @@ class HotkeyManager(QObject):
             try:
                 self.key_listener.stop()
                 self.key_listener = None
-            except Exception as e:
+            except (RuntimeError, OSError) as e:
                 self.logger.debug(f"Error stopping key listener: {e}")
                 self.key_listener = None
 

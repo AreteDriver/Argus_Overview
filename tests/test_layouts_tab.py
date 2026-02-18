@@ -350,7 +350,7 @@ class TestGridApplier:
         """Test apply_arrangement handles exceptions"""
         from argus_overview.ui.layouts_tab import GridApplier, ScreenGeometry
 
-        mock_subprocess.side_effect = Exception("xdotool error")
+        mock_subprocess.side_effect = OSError("xdotool error")
 
         mock_layout_manager = MagicMock()
         applier = GridApplier(mock_layout_manager)

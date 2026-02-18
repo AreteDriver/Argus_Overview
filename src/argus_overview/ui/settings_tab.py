@@ -566,7 +566,7 @@ class AdvancedPanel(QWidget):
 
                 self.settings_manager.export_config(Path(filename))
                 QMessageBox.information(self, "Success", f"Settings exported to {filename}")
-            except Exception as e:
+            except (OSError, TypeError, ValueError) as e:
                 QMessageBox.critical(self, "Error", f"Failed to export settings: {e}")
 
     def _import_settings(self):
@@ -586,7 +586,7 @@ class AdvancedPanel(QWidget):
                     "Success",
                     f"Settings imported from {filename}\nRestart required to apply all changes.",
                 )
-            except Exception as e:
+            except (OSError, ValueError) as e:
                 QMessageBox.critical(self, "Error", f"Failed to import settings: {e}")
 
 
