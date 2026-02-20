@@ -1,0 +1,8 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+[allowlist]
+paths = [
+    '''.venv/''',
+    '''node_modules/''',
+]
