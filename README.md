@@ -9,6 +9,27 @@
 [![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)]()
 [![Downloads](https://img.shields.io/github/downloads/AreteDriver/Argus_Overview/total)](https://github.com/AreteDriver/Argus_Overview/releases)
 
+## Quick Install
+
+**Linux (pip):**
+```bash
+pip install argus-overview
+argus-overview
+```
+
+**Linux (portable — no install):**
+```bash
+# Download from https://github.com/AreteDriver/Argus_Overview/releases
+tar -xzf Argus-Overview-*-Linux.tar.gz && cd argus-overview-linux
+./run.sh
+```
+
+**Windows:** Download the `.exe` from [Releases](https://github.com/AreteDriver/Argus_Overview/releases) and run it.
+
+**1,875 tests · 96% coverage · 2,500+ downloads**
+
+---
+
 ## Screenshots
 
 ### Overview Tab
