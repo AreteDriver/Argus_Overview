@@ -1190,8 +1190,8 @@ class TestWindowCaptureLinuxEdgeCases:
 
         assert result is None
 
-    def test_capture_window_sync_with_scaling(self):
-        """Test sync capture with scaling (lines 369-371)."""
+    def test_capture_window_sync_scale_ignored(self):
+        """Test sync capture ignores scale param (scaling now done in Qt)."""
         from argus_overview.platform.linux import WindowCaptureLinux
 
         capture = WindowCaptureLinux(max_workers=1)
@@ -1210,12 +1210,14 @@ class TestWindowCaptureLinuxEdgeCases:
         mock_result.returncode = 0
         mock_result.stdout = fake_png
 
-        with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
-            result = capture.capture_window_sync("0x12345", scale=0.5)
+        with patch("argus_overview.platform.linux.HAS_XLIB", False):
+            with patch("argus_overview.platform.linux.subprocess.run", return_value=mock_result):
+                result = capture.capture_window_sync("0x12345", scale=0.5)
 
         assert result is not None
-        assert result.width == 50
-        assert result.height == 50
+        # Scale is deprecated/ignored — image retains original dimensions
+        assert result.width == 100
+        assert result.height == 100
 
 
 class TestWindowManagerLinuxEmptyLines:
@@ -1371,3 +1373,176 @@ class TestNormalizeComboEmptyPart:
 
         result = helper.normalize_combo("<ctrl>+a+")
         assert result == "<ctrl>+a"
+
+
+# =============================================================================
+# Performance overhaul: xlib capture, queue backpressure, fallback paths
+# =============================================================================
+
+
+class TestXlibCapture:
+    """Tests for python-xlib capture path."""
+
+    def test_capture_xlib_success(self):
+        """Test _capture_xlib returns PIL Image on success."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        # Mock Xlib objects
+        mock_display = MagicMock()
+        mock_window = MagicMock()
+        mock_geom = MagicMock()
+        mock_geom.width = 4
+        mock_geom.height = 2
+        mock_window.get_geometry.return_value = mock_geom
+
+        # BGRX pixel data: 4 bytes per pixel, 4x2 = 32 bytes
+        mock_raw = MagicMock()
+        mock_raw.data = b"\x00\x00\xff\xff" * 8  # Blue in BGRX
+        mock_window.get_image.return_value = mock_raw
+        mock_display.create_resource_object.return_value = mock_window
+
+        with patch("argus_overview.platform.linux._thread_local") as mock_tl:
+            mock_tl.display = mock_display
+            result = capture._capture_xlib("0x12345")
+
+        assert result is not None
+        assert result.mode == "RGB"
+        assert result.size == (4, 2)
+
+    def test_capture_xlib_failure_returns_none(self):
+        """Test _capture_xlib returns None on exception."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        mock_display = MagicMock()
+        mock_display.create_resource_object.side_effect = Exception("X11 BadWindow")
+
+        with patch("argus_overview.platform.linux._thread_local") as mock_tl:
+            mock_tl.display = mock_display
+            result = capture._capture_xlib("0x12345")
+
+        assert result is None
+
+    def test_capture_xlib_creates_thread_local_display(self):
+        """Test _capture_xlib creates Display on first call per thread."""
+        import threading
+
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        mock_tl = threading.local()  # Fresh local with no .display
+
+        mock_display_cls = MagicMock()
+        mock_display_instance = MagicMock()
+        mock_display_cls.return_value = mock_display_instance
+        mock_display_instance.create_resource_object.side_effect = Exception("stop")
+
+        with patch("argus_overview.platform.linux._thread_local", mock_tl):
+            with patch("argus_overview.platform.linux.xlib_display.Display", mock_display_cls):
+                capture._capture_xlib("0x12345")
+
+        mock_display_cls.assert_called_once()
+
+
+class TestXlibFallbackToImageMagick:
+    """Tests for xlib→ImageMagick fallback."""
+
+    def test_capture_falls_back_to_imagemagick(self):
+        """Test capture_window_sync falls back to ImageMagick when xlib fails."""
+        from io import BytesIO
+
+        from PIL import Image
+
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        # Create a fake PNG
+        img = Image.new("RGB", (50, 50), color="green")
+        buf = BytesIO()
+        img.save(buf, format="PNG")
+        fake_png = buf.getvalue()
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = fake_png
+
+        with patch("argus_overview.platform.linux.HAS_XLIB", True):
+            with patch.object(capture, "_capture_xlib", return_value=None):
+                with patch(
+                    "argus_overview.platform.linux.subprocess.run", return_value=mock_result
+                ):
+                    result = capture.capture_window_sync("0x12345")
+
+        assert result is not None
+        assert result.size == (50, 50)
+
+    def test_capture_uses_xlib_when_available(self):
+        """Test capture_window_sync uses xlib path when HAS_XLIB=True."""
+        from PIL import Image
+
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        mock_image = Image.new("RGB", (100, 100))
+
+        with patch("argus_overview.platform.linux.HAS_XLIB", True):
+            with patch.object(capture, "_capture_xlib", return_value=mock_image) as mock_xlib:
+                result = capture.capture_window_sync("0x12345")
+
+        mock_xlib.assert_called_once_with("0x12345")
+        assert result is mock_image
+
+    def test_capture_skips_xlib_when_not_available(self):
+        """Test capture_window_sync uses ImageMagick when HAS_XLIB=False."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        with patch("argus_overview.platform.linux.HAS_XLIB", False):
+            with patch.object(capture, "_capture_imagemagick", return_value=None) as mock_im:
+                capture.capture_window_sync("0x12345")
+
+        mock_im.assert_called_once_with("0x12345")
+
+
+class TestQueueBackpressure:
+    """Tests for bounded queue and backpressure."""
+
+    def test_queue_is_bounded(self):
+        """Test capture queue has maxsize = max_workers * 2."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=3)
+        assert capture.capture_queue.maxsize == 6
+
+    def test_capture_async_returns_empty_on_full_queue(self):
+        """Test capture_window_async returns empty string when queue is full."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        # maxsize=2, fill it up
+        capture.capture_queue.put(("0x1", 1.0, "r1"))
+        capture.capture_queue.put(("0x2", 1.0, "r2"))
+
+        result = capture.capture_window_async("0x12345")
+        assert result == ""
+
+    def test_stop_handles_full_queue(self):
+        """Test stop() doesn't block if queue is full."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+        # Fill queue to maxsize
+        capture.capture_queue.put(("0x1", 1.0, "r1"))
+        capture.capture_queue.put(("0x2", 1.0, "r2"))
+
+        capture._stop_event.clear()  # Pretend started
+        capture.workers = [MagicMock()]  # Mock worker
+        capture.stop()  # Should not block or raise
+
+        assert capture._stop_event.is_set()

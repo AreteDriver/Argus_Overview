@@ -1347,6 +1347,7 @@ class TestWindowPreviewWidgetAdditional:
             widget.window_id = "12345"
             widget.logger = MagicMock()
             widget.image_label = MagicMock()
+            widget._last_frame_hash = None
 
             img = Image.new("RGB", (100, 100), (255, 0, 0))
 
@@ -1368,6 +1369,7 @@ class TestWindowPreviewWidgetAdditional:
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
             widget.window_id = "12345"
             widget.logger = MagicMock()
+            widget._last_frame_hash = None
 
             img = Image.new("RGB", (100, 100), (255, 0, 0))
 
@@ -1894,18 +1896,20 @@ class TestWindowPreviewWidgetUpdateFrame:
     """Tests for WindowPreviewWidget.update_frame"""
 
     def test_update_frame_handles_none_image(self):
-        """Test update_frame handles None image"""
+        """Test update_frame handles None image (caught by except block)"""
         from argus_overview.ui.main_tab import WindowPreviewWidget
 
         with patch.object(WindowPreviewWidget, "__init__", return_value=None):
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
             widget.logger = MagicMock()
-            widget.preview_label = MagicMock()
-            widget._current_pixmap = None
+            widget.image_label = MagicMock()
+            widget.current_pixmap = None
+            widget.window_id = "0xtest"
+            widget._last_frame_hash = None
 
             widget.update_frame(None)  # Should not raise
 
-            widget.preview_label.setPixmap.assert_not_called()
+            widget.image_label.setPixmap.assert_not_called()
 
 
 class TestWindowManagerStartStop:
@@ -5685,6 +5689,8 @@ class TestWindowPreviewWidgetUpdateFrame:
             widget.current_pixmap = None
             widget.zoom_factor = 0.3
             widget.last_activity = datetime.now()
+            widget._last_frame_hash = None
+            widget.logger = MagicMock()
 
             # Mock PIL Image
             mock_image = MagicMock()
@@ -5698,6 +5704,7 @@ class TestWindowPreviewWidgetUpdateFrame:
                     widget.update_frame(mock_image)
 
                     widget.image_label.setPixmap.assert_called_once()
+                    mock_image.close.assert_called_once()  # Memory cleanup
 
     def test_update_frame_with_pil_to_qimage_returns_none(self):
         """Test update_frame returns early if pil_to_qimage returns None"""
@@ -5707,14 +5714,19 @@ class TestWindowPreviewWidgetUpdateFrame:
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
             widget.image_label = MagicMock()
             widget.current_pixmap = MagicMock()
+            widget._last_frame_hash = None
+            widget.logger = MagicMock()
 
             mock_image = MagicMock()
+            mock_image.tobytes.return_value = b"\xff" * 100
 
             with patch("argus_overview.ui.main_tab.pil_to_qimage", return_value=None):
                 widget.update_frame(mock_image)
 
                 # Should not call setPixmap since pil_to_qimage returned None
                 widget.image_label.setPixmap.assert_not_called()
+                # But image should still be closed
+                mock_image.close.assert_called_once()
 
 
 # =============================================================================
@@ -5722,6 +5734,230 @@ class TestWindowPreviewWidgetUpdateFrame:
 # =============================================================================
 
 # Note: contextMenuEvent test removed - QMenu instantiation crashes in headless mode
+
+
+# =============================================================================
+# Performance Overhaul Tests
+# =============================================================================
+
+
+class TestFrameFingerprintCache:
+    """Tests for frame fingerprint caching (skip identical frames)."""
+
+    def test_identical_frame_skipped(self):
+        """Test update_frame skips rendering when frame bytes are identical."""
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget.image_label = MagicMock()
+            widget.current_pixmap = None
+            widget._last_frame_hash = None
+            widget.logger = MagicMock()
+
+            frame_data = b"\xAA" * 5000
+            mock_image = MagicMock()
+            mock_image.tobytes.return_value = frame_data
+
+            # First call — should render
+            with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_pil:
+                mock_pil.return_value = MagicMock()
+                with patch("argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()):
+                    widget.update_frame(mock_image)
+                assert mock_pil.call_count == 1
+
+            # Second call with same data — should skip
+            mock_image2 = MagicMock()
+            mock_image2.tobytes.return_value = frame_data
+
+            with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_pil2:
+                widget.update_frame(mock_image2)
+                mock_pil2.assert_not_called()
+                mock_image2.close.assert_called_once()  # Still closed
+
+    def test_different_frame_rendered(self):
+        """Test update_frame renders when frame bytes differ."""
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget.image_label = MagicMock()
+            widget.current_pixmap = None
+            widget._last_frame_hash = None
+            widget.logger = MagicMock()
+
+            mock_image1 = MagicMock()
+            mock_image1.tobytes.return_value = b"\xAA" * 5000
+            mock_image2 = MagicMock()
+            mock_image2.tobytes.return_value = b"\xBB" * 5000
+
+            with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_pil:
+                mock_pil.return_value = MagicMock()
+                with patch("argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()):
+                    widget.update_frame(mock_image1)
+                    widget.update_frame(mock_image2)
+                assert mock_pil.call_count == 2  # Both frames rendered
+
+
+class TestCaptureCycleSkipsPending:
+    """Tests for _capture_cycle skipping windows with pending requests."""
+
+    def test_skips_window_with_pending_request(self):
+        """Test _capture_cycle skips windows that already have pending captures."""
+        import threading
+
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            manager.logger = MagicMock()
+            manager.capture_system = MagicMock()
+            manager.capture_system.capture_window_async.return_value = "req-2"
+            manager.pending_requests = {"req-1": "0x123"}  # 0x123 already pending
+            manager._pending_lock = threading.Lock()
+            manager._process_capture_results = MagicMock()
+
+            frame1 = MagicMock()
+            frame1.isVisible.return_value = True
+            frame2 = MagicMock()
+            frame2.isVisible.return_value = True
+
+            manager.preview_frames = {"0x123": frame1, "0x456": frame2}
+
+            manager._capture_cycle()
+
+            # 0x123 should be skipped (already pending), only 0x456 captured
+            manager.capture_system.capture_window_async.assert_called_once_with("0x456")
+
+    def test_skips_when_async_returns_empty(self):
+        """Test _capture_cycle handles empty string from queue-full scenario."""
+        import threading
+
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            manager.logger = MagicMock()
+            manager.capture_system = MagicMock()
+            manager.capture_system.capture_window_async.return_value = ""  # Queue full
+            manager.pending_requests = {}
+            manager._pending_lock = threading.Lock()
+            manager._process_capture_results = MagicMock()
+
+            mock_frame = MagicMock()
+            mock_frame.isVisible.return_value = True
+            manager.preview_frames = {"0x123": mock_frame}
+
+            manager._capture_cycle()
+
+            # Empty request_id should NOT be added to pending
+            assert "" not in manager.pending_requests
+
+
+class TestProcessResultsDedup:
+    """Tests for _process_capture_results deduplication."""
+
+    def test_dedup_keeps_latest_frame(self):
+        """Test _process_capture_results deduplicates by window_id (last wins)."""
+        import threading
+
+        from PIL import Image
+
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            manager.logger = MagicMock()
+            manager.pending_requests = {"req-1": "0x123", "req-2": "0x123"}
+            manager._pending_lock = threading.Lock()
+
+            mock_frame = MagicMock()
+            manager.preview_frames = {"0x123": mock_frame}
+
+            old_image = Image.new("RGB", (10, 10), "red")
+            new_image = Image.new("RGB", (10, 10), "blue")
+
+            manager.capture_system = MagicMock()
+            manager.capture_system.get_result.side_effect = [
+                ("req-1", "0x123", old_image),
+                ("req-2", "0x123", new_image),
+                None,
+            ]
+
+            manager._process_capture_results()
+
+            # update_frame should only be called once with the latest image
+            mock_frame.update_frame.assert_called_once_with(new_image)
+
+    def test_skips_none_images(self):
+        """Test _process_capture_results skips None images."""
+        import threading
+
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            manager.logger = MagicMock()
+            manager.pending_requests = {"req-1": "0x123"}
+            manager._pending_lock = threading.Lock()
+
+            mock_frame = MagicMock()
+            manager.preview_frames = {"0x123": mock_frame}
+
+            manager.capture_system = MagicMock()
+            manager.capture_system.get_result.side_effect = [
+                ("req-1", "0x123", None),
+                None,
+            ]
+
+            manager._process_capture_results()
+
+            mock_frame.update_frame.assert_not_called()
+
+
+class TestMemoryCleanup:
+    """Tests for image memory cleanup in update_frame."""
+
+    def test_image_closed_on_success(self):
+        """Test PIL image is closed after conversion."""
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget.image_label = MagicMock()
+            widget.current_pixmap = None
+            widget._last_frame_hash = None
+            widget.logger = MagicMock()
+
+            mock_image = MagicMock()
+            mock_image.tobytes.return_value = b"\x00" * 100
+
+            with patch("argus_overview.ui.main_tab.pil_to_qimage", return_value=MagicMock()):
+                with patch("argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()):
+                    widget.update_frame(mock_image)
+
+            mock_image.close.assert_called_once()
+
+    def test_image_closed_on_identical_frame(self):
+        """Test PIL image is closed even when frame is skipped (identical)."""
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget.image_label = MagicMock()
+            widget.current_pixmap = None
+            widget.logger = MagicMock()
+
+            frame_data = b"\xCC" * 100
+            # Set hash to match what we'll compute
+            widget._last_frame_hash = hash(frame_data[:4096])
+
+            mock_image = MagicMock()
+            mock_image.tobytes.return_value = frame_data
+
+            widget.update_frame(mock_image)
+
+            mock_image.close.assert_called_once()
 
 
 # =============================================================================

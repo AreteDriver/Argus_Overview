@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from queue import Empty, Queue
+from queue import Empty, Full, Queue
 from typing import Any
 
 from PIL import Image
@@ -25,6 +25,17 @@ from .base import (
     WindowCapture,
     WindowManager,
 )
+
+# python-xlib for direct X11 capture (optional, falls back to ImageMagick)
+try:
+    from Xlib import X, display as xlib_display  # noqa: I001
+
+    HAS_XLIB = True
+except ImportError:
+    HAS_XLIB = False
+
+# Thread-local storage for per-worker Xlib Display connections
+_thread_local = threading.local()
 
 logger = logging.getLogger(__name__)
 
@@ -297,11 +308,11 @@ class WindowManagerLinux(WindowManager):
 
 
 class WindowCaptureLinux(WindowCapture):
-    """Linux window capture using ImageMagick."""
+    """Linux window capture using python-xlib (preferred) or ImageMagick (fallback)."""
 
     def __init__(self, max_workers: int = 4):
         self.max_workers = max_workers
-        self.capture_queue: Queue[Any] = Queue()
+        self.capture_queue: Queue[Any] = Queue(maxsize=max_workers * 2)
         self.result_queue: Queue[Any] = Queue()
         self.workers: list[threading.Thread] = []
         self._stop_event = threading.Event()
@@ -326,7 +337,10 @@ class WindowCaptureLinux(WindowCapture):
         """Stop worker threads."""
         self._stop_event.set()
         for _ in self.workers:
-            self.capture_queue.put(None)
+            try:
+                self.capture_queue.put_nowait(None)
+            except Full:
+                pass
         for worker in self.workers:
             worker.join(timeout=1.0)
         self.workers.clear()
@@ -354,7 +368,11 @@ class WindowCaptureLinux(WindowCapture):
             logger.warning(f"Invalid window ID format for capture: {window_id}")
             return ""
         request_id = str(uuid.uuid4())
-        self.capture_queue.put((window_id, scale, request_id))
+        try:
+            self.capture_queue.put_nowait((window_id, scale, request_id))
+        except Full:
+            logger.debug(f"Capture queue full, dropping request for {window_id}")
+            return ""
         return request_id
 
     def get_result(self, timeout: float = 0.1) -> tuple[str, str, Image.Image] | None:
@@ -365,7 +383,45 @@ class WindowCaptureLinux(WindowCapture):
             return None
 
     def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Image.Image | None:
-        """Synchronous window capture using ImageMagick."""
+        """Synchronous window capture.
+
+        Uses python-xlib for direct X11 capture when available,
+        falls back to ImageMagick subprocess.
+
+        Args:
+            window_id: X11 window ID (hex string)
+            scale: Deprecated, ignored. Scaling is done in Qt.
+
+        Returns:
+            PIL Image or None if capture failed.
+        """
+        if HAS_XLIB:
+            img = self._capture_xlib(window_id)
+            if img is not None:
+                return img
+            # Fall through to ImageMagick on xlib failure
+
+        return self._capture_imagemagick(window_id)
+
+    def _capture_xlib(self, window_id: str) -> Image.Image | None:
+        """Capture window using python-xlib (no subprocess)."""
+        try:
+            # Thread-local Display to avoid locking on hot path
+            if not hasattr(_thread_local, "display"):
+                _thread_local.display = xlib_display.Display()
+
+            disp = _thread_local.display
+            window = disp.create_resource_object("window", int(window_id, 16))
+            geom = window.get_geometry()
+            raw = window.get_image(0, 0, geom.width, geom.height, X.ZPixmap, 0xFFFFFFFF)
+            img = Image.frombytes("RGBX", (geom.width, geom.height), raw.data, "raw", "BGRX")
+            return img.convert("RGB")
+        except Exception as e:
+            logger.debug(f"Xlib capture failed for {window_id}: {e}")
+            return None
+
+    def _capture_imagemagick(self, window_id: str) -> Image.Image | None:
+        """Capture window using ImageMagick import subprocess (fallback)."""
         try:
             result = subprocess.run(
                 ["import", "-window", window_id, "-silent", "png:-"],
@@ -374,15 +430,9 @@ class WindowCaptureLinux(WindowCapture):
             )
 
             if result.returncode == 0 and result.stdout:
-                img: Image.Image = Image.open(io.BytesIO(result.stdout))
-
-                if scale != 1.0:
-                    new_size = (int(img.width * scale), int(img.height * scale))
-                    img = img.resize(new_size, Image.Resampling.LANCZOS)
-
-                return img
+                return Image.open(io.BytesIO(result.stdout))
         except (OSError, subprocess.SubprocessError) as e:
-            logger.debug(f"Capture failed for {window_id}: {e}")
+            logger.debug(f"ImageMagick capture failed for {window_id}: {e}")
 
         return None
 

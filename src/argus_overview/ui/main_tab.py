@@ -601,6 +601,9 @@ class WindowPreviewWidget(QWidget):
         self._is_hovered: bool = False
         self._positions_locked: bool = False
 
+        # Frame fingerprint cache — skip identical frames
+        self._last_frame_hash: int | None = None
+
         # v2.2 Settings (from settings_manager or defaults)
         self._opacity_on_hover = 0.3
         self._zoom_on_hover = 1.5
@@ -691,13 +694,23 @@ class WindowPreviewWidget(QWidget):
             image: PIL Image
         """
         try:
+            # Frame fingerprint — hash first 4KB of image bytes to skip identical frames
+            frame_bytes = image.tobytes()
+            frame_hash = hash(frame_bytes[:4096])
+            if frame_hash == self._last_frame_hash:
+                image.close()
+                return  # Frame unchanged, skip conversion pipeline
+            self._last_frame_hash = frame_hash
+
             # Convert PIL to QImage
             qimage = pil_to_qimage(image)
+            image.close()  # Release PIL image memory immediately
             if qimage is None:
                 return  # Skip frame if capture failed
 
             # Convert to pixmap
             self.current_pixmap = QPixmap.fromImage(qimage)
+            del qimage  # Release intermediate QImage memory
 
             # Scale to fit widget while maintaining aspect ratio
             scaled_pixmap = self.current_pixmap.scaled(
@@ -1023,17 +1036,21 @@ class WindowManager:
         """
         Capture cycle - called by timer
 
-        Requests captures for all visible frames, then polls for results
+        Requests captures for all visible frames, then polls for results.
+        Skips windows that already have pending capture requests.
         """
+        # Build set of windows with pending requests to avoid duplicates
+        with self._pending_lock:
+            pending_windows = set(self.pending_requests.values())
+
         # Request captures for all visible preview frames
         for window_id, frame in self.preview_frames.items():
-            if frame.isVisible():
+            if frame.isVisible() and window_id not in pending_windows:
                 try:
-                    request_id = self.capture_system.capture_window_async(
-                        window_id, scale=frame.zoom_factor
-                    )
-                    with self._pending_lock:
-                        self.pending_requests[request_id] = window_id
+                    request_id = self.capture_system.capture_window_async(window_id)
+                    if request_id:
+                        with self._pending_lock:
+                            self.pending_requests[request_id] = window_id
                 except (OSError, RuntimeError) as e:
                     self.logger.error(f"Failed to request capture for {window_id}: {e}")
 
@@ -1041,32 +1058,39 @@ class WindowManager:
         self._process_capture_results()
 
     def _process_capture_results(self):
-        """Poll and process capture results from worker threads"""
-        # Process up to 10 results per cycle to avoid blocking UI
-        max_per_cycle = 10
-        processed = 0
+        """Poll and process capture results from worker threads.
+
+        Collects all available results, deduplicates by window_id
+        (last write wins), and only calls update_frame on the latest
+        frame per window.
+        """
+        # Collect all available results
+        max_per_cycle = 20
+        latest: dict[str, tuple[str, Image.Image]] = {}
 
         for _ in range(max_per_cycle):
             result = self.capture_system.get_result(timeout=0.0)  # Non-blocking
             if not result:
                 break
 
-            processed += 1
             request_id, window_id, image = result
-
-            # Update preview
-            if window_id in self.preview_frames:
-                try:
-                    self.preview_frames[window_id].update_frame(image)
-                except (ValueError, AttributeError, RuntimeError) as e:
-                    self.logger.error(f"Failed to process frame for {window_id}: {e}")
+            # Dedup: keep only the latest result per window
+            latest[window_id] = (request_id, image)
 
             # Remove from pending
             with self._pending_lock:
                 self.pending_requests.pop(request_id, None)
 
-        if processed > 0:
-            self.logger.debug(f"Processed {processed} capture results")
+        # Update previews with only the latest frame per window
+        for window_id, (_request_id, image) in latest.items():
+            if window_id in self.preview_frames and image is not None:
+                try:
+                    self.preview_frames[window_id].update_frame(image)
+                except (ValueError, AttributeError, RuntimeError) as e:
+                    self.logger.error(f"Failed to process frame for {window_id}: {e}")
+
+        if latest:
+            self.logger.debug(f"Processed {len(latest)} capture results")
 
     def get_active_window_count(self) -> int:
         """Get count of active preview windows"""

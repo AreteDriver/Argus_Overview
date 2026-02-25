@@ -186,7 +186,7 @@ class WindowCapture(ABC):
 
         Args:
             window_id: Platform-specific window identifier
-            scale: Scale factor (0.0-1.0)
+            scale: Deprecated — ignored. Scaling is now done once in Qt.
 
         Returns:
             PIL Image or None if capture failed
