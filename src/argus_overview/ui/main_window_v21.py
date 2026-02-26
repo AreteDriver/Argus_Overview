@@ -317,12 +317,11 @@ class MainWindowV21(QMainWindow):
         self._cycle_window(direction=-1)
 
     def _activate_window(self, window_id: str):
-        """Activate a window by ID using xdotool, optionally minimizing previous EVE window"""
-        import re
-        import subprocess
+        """Activate a window by ID, optionally minimizing previous EVE window.
 
-        # Validate window ID format (X11: 0x followed by hex digits)
-        if not window_id or not re.match(r"^0x[0-9a-fA-F]+$", window_id):
+        Uses the platform abstraction layer instead of raw subprocess calls.
+        """
+        if not self.capture_system._window_mgr.is_valid_window_id(window_id):
             self.logger.warning(f"Invalid window ID format: {window_id}")
             return
 
@@ -337,24 +336,17 @@ class MainWindowV21(QMainWindow):
                 if (
                     last_eve_window
                     and last_eve_window != window_id
-                    and re.match(r"^0x[0-9a-fA-F]+$", last_eve_window)
+                    and self.capture_system._window_mgr.is_valid_window_id(last_eve_window)
                 ):
-                    # Minimize the previous EVE window
-                    subprocess.run(
-                        ["xdotool", "windowminimize", last_eve_window],
-                        capture_output=True,
-                        timeout=2,
-                    )
+                    self.capture_system.minimize_window(last_eve_window)
                     self.logger.info(f"Auto-minimized previous EVE window: {last_eve_window}")
 
             # Track this as the last activated EVE window
             self.settings_manager.set_last_activated_window(window_id)
 
             # Activate the new window
-            subprocess.run(
-                ["xdotool", "windowactivate", "--sync", window_id], capture_output=True, timeout=2
-            )
-        except (OSError, subprocess.SubprocessError) as e:
+            self.capture_system.activate_window(window_id)
+        except (OSError, RuntimeError) as e:
             self.logger.error(f"Failed to activate window {window_id}: {e}")
 
     @Slot(str)

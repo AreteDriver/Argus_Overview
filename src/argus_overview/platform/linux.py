@@ -154,24 +154,17 @@ class WindowManagerLinux(WindowManager):
     """Linux window management using wmctrl and xdotool."""
 
     def get_window_list(self) -> list[tuple[str, str]]:
-        """Get list of all windows using wmctrl."""
-        try:
-            result = run_x11_subprocess(["wmctrl", "-l"], timeout=2)
-            stdout = result.stdout.decode("utf-8", errors="replace")
-
-            windows = []
-            for line in stdout.strip().split("\n"):
-                if line:
-                    parts = line.split(None, 3)
-                    if len(parts) >= 4:
-                        window_id = parts[0]
-                        window_title = parts[3]
-                        windows.append((window_id, window_title))
-
-            return windows
-        except (OSError, subprocess.SubprocessError) as e:
-            logger.warning(f"Failed to get window list: {e}")
-            return []
+        """Get list of all windows using wmctrl (cached)."""
+        output = _get_wmctrl_window_list()
+        windows = []
+        for line in output.strip().split("\n"):
+            if line:
+                parts = line.split(None, 3)
+                if len(parts) >= 4:
+                    window_id = parts[0]
+                    window_title = parts[3]
+                    windows.append((window_id, window_title))
+        return windows
 
     def get_eve_windows(self) -> list[tuple[str, str]]:
         """Get list of EVE Online windows."""
@@ -404,7 +397,11 @@ class WindowCaptureLinux(WindowCapture):
         return self._capture_imagemagick(window_id)
 
     def _capture_xlib(self, window_id: str) -> Image.Image | None:
-        """Capture window using python-xlib (no subprocess)."""
+        """Capture window using python-xlib (no subprocess).
+
+        Returns an RGBX image to avoid the overhead of converting to RGB.
+        The UI layer handles RGBX natively via QImage.Format_RGBX8888.
+        """
         try:
             # Thread-local Display to avoid locking on hot path
             if not hasattr(_thread_local, "display"):
@@ -414,8 +411,8 @@ class WindowCaptureLinux(WindowCapture):
             window = disp.create_resource_object("window", int(window_id, 16))
             geom = window.get_geometry()
             raw = window.get_image(0, 0, geom.width, geom.height, X.ZPixmap, 0xFFFFFFFF)
-            img = Image.frombytes("RGBX", (geom.width, geom.height), raw.data, "raw", "BGRX")
-            return img.convert("RGB")
+            # Return RGBX directly — avoids a full-image copy from .convert("RGB")
+            return Image.frombytes("RGBX", (geom.width, geom.height), raw.data, "raw", "BGRX")
         except Exception as e:
             logger.debug(f"Xlib capture failed for {window_id}: {e}")
             return None
