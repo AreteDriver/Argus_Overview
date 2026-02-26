@@ -72,6 +72,12 @@ def create_mock_window():
         window, enabled
     )
 
+    # Provide capture_system mock with _window_mgr for _activate_window
+    mock_window_mgr = MagicMock()
+    mock_window_mgr.is_valid_window_id.return_value = True
+    window.capture_system = MagicMock()
+    window.capture_system._window_mgr = mock_window_mgr
+
     return window
 
 
@@ -264,29 +270,26 @@ class TestCycling:
         assert window.cycling_index == 1
 
 
-# Test activate window
-class TestActivateWindow:
-    """Tests for _activate_window method"""
+# Test activate window (uses create_mock_window with capture_system)
+class TestActivateWindowBasic:
+    """Tests for _activate_window method (basic)"""
 
-    @patch("subprocess.run")
-    def test_activate_window_calls_xdotool(self, mock_subprocess):
-        """Test that activate_window calls xdotool"""
+    def test_activate_window_calls_capture_system(self):
+        """Test that activate_window delegates to capture_system"""
         window = create_mock_window()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = False  # auto_minimize off
 
         window._activate_window("0x12345")
 
-        mock_subprocess.assert_called_once()
-        call_args = mock_subprocess.call_args[0][0]
-        assert "xdotool" in call_args
-        assert "windowactivate" in call_args
-        assert "0x12345" in call_args
+        window.capture_system.activate_window.assert_called_once_with("0x12345")
 
-    @patch("subprocess.run")
-    def test_activate_window_handles_exception(self, mock_subprocess):
+    def test_activate_window_handles_exception(self):
         """Test that activate_window handles exceptions"""
-        mock_subprocess.side_effect = Exception("xdotool failed")
-
         window = create_mock_window()
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = False
+        window.capture_system.activate_window.side_effect = OSError("failed")
 
         # Should not raise
         window._activate_window("0x12345")
@@ -339,8 +342,7 @@ class TestMinimizeRestoreWindows:
 class TestActivateCharacter:
     """Tests for _activate_character method"""
 
-    @patch("subprocess.run")
-    def test_activate_character_found(self, mock_run):
+    def test_activate_character_found(self):
         """Test activating a found character"""
         window = create_mock_window()
         window.settings_manager = MagicMock()
@@ -353,13 +355,10 @@ class TestActivateCharacter:
         window.main_tab.window_manager = MagicMock()
         window.main_tab.window_manager.preview_frames = {"0x12345": mock_frame}
 
-        mock_run.return_value = MagicMock(returncode=0)
-
         window._activate_character("TestPilot")
 
-        # Should call xdotool windowactivate via _activate_window
-        calls = [str(c) for c in mock_run.call_args_list]
-        assert any("windowactivate" in c and "0x12345" in c for c in calls)
+        # Should delegate to capture_system.activate_window via _activate_window
+        window.capture_system.activate_window.assert_called_once_with("0x12345")
 
     def test_activate_character_not_found(self):
         """Test activating a character not found"""
@@ -1285,121 +1284,98 @@ class TestRegisterCyclingHotkeys:
         window.hotkey_manager.register_hotkey.assert_not_called()
 
 
-# Test _activate_window
-class TestActivateWindow:
-    """Tests for _activate_window method"""
+# Test _activate_window (platform abstraction layer)
+class TestActivateWindowPlatform:
+    """Tests for _activate_window method using capture_system abstraction"""
 
-    @patch("subprocess.run")
-    def test_activate_window_success(self, mock_run):
-        """Test activating window with xdotool"""
+    def _make_window(self, *, auto_minimize=False, valid_id=True):
+        """Helper to create a mock window with capture_system."""
         from argus_overview.ui.main_window_v21 import MainWindowV21
 
         window = MagicMock(spec=MainWindowV21)
         window.logger = MagicMock()
         window.settings_manager = MagicMock()
-        window.settings_manager.get.return_value = False  # auto_minimize off
+        window.settings_manager.get.return_value = auto_minimize
+        window.capture_system = MagicMock()
+        window.capture_system._window_mgr = MagicMock()
+        window.capture_system._window_mgr.is_valid_window_id.return_value = valid_id
+        return window
 
-        mock_run.return_value = MagicMock(returncode=0)
+    def test_activate_window_success(self):
+        """Test activating window delegates to capture_system"""
+        window = self._make_window()
+
+        from argus_overview.ui.main_window_v21 import MainWindowV21
 
         MainWindowV21._activate_window(window, "0x12345")
 
-        # Check xdotool windowactivate was called (may have other subprocess calls)
-        calls = [c for c in mock_run.call_args_list if c[0] and "xdotool" in c[0][0]]
-        assert len(calls) >= 1
-        assert "windowactivate" in calls[-1][0][0]
-        assert "0x12345" in calls[-1][0][0]
+        window.capture_system.activate_window.assert_called_once_with("0x12345")
 
-    @patch("subprocess.run")
-    def test_activate_window_failure(self, mock_run):
-        """Test activate window handles subprocess failure"""
+    def test_activate_window_failure(self):
+        """Test activate window handles failure"""
+        window = self._make_window()
+        window.capture_system.activate_window.side_effect = OSError("failed")
+
         from argus_overview.ui.main_window_v21 import MainWindowV21
-
-        window = MagicMock(spec=MainWindowV21)
-        window.logger = MagicMock()
-        window.settings_manager = MagicMock()
-        window.settings_manager.get.return_value = False  # auto_minimize off
-
-        mock_run.side_effect = OSError("xdotool not found")
 
         MainWindowV21._activate_window(window, "0x12345")
 
         window.logger.error.assert_called()
 
-    @patch("subprocess.run")
-    def test_activate_window_with_auto_minimize(self, mock_run):
+    def test_activate_window_with_auto_minimize(self):
         """Test activating window minimizes previous when auto-minimize enabled"""
+        window = self._make_window(auto_minimize=True)
+        window.settings_manager.get_last_activated_window.return_value = "0x99999"
+
         from argus_overview.ui.main_window_v21 import MainWindowV21
-
-        window = MagicMock(spec=MainWindowV21)
-        window.logger = MagicMock()
-        window.settings_manager = MagicMock()
-        window.settings_manager.get.return_value = True  # auto_minimize ON
-        window.settings_manager.get_last_activated_window.return_value = (
-            "0x99999"  # Previous EVE window (shared)
-        )
-
-        mock_run.return_value = MagicMock(returncode=0)
 
         MainWindowV21._activate_window(window, "0x12345")
 
-        # Should have 2 calls: windowminimize (previous), windowactivate (new)
-        assert mock_run.call_count == 2
         # Verify minimize was called on previous window
-        calls = [str(c) for c in mock_run.call_args_list]
-        assert any("windowminimize" in c and "0x99999" in c for c in calls)
-        assert any("windowactivate" in c and "0x12345" in c for c in calls)
+        window.capture_system.minimize_window.assert_called_once_with("0x99999")
+        # Verify activate was called on new window
+        window.capture_system.activate_window.assert_called_once_with("0x12345")
 
-    @patch("subprocess.run")
-    def test_activate_window_invalid_id_none(self, mock_run):
+    def test_activate_window_invalid_id_none(self):
         """Test activate window rejects None window ID"""
-        from argus_overview.ui.main_window_v21 import MainWindowV21
+        window = self._make_window(valid_id=False)
 
-        window = MagicMock(spec=MainWindowV21)
-        window.logger = MagicMock()
+        from argus_overview.ui.main_window_v21 import MainWindowV21
 
         MainWindowV21._activate_window(window, None)
 
         window.logger.warning.assert_called()
-        mock_run.assert_not_called()
+        window.capture_system.activate_window.assert_not_called()
 
-    @patch("subprocess.run")
-    def test_activate_window_invalid_id_format(self, mock_run):
+    def test_activate_window_invalid_id_format(self):
         """Test activate window rejects invalid window ID format"""
-        from argus_overview.ui.main_window_v21 import MainWindowV21
+        window = self._make_window(valid_id=False)
 
-        window = MagicMock(spec=MainWindowV21)
-        window.logger = MagicMock()
+        from argus_overview.ui.main_window_v21 import MainWindowV21
 
         # Test various invalid formats
         for invalid_id in ["12345", "abc", "0xGGGG", "", "window123"]:
-            mock_run.reset_mock()
+            window.capture_system.activate_window.reset_mock()
             window.logger.reset_mock()
 
             MainWindowV21._activate_window(window, invalid_id)
 
             window.logger.warning.assert_called()
-            mock_run.assert_not_called()
+            window.capture_system.activate_window.assert_not_called()
 
-    @patch("subprocess.run")
-    def test_activate_window_valid_id_formats(self, mock_run):
+    def test_activate_window_valid_id_formats(self):
         """Test activate window accepts valid window ID formats"""
+        window = self._make_window()
+
         from argus_overview.ui.main_window_v21 import MainWindowV21
-
-        window = MagicMock(spec=MainWindowV21)
-        window.logger = MagicMock()
-        window.settings_manager = MagicMock()
-        window.settings_manager.get.return_value = False
-
-        mock_run.return_value = MagicMock(returncode=0)
 
         # Test various valid formats
         for valid_id in ["0x12345", "0xABCDEF", "0x0", "0xFFFFFFFF"]:
-            mock_run.reset_mock()
+            window.capture_system.activate_window.reset_mock()
 
             MainWindowV21._activate_window(window, valid_id)
 
-            # Should have called subprocess
-            assert mock_run.called
+            window.capture_system.activate_window.assert_called_once_with(valid_id)
 
 
 # Test _create_menu_bar

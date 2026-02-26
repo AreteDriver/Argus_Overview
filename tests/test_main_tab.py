@@ -64,6 +64,34 @@ class TestPilToQimage:
         assert result.width() == 10
         assert result.height() == 10
 
+    def test_pil_to_qimage_rgbx(self):
+        """Test pil_to_qimage with RGBX image (xlib capture mode)"""
+        from PIL import Image
+
+        from argus_overview.ui.main_tab import pil_to_qimage
+
+        # Create an RGBX image (4 bytes per pixel, X channel ignored)
+        img = Image.new("RGBX", (10, 10), color=(255, 0, 0, 255))
+        result = pil_to_qimage(img)
+
+        assert result is not None
+        assert result.width() == 10
+        assert result.height() == 10
+
+    def test_pil_to_qimage_raw_data_kwarg(self):
+        """Test pil_to_qimage with pre-computed raw_data avoids redundant copy"""
+        from PIL import Image
+
+        from argus_overview.ui.main_tab import pil_to_qimage
+
+        img = Image.new("RGB", (10, 10), color="blue")
+        raw = img.tobytes()
+        result = pil_to_qimage(img, raw_data=raw)
+
+        assert result is not None
+        assert result.width() == 10
+        assert result.height() == 10
+
     def test_pil_to_qimage_other_mode(self):
         """Test pil_to_qimage with other mode (converts to RGB)"""
         from PIL import Image
@@ -5755,14 +5783,16 @@ class TestFrameFingerprintCache:
             widget._last_frame_hash = None
             widget.logger = MagicMock()
 
-            frame_data = b"\xAA" * 5000
+            frame_data = b"\xaa" * 5000
             mock_image = MagicMock()
             mock_image.tobytes.return_value = frame_data
 
             # First call — should render
             with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_pil:
                 mock_pil.return_value = MagicMock()
-                with patch("argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()):
+                with patch(
+                    "argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()
+                ):
                     widget.update_frame(mock_image)
                 assert mock_pil.call_count == 1
 
@@ -5787,13 +5817,15 @@ class TestFrameFingerprintCache:
             widget.logger = MagicMock()
 
             mock_image1 = MagicMock()
-            mock_image1.tobytes.return_value = b"\xAA" * 5000
+            mock_image1.tobytes.return_value = b"\xaa" * 5000
             mock_image2 = MagicMock()
-            mock_image2.tobytes.return_value = b"\xBB" * 5000
+            mock_image2.tobytes.return_value = b"\xbb" * 5000
 
             with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_pil:
                 mock_pil.return_value = MagicMock()
-                with patch("argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()):
+                with patch(
+                    "argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()
+                ):
                     widget.update_frame(mock_image1)
                     widget.update_frame(mock_image2)
                 assert mock_pil.call_count == 2  # Both frames rendered
@@ -5933,7 +5965,9 @@ class TestMemoryCleanup:
             mock_image.tobytes.return_value = b"\x00" * 100
 
             with patch("argus_overview.ui.main_tab.pil_to_qimage", return_value=MagicMock()):
-                with patch("argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()):
+                with patch(
+                    "argus_overview.ui.main_tab.QPixmap.fromImage", return_value=MagicMock()
+                ):
                     widget.update_frame(mock_image)
 
             mock_image.close.assert_called_once()
@@ -5948,7 +5982,7 @@ class TestMemoryCleanup:
             widget.current_pixmap = None
             widget.logger = MagicMock()
 
-            frame_data = b"\xCC" * 100
+            frame_data = b"\xcc" * 100
             # Set hash to match what we'll compute
             widget._last_frame_hash = hash(frame_data[:4096])
 

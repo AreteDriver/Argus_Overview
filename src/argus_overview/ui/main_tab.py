@@ -51,6 +51,14 @@ from argus_overview.ui.action_registry import PrimaryHome
 from argus_overview.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
 from argus_overview.utils.screen import ScreenGeometry, get_screen_geometry
 
+# Module-level constant: avoids re-creating the dict on every pil_to_qimage call
+_FORMAT_MAP = {
+    "RGB": (3, QImage.Format.Format_RGB888),
+    "RGBX": (4, QImage.Format.Format_RGBX8888),
+    "RGBA": (4, QImage.Format.Format_RGBA8888),
+    "L": (1, QImage.Format.Format_Grayscale8),
+}
+
 
 class FlowLayout(QLayout):
     """
@@ -525,13 +533,6 @@ def pil_to_qimage(pil_image: Image.Image, raw_data: bytes | None = None) -> QIma
     """
     if pil_image is None:
         return None
-
-    _FORMAT_MAP = {
-        "RGB": (3, QImage.Format.Format_RGB888),
-        "RGBX": (4, QImage.Format.Format_RGBX8888),
-        "RGBA": (4, QImage.Format.Format_RGBA8888),
-        "L": (1, QImage.Format.Format_Grayscale8),
-    }
 
     mode = pil_image.mode
     if mode in _FORMAT_MAP:

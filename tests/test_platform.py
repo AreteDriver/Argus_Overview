@@ -160,13 +160,12 @@ class TestLinuxWindowManager:
 
         wm = WindowManagerLinux()
 
-        mock_result = MagicMock()
-        mock_result.returncode = 0
-        mock_result.stdout = (
-            b"0x03800003  0 hostname EVE - CharOne\n0x03800004  0 hostname Firefox\n"
-        )
+        wmctrl_output = "0x03800003  0 hostname EVE - CharOne\n0x03800004  0 hostname Firefox\n"
 
-        with patch("argus_overview.platform.linux.run_x11_subprocess", return_value=mock_result):
+        with patch(
+            "argus_overview.platform.linux._get_wmctrl_window_list",
+            return_value=wmctrl_output,
+        ):
             windows = wm.get_window_list()
 
         assert len(windows) == 2
@@ -926,14 +925,14 @@ class TestWindowManagerLinuxGetWindowListEdgeCases:
     """Edge case tests for get_window_list."""
 
     def test_get_window_list_exception(self):
-        """Test get_window_list returns empty list on exception."""
+        """Test get_window_list returns empty list on error."""
         from argus_overview.platform.linux import WindowManagerLinux
 
         wm = WindowManagerLinux()
 
         with patch(
-            "argus_overview.platform.linux.run_x11_subprocess",
-            side_effect=OSError("test error"),
+            "argus_overview.platform.linux._get_wmctrl_window_list",
+            return_value="",
         ):
             result = wm.get_window_list()
 
@@ -1420,7 +1419,7 @@ class TestXlibCapture:
             result = capture._capture_xlib("0x12345")
 
         assert result is not None
-        assert result.mode == "RGB"
+        assert result.mode == "RGBX"
         assert result.size == (4, 2)
 
     def test_capture_xlib_failure_returns_none(self):
