@@ -84,8 +84,16 @@ def is_linux() -> bool:
     return sys.platform in ("linux", "linux2")
 
 
+_singleton_cache: dict[str, object] = {}
+
+
+def _clear_singleton_cache() -> None:
+    """Clear singleton cache (for testing)."""
+    _singleton_cache.clear()
+
+
 def get_window_manager() -> WindowManager:
-    """Create a platform-appropriate WindowManager instance.
+    """Get the platform-appropriate WindowManager singleton.
 
     Returns:
         WindowManager implementation for current platform
@@ -93,23 +101,27 @@ def get_window_manager() -> WindowManager:
     Raises:
         RuntimeError: If platform is not supported
     """
-    platform = get_platform_name()
-    if platform == "windows":
-        from .windows import WindowManagerWindows
+    key = "window_manager"
+    if key not in _singleton_cache:
+        platform = get_platform_name()
+        if platform == "windows":
+            from .windows import WindowManagerWindows
 
-        return WindowManagerWindows()
-    elif platform == "linux":
-        from .linux import WindowManagerLinux
+            _singleton_cache[key] = WindowManagerWindows()
+        elif platform == "linux":
+            from .linux import WindowManagerLinux
 
-        return WindowManagerLinux()
-    raise RuntimeError(f"Unsupported platform: {platform}")
+            _singleton_cache[key] = WindowManagerLinux()
+        else:
+            raise RuntimeError(f"Unsupported platform: {platform}")
+    return _singleton_cache[key]  # type: ignore[return-value]
 
 
 def get_window_capture(max_workers: int = 4) -> WindowCapture:
-    """Create a platform-appropriate WindowCapture instance.
+    """Get the platform-appropriate WindowCapture singleton.
 
     Args:
-        max_workers: Number of capture worker threads
+        max_workers: Number of capture worker threads (only used on first call)
 
     Returns:
         WindowCapture implementation for current platform
@@ -117,20 +129,24 @@ def get_window_capture(max_workers: int = 4) -> WindowCapture:
     Raises:
         RuntimeError: If platform is not supported
     """
-    platform = get_platform_name()
-    if platform == "windows":
-        from .windows import WindowCaptureWindows
+    key = "window_capture"
+    if key not in _singleton_cache:
+        platform = get_platform_name()
+        if platform == "windows":
+            from .windows import WindowCaptureWindows
 
-        return WindowCaptureWindows(max_workers=max_workers)
-    elif platform == "linux":
-        from .linux import WindowCaptureLinux
+            _singleton_cache[key] = WindowCaptureWindows(max_workers=max_workers)
+        elif platform == "linux":
+            from .linux import WindowCaptureLinux
 
-        return WindowCaptureLinux(max_workers=max_workers)
-    raise RuntimeError(f"Unsupported platform: {platform}")
+            _singleton_cache[key] = WindowCaptureLinux(max_workers=max_workers)
+        else:
+            raise RuntimeError(f"Unsupported platform: {platform}")
+    return _singleton_cache[key]  # type: ignore[return-value]
 
 
 def get_screen_manager() -> ScreenManager:
-    """Create a platform-appropriate ScreenManager instance.
+    """Get the platform-appropriate ScreenManager singleton.
 
     Returns:
         ScreenManager implementation for current platform
@@ -138,20 +154,24 @@ def get_screen_manager() -> ScreenManager:
     Raises:
         RuntimeError: If platform is not supported
     """
-    platform = get_platform_name()
-    if platform == "windows":
-        from .windows import ScreenManagerWindows
+    key = "screen_manager"
+    if key not in _singleton_cache:
+        platform = get_platform_name()
+        if platform == "windows":
+            from .windows import ScreenManagerWindows
 
-        return ScreenManagerWindows()
-    elif platform == "linux":
-        from .linux import ScreenManagerLinux
+            _singleton_cache[key] = ScreenManagerWindows()
+        elif platform == "linux":
+            from .linux import ScreenManagerLinux
 
-        return ScreenManagerLinux()
-    raise RuntimeError(f"Unsupported platform: {platform}")
+            _singleton_cache[key] = ScreenManagerLinux()
+        else:
+            raise RuntimeError(f"Unsupported platform: {platform}")
+    return _singleton_cache[key]  # type: ignore[return-value]
 
 
 def get_eve_path_resolver() -> EVEPathResolver:
-    """Create a platform-appropriate EVEPathResolver instance.
+    """Get the platform-appropriate EVEPathResolver singleton.
 
     Returns:
         EVEPathResolver implementation for current platform
@@ -159,20 +179,24 @@ def get_eve_path_resolver() -> EVEPathResolver:
     Raises:
         RuntimeError: If platform is not supported
     """
-    platform = get_platform_name()
-    if platform == "windows":
-        from .windows import EVEPathResolverWindows
+    key = "eve_path_resolver"
+    if key not in _singleton_cache:
+        platform = get_platform_name()
+        if platform == "windows":
+            from .windows import EVEPathResolverWindows
 
-        return EVEPathResolverWindows()
-    elif platform == "linux":
-        from .linux import EVEPathResolverLinux
+            _singleton_cache[key] = EVEPathResolverWindows()
+        elif platform == "linux":
+            from .linux import EVEPathResolverLinux
 
-        return EVEPathResolverLinux()
-    raise RuntimeError(f"Unsupported platform: {platform}")
+            _singleton_cache[key] = EVEPathResolverLinux()
+        else:
+            raise RuntimeError(f"Unsupported platform: {platform}")
+    return _singleton_cache[key]  # type: ignore[return-value]
 
 
 def get_hotkey_helper() -> HotkeyHelper:
-    """Create a platform-appropriate HotkeyHelper instance.
+    """Get the platform-appropriate HotkeyHelper singleton.
 
     Returns:
         HotkeyHelper implementation for current platform
@@ -180,13 +204,17 @@ def get_hotkey_helper() -> HotkeyHelper:
     Raises:
         RuntimeError: If platform is not supported
     """
-    platform = get_platform_name()
-    if platform == "windows":
-        from .windows import HotkeyHelperWindows
+    key = "hotkey_helper"
+    if key not in _singleton_cache:
+        platform = get_platform_name()
+        if platform == "windows":
+            from .windows import HotkeyHelperWindows
 
-        return HotkeyHelperWindows()
-    elif platform == "linux":
-        from .linux import HotkeyHelperLinux
+            _singleton_cache[key] = HotkeyHelperWindows()
+        elif platform == "linux":
+            from .linux import HotkeyHelperLinux
 
-        return HotkeyHelperLinux()
-    raise RuntimeError(f"Unsupported platform: {platform}")
+            _singleton_cache[key] = HotkeyHelperLinux()
+        else:
+            raise RuntimeError(f"Unsupported platform: {platform}")
+    return _singleton_cache[key]  # type: ignore[return-value]

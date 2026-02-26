@@ -704,6 +704,12 @@ class TestHotkeyHelperLinux:
 class TestFactoryFunctions:
     """Tests for platform factory functions."""
 
+    def setup_method(self):
+        """Clear singleton cache before each test for isolation."""
+        from argus_overview.platform import _clear_singleton_cache
+
+        _clear_singleton_cache()
+
     def test_get_window_manager_returns_linux_on_linux(self):
         """Test get_window_manager returns Linux implementation."""
         from argus_overview.platform import get_window_manager
@@ -1053,6 +1059,12 @@ class TestEVEPathResolverLinuxEdgeCases:
 
 class TestWindowsFactoryBranches:
     """Tests for Windows branches of factory functions (mocked)."""
+
+    def setup_method(self):
+        """Clear singleton cache before each test for isolation."""
+        from argus_overview.platform import _clear_singleton_cache
+
+        _clear_singleton_cache()
 
     def test_get_platform_name_windows(self):
         """Test get_platform_name returns windows on win32."""

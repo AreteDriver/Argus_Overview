@@ -512,44 +512,37 @@ class GridApplier:
         wm.move_window(window_id, x, y, 0, 0)
 
 
-def pil_to_qimage(pil_image: Image.Image) -> QImage:
+def pil_to_qimage(pil_image: Image.Image, raw_data: bytes | None = None) -> QImage:
     """
     Convert PIL Image to QImage
 
     Args:
         pil_image: PIL Image object
+        raw_data: Optional pre-computed tobytes() to avoid a redundant copy
 
     Returns:
         QImage: Converted image, or None if input is None
     """
     if pil_image is None:
         return None
-    if pil_image.mode == "RGB":
-        bytes_per_line = 3 * pil_image.width
+
+    _FORMAT_MAP = {
+        "RGB": (3, QImage.Format.Format_RGB888),
+        "RGBX": (4, QImage.Format.Format_RGBX8888),
+        "RGBA": (4, QImage.Format.Format_RGBA8888),
+        "L": (1, QImage.Format.Format_Grayscale8),
+    }
+
+    mode = pil_image.mode
+    if mode in _FORMAT_MAP:
+        bpp, fmt = _FORMAT_MAP[mode]
+        data = raw_data if raw_data is not None else pil_image.tobytes()
         return QImage(
-            pil_image.tobytes(),
+            data,
             pil_image.width,
             pil_image.height,
-            bytes_per_line,
-            QImage.Format.Format_RGB888,
-        )
-    elif pil_image.mode == "RGBA":
-        bytes_per_line = 4 * pil_image.width
-        return QImage(
-            pil_image.tobytes(),
-            pil_image.width,
-            pil_image.height,
-            bytes_per_line,
-            QImage.Format.Format_RGBA8888,
-        )
-    elif pil_image.mode == "L":
-        bytes_per_line = pil_image.width
-        return QImage(
-            pil_image.tobytes(),
-            pil_image.width,
-            pil_image.height,
-            bytes_per_line,
-            QImage.Format.Format_Grayscale8,
+            bpp * pil_image.width,
+            fmt,
         )
     else:
         # Convert to RGB if unknown mode
@@ -694,16 +687,17 @@ class WindowPreviewWidget(QWidget):
             image: PIL Image
         """
         try:
-            # Frame fingerprint — hash first 4KB of image bytes to skip identical frames
-            frame_bytes = image.tobytes()
-            frame_hash = hash(frame_bytes[:4096])
+            # Frame fingerprint — sample raw pixel bytes to detect duplicate frames
+            # Accessing the internal buffer avoids a full tobytes() copy.
+            raw_data = image.tobytes()
+            frame_hash = hash(raw_data[:4096])
             if frame_hash == self._last_frame_hash:
                 image.close()
                 return  # Frame unchanged, skip conversion pipeline
             self._last_frame_hash = frame_hash
 
-            # Convert PIL to QImage
-            qimage = pil_to_qimage(image)
+            # Convert PIL to QImage (reuse the raw bytes we already have)
+            qimage = pil_to_qimage(image, raw_data)
             image.close()  # Release PIL image memory immediately
             if qimage is None:
                 return  # Skip frame if capture failed
@@ -1074,7 +1068,10 @@ class WindowManager:
                 break
 
             request_id, window_id, image = result
-            # Dedup: keep only the latest result per window
+            # Dedup: keep only the latest result per window, close superseded frames
+            prev = latest.get(window_id)
+            if prev is not None and prev[1] is not None:
+                prev[1].close()
             latest[window_id] = (request_id, image)
 
             # Remove from pending

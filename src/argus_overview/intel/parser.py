@@ -472,20 +472,24 @@ class IntelParser:
         """
         Extract ship types from message.
 
+        Tokenizes the message once and uses set intersection instead of
+        running 200+ regex searches per message.
+
         Args:
             message: Chat message
 
         Returns:
             List of ship types found
         """
-        found = []
+        # Tokenize into lowercase words — handles most single-word ship names
+        words = set(re.findall(r"[a-z]+", message.lower()))
+        # Single-word ships via fast set intersection
+        found = list(words & self.SHIP_TYPES)
+        # Multi-word ship names (e.g. "force auxiliary") need substring check
         msg_lower = message.lower()
-
         for ship in self.SHIP_TYPES:
-            # Use word boundary matching
-            if re.search(rf"\b{re.escape(ship)}\b", msg_lower):
+            if " " in ship and ship in msg_lower:
                 found.append(ship)
-
         return found
 
     def _extract_count(self, message: str) -> int | None:
