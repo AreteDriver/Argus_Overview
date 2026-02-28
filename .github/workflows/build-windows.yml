@@ -75,7 +75,7 @@ jobs:
         7z a Argus-Overview-${{ steps.version.outputs.version }}-Windows.zip Argus-Overview.exe
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: Argus-Overview-Windows
         path: dist/Argus-Overview-*.zip
