@@ -2,20 +2,40 @@
 
 ## Supported Versions
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
-
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+| Version | Supported |
+|---------|-----------|
+| 3.0.x | Yes |
+| < 3.0 | No |
 
 ## Reporting a Vulnerability
 
-Use this section to tell people how to report a vulnerability.
+If you discover a security vulnerability, please report it responsibly:
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+1. **Do not** open a public issue
+2. Email **jamesyng79@gmail.com** with:
+   - Description of the vulnerability
+   - Steps to reproduce
+   - Potential impact
+3. You will receive an acknowledgment within 48 hours
+4. A fix will be prioritized based on severity
+
+## Security Measures
+
+This project uses:
+- **CodeQL** — static analysis on every push
+- **gitleaks** — secret scanning on every push
+- **pip-audit** — dependency vulnerability scanning
+- **Dependabot** — automated dependency updates
+
+## Scope
+
+The following are in scope for security reports:
+- Code injection vulnerabilities
+- Credential exposure
+- Dependency vulnerabilities with known exploits
+- Privilege escalation via hotkey or window management APIs
+
+Out of scope:
+- Denial of service
+- Social engineering
+- EVE Online EULA compliance (this is CCP's domain, not a security issue)
