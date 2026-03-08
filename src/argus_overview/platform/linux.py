@@ -352,7 +352,7 @@ class WindowCaptureLinux(WindowCapture):
 
             except Empty:
                 continue
-            except (OSError, subprocess.SubprocessError, ValueError) as e:
+            except Exception as e:
                 logger.error(f"Worker error: {e}")
 
     def capture_window_async(self, window_id: str, scale: float = 1.0) -> str:
@@ -409,12 +409,25 @@ class WindowCaptureLinux(WindowCapture):
 
             disp = _thread_local.display
             window = disp.create_resource_object("window", int(window_id, 16))
+
+            # Skip unmapped/minimized windows — XGetImage on unmapped is BadMatch
+            attrs = window.get_attributes()
+            if attrs.map_state != X.IsViewable:
+                return None
+
             geom = window.get_geometry()
             raw = window.get_image(0, 0, geom.width, geom.height, X.ZPixmap, 0xFFFFFFFF)
             # Return RGBX directly — avoids a full-image copy from .convert("RGB")
             return Image.frombytes("RGBX", (geom.width, geom.height), raw.data, "raw", "BGRX")
         except Exception as e:
             logger.debug(f"Xlib capture failed for {window_id}: {e}")
+            # Reset Display connection to avoid corrupted state on reuse
+            if hasattr(_thread_local, "display"):
+                try:
+                    _thread_local.display.close()
+                except Exception:
+                    pass
+                del _thread_local.display
             return None
 
     def _capture_imagemagick(self, window_id: str) -> Image.Image | None:

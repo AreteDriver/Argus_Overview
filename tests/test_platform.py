@@ -1412,6 +1412,11 @@ class TestXlibCapture:
         mock_raw = MagicMock()
         mock_raw.data = b"\x00\x00\xff\xff" * 8  # Blue in BGRX
         mock_window.get_image.return_value = mock_raw
+        # Window is viewable (not minimized)
+        mock_attrs = MagicMock()
+        mock_attrs.map_state = 2  # X.IsViewable
+        mock_window.get_attributes.return_value = mock_attrs
+
         mock_display.create_resource_object.return_value = mock_window
 
         with patch("argus_overview.platform.linux._thread_local") as mock_tl:
@@ -1422,8 +1427,28 @@ class TestXlibCapture:
         assert result.mode == "RGBX"
         assert result.size == (4, 2)
 
-    def test_capture_xlib_failure_returns_none(self):
-        """Test _capture_xlib returns None on exception."""
+    def test_capture_xlib_skips_minimized_window(self):
+        """Test _capture_xlib returns None for unmapped/minimized windows."""
+        from argus_overview.platform.linux import WindowCaptureLinux
+
+        capture = WindowCaptureLinux(max_workers=1)
+
+        mock_display = MagicMock()
+        mock_window = MagicMock()
+        mock_attrs = MagicMock()
+        mock_attrs.map_state = 0  # IsUnmapped
+        mock_window.get_attributes.return_value = mock_attrs
+        mock_display.create_resource_object.return_value = mock_window
+
+        with patch("argus_overview.platform.linux._thread_local") as mock_tl:
+            mock_tl.display = mock_display
+            result = capture._capture_xlib("0x12345")
+
+        assert result is None
+        mock_window.get_image.assert_not_called()
+
+    def test_capture_xlib_failure_resets_display(self):
+        """Test _capture_xlib returns None and resets Display on exception."""
         from argus_overview.platform.linux import WindowCaptureLinux
 
         capture = WindowCaptureLinux(max_workers=1)
@@ -1436,6 +1461,8 @@ class TestXlibCapture:
             result = capture._capture_xlib("0x12345")
 
         assert result is None
+        # Display should be closed and removed to avoid corrupted state
+        mock_display.close.assert_called_once()
 
     def test_capture_xlib_creates_thread_local_display(self):
         """Test _capture_xlib creates Display on first call per thread."""
