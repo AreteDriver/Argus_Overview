@@ -28,6 +28,8 @@ tar -xzf Argus-Overview-*-Linux.tar.gz && cd argus-overview-linux
 
 **1,875 tests · 96% coverage · 2,500+ downloads**
 
+> Cross-platform support (Windows native, Mac) planned for v3. Community interest in Qt/Rust port welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ---
 
 ## Screenshots

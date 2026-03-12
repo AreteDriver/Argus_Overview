@@ -205,6 +205,32 @@ pytest tests/test_character_manager.py -v
 - Plugin system
 - Cloud sync for profiles
 
+### High Impact Contributions
+
+These are named opportunities for contributors who want to make a significant impact:
+
+**Cross-Platform Port (Qt/Rust)**
+
+The EVE community has expressed interest in a fully cross-platform rewrite that would bring native Mac support and eliminate X11 dependencies on Linux. This is the highest-impact contribution opportunity in the project.
+
+**Language options:**
+- **Qt/C++** — Closest to current PySide6 architecture, minimal UI redesign
+- **Rust + egui/iced** — Modern, high-performance, single binary distribution
+- **Go + Fyne** — Simple cross-platform GUI, fast compile times
+
+**What the architecture must preserve:**
+- Platform abstraction layer (`platform/base.py` defines the interface)
+- Window capture and preview rendering pipeline
+- Hotkey system (global hotkeys, per-character bindings, cycling groups)
+- Profile/layout persistence (JSON-based settings)
+- Intel channel parser (regex-based, portable as-is)
+
+**Where to start:**
+1. Read `docs/ARCHITECTURE.md` and `src/argus_overview/platform/base.py` for the abstraction contract
+2. Prototype window enumeration + capture on your target platform
+3. Open an issue to discuss your approach before building the full port
+4. Proof of concept: list EVE windows + render one preview thumbnail
+
 ## Code of Conduct
 
 - Be respectful and inclusive
