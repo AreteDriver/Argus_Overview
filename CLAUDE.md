@@ -9,7 +9,7 @@ Professional multi-boxing tool for EVE Online on Linux & Windows. Window preview
 
 ## Current State
 
-- **Version**: 3.0.6
+- **Version**: 3.1.0
 - **Language**: Python
 - **Files**: 154 across 2 languages
 - **Lines**: 58,394

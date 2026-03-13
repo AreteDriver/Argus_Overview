@@ -1231,3 +1231,50 @@ class TestEVETitlePatterns:
         from argus_overview.platform.windows import EVE_CLASS_NAME
 
         assert EVE_CLASS_NAME == "triuiScreen"
+
+
+# ---------------------------------------------------------------------------
+# Coverage Push: WindowCaptureWindows.stop() Empty exception (lines 266-267)
+# ---------------------------------------------------------------------------
+
+
+class TestWindowCaptureStopEmptyException:
+    """Tests for stop() when request_queue.get_nowait() raises Empty."""
+
+    def test_stop_handles_empty_during_queue_drain(self, mock_win32):
+        """Lines 266-267: Empty exception breaks the drain loop."""
+        from argus_overview.platform.windows import WindowCaptureWindows
+
+        cap = WindowCaptureWindows(max_workers=1)
+        cap._stop_event.clear()  # Pretend running
+
+        # Make the queue report non-empty but raise Empty on get
+        with patch.object(cap.request_queue, "empty", return_value=False):
+            with patch.object(cap.request_queue, "get_nowait", side_effect=Empty):
+                cap.stop()
+
+        assert cap._stop_event.is_set()
+
+
+# ---------------------------------------------------------------------------
+# Coverage Push: ScreenManagerWindows.get_screen_geometry empty monitors (line 399)
+# ---------------------------------------------------------------------------
+
+
+class TestScreenManagerWindowsEmptyMonitors:
+    """Tests for get_screen_geometry when get_all_monitors returns empty."""
+
+    def test_get_screen_geometry_empty_monitors_returns_default(self, mock_win32):
+        """Line 399: returns 1920x1080 default when no monitors detected."""
+        from argus_overview.platform.windows import ScreenManagerWindows
+
+        mgr = ScreenManagerWindows()
+
+        # Mock get_all_monitors to return empty list (simulating enumeration failure
+        # where the callback finds zero monitors but no exception is raised)
+        with patch.object(mgr, "get_all_monitors", return_value=[]):
+            geom = mgr.get_screen_geometry(0)
+
+        from argus_overview.platform.base import ScreenGeometry
+
+        assert geom == ScreenGeometry(0, 0, 1920, 1080, True)

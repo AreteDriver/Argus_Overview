@@ -802,3 +802,38 @@ class TestPauseKeyListenerException:
 
         assert manager.key_listener is None
         mock_key.stop.assert_called_once()
+
+
+class TestOnKeyReleaseTypeError:
+    """Tests for _on_key_release when TypeError is raised (lines 232-233)."""
+
+    def test_key_release_catches_type_error(self):
+        """TypeError during key release processing is caught silently."""
+        manager = HotkeyManager()
+        manager.pressed_modifiers.add("ctrl")
+
+        mock_key = MagicMock()
+        # Make hasattr return True but name access raise TypeError
+        type(mock_key).name = property(lambda self: (_ for _ in ()).throw(TypeError("bad type")))
+
+        # Should not raise
+        manager._on_key_release(mock_key)
+
+    def test_key_release_catches_os_error_via_attribute(self):
+        """OSError-wrapping scenario during key release handling (lines 232-233)."""
+        manager = HotkeyManager()
+
+        # Construct a key where .name raises TypeError on second access
+        mock_key = MagicMock()
+        call_count = 0
+
+        def name_getter(self):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return True  # hasattr check passes
+            raise TypeError("unexpected type")
+
+        type(mock_key).name = property(name_getter)
+
+        manager._on_key_release(mock_key)

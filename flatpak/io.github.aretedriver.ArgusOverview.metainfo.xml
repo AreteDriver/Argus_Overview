@@ -54,7 +54,19 @@
   </branding>
 
   <releases>
-    <release version="3.0.6" date="2026-03-13">
+    <release version="3.1.0" date="2026-03-13">
+      <description>
+        <p>Wayland POC, Intel SDE, Windows parity, coverage 99%</p>
+        <ul>
+          <li>Wayland proof-of-concept: Sway + Hyprland support via swaymsg/hyprctl/grim/wlr-randr</li>
+          <li>Intel system database: 350 EVE systems from SDE with multi-word matching</li>
+          <li>Windows parity: IsIconic guard, GDI cleanup, threading.Event, consistent validation</li>
+          <li>Test coverage: 96% to 99% (2094 tests)</li>
+          <li>Jump distance calculator with BFS shortest path</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.0.6" date="2026-03-12">
       <description>
         <p>Cross-platform release with intel and coverage improvements</p>
         <ul>

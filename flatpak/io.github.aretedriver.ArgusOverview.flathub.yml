@@ -99,7 +99,7 @@ modules:
     buildsystem: simple
     build-commands:
       # Install application from PyPI wheel
-      - pip3 install --prefix=/app --no-deps argus_overview-3.0.6-py3-none-any.whl
+      - pip3 install --prefix=/app --no-deps argus_overview-3.1.0-py3-none-any.whl
       # Install desktop file
       - install -Dm644 flatpak/io.github.aretedriver.ArgusOverview.desktop /app/share/applications/io.github.aretedriver.ArgusOverview.desktop
       # Install icons
@@ -110,9 +110,9 @@ modules:
       - install -Dm644 flatpak/io.github.aretedriver.ArgusOverview.metainfo.xml /app/share/metainfo/io.github.aretedriver.ArgusOverview.metainfo.xml
     sources:
       - type: file
-        # TODO: update PyPI URL and sha256 after v3.0.6 wheel is published
-        url: https://files.pythonhosted.org/packages/PLACEHOLDER/argus_overview-3.0.6-py3-none-any.whl
-        sha256: 0000000000000000000000000000000000000000000000000000000000000000
+        # TODO: update PyPI URL after v3.1.0 wheel is published to PyPI
+        url: https://files.pythonhosted.org/packages/PLACEHOLDER/argus_overview-3.1.0-py3-none-any.whl
+        sha256: cf1d1238ecca2737b2b2a21712f06750f1739a7486f583707e12b880295ab77d
       - type: git
         url: https://github.com/AreteDriver/Argus_Overview.git
         commit: 742e6de6374137739e51e4187218796e2c6e27e6

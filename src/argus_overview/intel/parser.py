@@ -14,6 +14,10 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .jumps import JumpCalculator
 
 
 class ThreatLevel(Enum):
@@ -302,17 +306,32 @@ class IntelParser:
         "moving",
     }
 
-    def __init__(self, known_systems: set[str] | None = None):
+    def __init__(
+        self,
+        known_systems: set[str] | None = None,
+        jump_calculator: "JumpCalculator | None" = None,
+    ):
         """
         Initialize the intel parser.
 
         Args:
             known_systems: Optional set of known system names (lowercase)
+            jump_calculator: Optional JumpCalculator for distance lookups
         """
         from .systems import load_systems
 
         self.logger = logging.getLogger(__name__)
         self.known_systems: set[str] = known_systems or load_systems()
+        self.jump_calculator = jump_calculator
+        self._current_system: str | None = None
+
+    def set_current_system(self, system: str):
+        """Set the pilot's current system for jump distance calculation.
+
+        Args:
+            system: Current system name (case-insensitive).
+        """
+        self._current_system = system
 
     def add_known_system(self, system: str):
         """Add a system to the known systems set."""
@@ -343,7 +362,7 @@ class IntelParser:
         if any(kw in msg_lower for kw in self.CLEAR_KEYWORDS):
             system = self._extract_system(message)
             if system:
-                return IntelReport(
+                report = IntelReport(
                     system=system,
                     threat_level=ThreatLevel.CLEAR,
                     hostile_count=0,
@@ -354,6 +373,8 @@ class IntelParser:
                     channel=channel,
                     reporter=reporter,
                 )
+                self._populate_jumps(report)
+                return report
 
         # Check for hostile indicators
         has_hostile_keyword = any(kw in msg_lower for kw in self.HOSTILE_KEYWORDS)
@@ -373,7 +394,7 @@ class IntelParser:
         # If we have a system and hostile indicators, it's intel
         if system and (has_hostile_keyword or ships or count):
             threat_level = self._assess_threat(count, ships)
-            return IntelReport(
+            report = IntelReport(
                 system=system,
                 threat_level=threat_level,
                 hostile_count=count,
@@ -384,6 +405,8 @@ class IntelParser:
                 channel=channel,
                 reporter=reporter,
             )
+            self._populate_jumps(report)
+            return report
 
         # Check if it looks like intel even without a system
         # (e.g., just "hostile Loki +5" in an intel channel)
@@ -402,6 +425,17 @@ class IntelParser:
             )
 
         return None
+
+    def _populate_jumps(self, report: IntelReport):
+        """Populate jumps_from_current on a report if possible.
+
+        Requires both a jump_calculator and a current system to be set,
+        and the report must have a non-None system.
+        """
+        if self.jump_calculator and self._current_system and report.system:
+            report.jumps_from_current = self.jump_calculator.distance(
+                self._current_system, report.system
+            )
 
     def _extract_system(self, message: str) -> str | None:
         """

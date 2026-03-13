@@ -5,6 +5,71 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-03-13
+
+### Added
+- **Wayland POC** - New `platform/wayland.py` with Sway and Hyprland compositor support
+  - Window enumeration via `swaymsg` / `hyprctl`
+  - Window capture via `grim`
+  - Screen geometry via `wlr-randr`
+  - Factory routing: pure Wayland → Wayland classes, XWayland → Linux (X11) classes
+  - Optional `wayland` dependency group with `dbus-next` for future portal integration
+- **Intel System Database** - 350 EVE systems from SDE (`intel/data/systems.json`)
+  - Replaces hardcoded 20-system set with comprehensive intel-relevant systems
+  - Trade hubs, null-sec entry systems, low-sec hotspots, Pochven
+- **Multi-word System Matching** - Intel parser now detects "Old Man Star", "New Caldari", etc.
+- **Multi-word Ship Detection** - "force auxiliary" now detected in intel messages
+- **Windows Platform Tests** - 97 mock tests for full `windows.py` coverage on Linux
+
+### Fixed
+- **Windows Parity** - Four fixes aligning Windows behavior with Linux
+  - Added `IsIconic()` check to skip minimized windows in capture (matches Linux `map_state` guard)
+  - GDI resource cleanup moved to `finally` block to prevent handle leaks on exception
+  - Worker stop mechanism changed from boolean flag to `threading.Event` (proper memory barrier)
+  - `capture_window_async` now uses consistent `is_valid_window_id()` validation
+
+### Changed
+- **Test Coverage** - 96% → 99% (1902 → 2094 tests, +192)
+  - `windows.py`: 0% → 97%
+  - `parser.py`: 99% → 100%
+  - New `intel/systems.py`: 100%
+  - New `platform/wayland.py`: 86%
+- **Packaging Updated** - Flatpak manifests and metainfo updated to v3.0.6→v3.1.0
+- **AppImage Script** - Uses dynamic versioning from pyproject.toml, warns on missing runtime tools
+- **CLAUDE.md** - Regenerated via claudemd-forge with domain context merged
+
+## [3.0.6] - 2026-03-12
+
+### Fixed
+- Skip minimized windows in xlib capture, reset Display connection on failure
+- Resolve Windows layout crash and cross-platform `move_window` (#43)
+- Narrow `except Exception` to specific types and modernize type hints (#46)
+- Set watchdog observer as daemon thread for clean shutdown
+
+### Changed
+- Overhaul capture pipeline — xlib direct capture, bounded queue, frame dedup
+- Eliminate redundant copies, fix memory leaks, use platform abstraction (#50)
+- Test coverage improved to 96% (1902 tests)
+
+### Security
+- Added gitleaks secret scanning and pip-audit dependency scanning
+
+## [3.0.5] - 2026-02-15
+
+### Changed
+- **Test Coverage** - Improved from 94% to 95% with 14 new tests covering all non-Windows stragglers to 100%
+- 1870 total tests passing
+
+## [3.0.4] - 2026-02-10
+
+### Added
+- **Real-time Cycling Hotkeys** - Enable cycling hotkey activation without restart
+- Batch listener restarts during cycling hotkey re-registration
+
+### Changed
+- Added CodeQL security scanning
+- Extended PySide6 skipif to Python 3.10+ for CI compatibility
+
 ## [3.0.3] - 2026-02-02
 
 ### Changed
@@ -320,7 +385,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simple hotkey support
 - Single window capture
 
-[Unreleased]: https://github.com/AreteDriver/Argus_Overview/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/AreteDriver/Argus_Overview/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/AreteDriver/Argus_Overview/compare/v3.0.6...v3.1.0
+[3.0.6]: https://github.com/AreteDriver/Argus_Overview/compare/v3.0.5...v3.0.6
+[3.0.5]: https://github.com/AreteDriver/Argus_Overview/compare/v3.0.4...v3.0.5
+[3.0.4]: https://github.com/AreteDriver/Argus_Overview/compare/v3.0.3...v3.0.4
+[3.0.3]: https://github.com/AreteDriver/Argus_Overview/compare/v3.0.2...v3.0.3
+[3.0.2]: https://github.com/AreteDriver/Argus_Overview/compare/v3.0.1...v3.0.2
+[3.0.1]: https://github.com/AreteDriver/Argus_Overview/compare/v3.0.0...v3.0.1
+[3.0.0]: https://github.com/AreteDriver/Argus_Overview/compare/v2.9.0...v3.0.0
+[2.9.0]: https://github.com/AreteDriver/Argus_Overview/compare/v2.8.6...v2.9.0
+[2.8.6]: https://github.com/AreteDriver/Argus_Overview/compare/v2.8.5...v2.8.6
+[2.8.5]: https://github.com/AreteDriver/Argus_Overview/compare/v2.8.4...v2.8.5
+[2.8.4]: https://github.com/AreteDriver/Argus_Overview/compare/v2.8.1...v2.8.4
+[2.8.1]: https://github.com/AreteDriver/Argus_Overview/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/AreteDriver/Argus_Overview/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/AreteDriver/Argus_Overview/compare/v2.4.2...v2.7.0
 [2.4.2]: https://github.com/AreteDriver/Argus_Overview/compare/v2.4.0...v2.4.2

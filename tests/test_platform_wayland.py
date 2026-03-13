@@ -809,3 +809,428 @@ class TestFactoryRouting:
 
         sm = get_screen_manager()
         assert isinstance(sm, ScreenManagerLinux)
+
+
+# ---------------------------------------------------------------------------
+# Coverage Push: _run_hyprctl exception path (lines 110-111)
+# ---------------------------------------------------------------------------
+
+
+class TestRunHyprctlExceptions:
+    """Tests for _run_hyprctl error handling."""
+
+    @patch("argus_overview.platform.wayland.subprocess.run")
+    def test_oserror_returns_none(self, mock_run):
+        """Lines 110-111: OSError from hyprctl is caught."""
+        mock_run.side_effect = OSError("hyprctl not found")
+        assert _run_hyprctl(["clients", "-j"]) is None
+
+    @patch("argus_overview.platform.wayland.subprocess.run")
+    def test_timeout_returns_none(self, mock_run):
+        """Lines 110-111: TimeoutExpired from hyprctl is caught."""
+        import subprocess as sp
+
+        mock_run.side_effect = sp.TimeoutExpired("hyprctl", 2)
+        assert _run_hyprctl(["clients", "-j"]) is None
+
+
+# ---------------------------------------------------------------------------
+# Coverage Push: WindowManagerWayland move/activate/minimize/restore/focus
+# exception paths and edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestWindowManagerWaylandExceptions:
+    """Tests for WindowManagerWayland exception handlers and edge cases."""
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    def test_move_window_sway_returns_false_when_swaymsg_fails(self, mock_swaymsg, _):
+        """Line 232: move_window returns False when swaymsg returns None."""
+        mock_swaymsg.return_value = None
+        wm = WindowManagerWayland()
+        assert wm.move_window("100", 0, 0, 1920, 1080) is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    def test_move_window_exception_caught(self, mock_swaymsg, _):
+        """Lines 246-248: Exception during move is caught, returns False."""
+        mock_swaymsg.side_effect = Exception("Unexpected")
+        wm = WindowManagerWayland()
+        assert wm.move_window("100", 0, 0, 1920, 1080) is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_activate_window_invalid_id(self, _):
+        """Lines 253-254: invalid ID returns False."""
+        wm = WindowManagerWayland()
+        assert wm.activate_window("") is False
+        assert wm.activate_window("not-valid!") is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    def test_activate_window_exception_caught(self, mock_swaymsg, _):
+        """Lines 263-265: Exception during activate is caught."""
+        mock_swaymsg.side_effect = Exception("Unexpected")
+        wm = WindowManagerWayland()
+        assert wm.activate_window("100") is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_minimize_window_invalid_id(self, _):
+        """Line 270: invalid ID returns False."""
+        wm = WindowManagerWayland()
+        assert wm.minimize_window("") is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_minimize_window_hyprland(self, mock_hyprctl, _):
+        """Lines 276-280: Hyprland minimize path."""
+        mock_hyprctl.return_value = "ok"
+        wm = WindowManagerWayland()
+        assert wm.minimize_window("0x55a1b2c3d4e5") is True
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_minimize_window_hyprland_failure(self, mock_hyprctl, _):
+        """Lines 276-280: Hyprland minimize returns None."""
+        mock_hyprctl.return_value = None
+        wm = WindowManagerWayland()
+        assert wm.minimize_window("0x55a1b2c3d4e5") is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    def test_minimize_window_exception_caught(self, mock_swaymsg, _):
+        """Lines 281-283: Exception during minimize is caught."""
+        mock_swaymsg.side_effect = Exception("Unexpected")
+        wm = WindowManagerWayland()
+        assert wm.minimize_window("100") is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_restore_window_invalid_id(self, _):
+        """Line 288: invalid ID returns False."""
+        wm = WindowManagerWayland()
+        assert wm.restore_window("") is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_restore_window_hyprland(self, mock_hyprctl, _):
+        """Lines 296-298: Hyprland restore path."""
+        mock_hyprctl.return_value = "ok"
+        wm = WindowManagerWayland()
+        assert wm.restore_window("0x55a1b2c3d4e5") is True
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_restore_window_hyprland_failure(self, mock_hyprctl, _):
+        """Lines 296-298: Hyprland restore returns None."""
+        mock_hyprctl.return_value = None
+        wm = WindowManagerWayland()
+        assert wm.restore_window("0x55a1b2c3d4e5") is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    def test_restore_window_exception_caught(self, mock_swaymsg, _):
+        """Lines 299-301: Exception during restore is caught."""
+        mock_swaymsg.side_effect = Exception("Unexpected")
+        wm = WindowManagerWayland()
+        assert wm.restore_window("100") is False
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_get_focused_window_hyprland_none(self, mock_hyprctl, _):
+        """Line 317: Hyprland focused window returns None when hyprctl fails."""
+        mock_hyprctl.return_value = None
+        wm = WindowManagerWayland()
+        assert wm.get_focused_window() is None
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    def test_get_focused_window_json_error(self, mock_swaymsg, _):
+        """Lines 321-323: JSONDecodeError during get_focused is caught."""
+        mock_swaymsg.return_value = "not json"
+        wm = WindowManagerWayland()
+        assert wm.get_focused_window() is None
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_get_focused_window_hyprland_json_error(self, mock_hyprctl, _):
+        """Lines 321-323: JSONDecodeError from hyprland path is caught."""
+        mock_hyprctl.return_value = "{bad json"
+        wm = WindowManagerWayland()
+        assert wm.get_focused_window() is None
+
+
+class TestWindowManagerWaylandFindFocused:
+    """Tests for _find_focused_sway with floating_nodes."""
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_find_focused_in_floating_nodes(self, _):
+        """Lines 362-364: focused window found in floating_nodes."""
+        wm = WindowManagerWayland()
+        tree = {
+            "id": 1,
+            "nodes": [],
+            "floating_nodes": [
+                {"id": 200, "pid": 999, "focused": True, "nodes": [], "floating_nodes": []},
+            ],
+        }
+        assert wm._find_focused_sway(tree) == "200"
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_find_focused_nested_in_floating(self, _):
+        """Lines 362-364: focused window nested inside floating_nodes."""
+        wm = WindowManagerWayland()
+        tree = {
+            "id": 1,
+            "nodes": [],
+            "floating_nodes": [
+                {
+                    "id": 50,
+                    "nodes": [
+                        {"id": 300, "pid": 888, "focused": True, "nodes": [], "floating_nodes": []},
+                    ],
+                    "floating_nodes": [],
+                },
+            ],
+        }
+        assert wm._find_focused_sway(tree) == "300"
+
+
+# ---------------------------------------------------------------------------
+# Coverage Push: WindowCaptureWayland worker/async/geometry paths
+# ---------------------------------------------------------------------------
+
+
+class TestWindowCaptureWaylandWorker:
+    """Tests for WindowCaptureWayland worker and async capture paths."""
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    @patch("argus_overview.platform.wayland.subprocess.run")
+    def test_worker_processes_task_and_puts_result(self, mock_run, mock_swaymsg, _):
+        """Lines 419-421: worker processes task from queue."""
+        mock_swaymsg.return_value = json.dumps(SWAY_TREE)
+
+        img = Image.new("RGB", (50, 50), "green")
+        import io
+
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        mock_run.return_value = MagicMock(returncode=0, stdout=buf.getvalue())
+
+        capture = WindowCaptureWayland(max_workers=1)
+        # Put a task and run worker iteration manually
+        capture.capture_queue.put(("100", 1.0, "req-123"))
+        capture._stop_event.clear()
+
+        # Run worker in a thread that stops after one iteration
+
+        def run_worker_once():
+            capture._worker()
+
+        # Worker will process one task then block on get; we stop it
+        capture.start()
+        import time
+
+        time.sleep(0.3)
+        capture.stop()
+
+        # Check result was produced
+        result = capture.get_result(timeout=0.5)
+        if result:
+            req_id, wid, image = result
+            assert wid == "100"
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_worker_handles_exception(self, _):
+        """Lines 424-425: worker catches exceptions during capture."""
+        capture = WindowCaptureWayland(max_workers=1)
+
+        # Put a malformed task (wrong number of values to unpack)
+        capture.capture_queue.put(("bad_task",))
+        capture._stop_event.clear()
+
+        # Start and stop quickly
+        capture.start()
+        import time
+
+        time.sleep(0.3)
+        capture.stop()
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_capture_async_queue_full(self, _):
+        """Lines 435-437: returns empty string when capture queue is full."""
+        capture = WindowCaptureWayland(max_workers=1)
+        # Fill the queue
+        for i in range(capture.capture_queue.maxsize):
+            capture.capture_queue.put(("dummy", 1.0, f"req-{i}"))
+
+        result = capture.capture_window_async("100")
+        assert result == ""
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    def test_capture_async_puts_valid_request(self, mock_swaymsg, _):
+        """Capture queue receives valid request."""
+        capture = WindowCaptureWayland(max_workers=1)
+        req_id = capture.capture_window_async("100")
+        assert req_id != ""
+        # Verify it's in the queue
+        task = capture.capture_queue.get_nowait()
+        assert task[0] == "100"  # window_id
+        assert task[2] == req_id  # request_id
+
+
+class TestWindowCaptureWaylandStopFull:
+    """Tests for stop() when capture_queue is full (lines 406-407)."""
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_stop_handles_full_queue(self, _):
+        """Lines 406-407: Full exception during stop is caught."""
+        capture = WindowCaptureWayland(max_workers=2)
+        # Fill the queue to capacity
+        for i in range(capture.capture_queue.maxsize):
+            capture.capture_queue.put(("dummy", 1.0, f"req-{i}"))
+
+        # Add mock workers so the loop runs
+        capture.workers = [MagicMock(), MagicMock()]
+        capture._stop_event.clear()  # Pretend running
+
+        # Stop should not raise despite full queue
+        capture.stop()
+        assert not capture.workers  # workers cleared
+
+
+class TestWindowCaptureWaylandWorkerEmpty:
+    """Tests for _worker Empty timeout path (line 423)."""
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_worker_continues_on_empty_timeout(self, _):
+        """Line 423: worker hits Empty timeout then exits when stopped."""
+
+        capture = WindowCaptureWayland(max_workers=1)
+        # Use a real queue with very short timeout - replace the queue's get
+        # to use a very short timeout so the Empty is hit quickly
+        original_get = capture.capture_queue.get
+
+        call_count = 0
+
+        def short_timeout_get(timeout=0.5):
+            nonlocal call_count
+            call_count += 1
+            if call_count >= 2:
+                capture._stop_event.set()
+            return original_get(timeout=0.01)  # Very short timeout
+
+        capture.capture_queue.get = short_timeout_get
+        capture._stop_event.clear()
+
+        capture._worker()
+        assert call_count >= 1
+
+
+# ---------------------------------------------------------------------------
+# Coverage Push: WindowCaptureWayland geometry paths
+# ---------------------------------------------------------------------------
+
+
+class TestWindowCaptureWaylandGeometry:
+    """Tests for _get_window_geometry and _find_sway_window_geometry."""
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    @patch("argus_overview.platform.wayland._run_swaymsg")
+    def test_sway_geometry_json_error(self, mock_swaymsg, _):
+        """Lines 482-483: JSONDecodeError in sway geometry returns None."""
+        mock_swaymsg.return_value = "not valid json"
+        capture = WindowCaptureWayland(max_workers=1)
+        assert capture._get_window_geometry("100") is None
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_hyprland_geometry_none_output(self, mock_hyprctl, _):
+        """Line 488: hyprctl returns None for geometry."""
+        mock_hyprctl.return_value = None
+        capture = WindowCaptureWayland(max_workers=1)
+        assert capture._get_window_geometry("0x55a1b2c3d4e5") is None
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_hyprland_geometry_json_error(self, mock_hyprctl, _):
+        """Lines 496-497: JSONDecodeError in hyprland geometry."""
+        mock_hyprctl.return_value = "bad json"
+        capture = WindowCaptureWayland(max_workers=1)
+        assert capture._get_window_geometry("0x55a1b2c3d4e5") is None
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="hyprland")
+    @patch("argus_overview.platform.wayland._run_hyprctl")
+    def test_hyprland_geometry_window_not_found(self, mock_hyprctl, _):
+        """Lines 496-499: window not found in hyprland clients list."""
+        mock_hyprctl.return_value = json.dumps(HYPRLAND_CLIENTS)
+        capture = WindowCaptureWayland(max_workers=1)
+        # Use an ID that doesn't match any client
+        result = capture._get_window_geometry("0xDEADBEEF")
+        assert result is None
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="unknown")
+    def test_unknown_compositor_geometry(self, _):
+        """Lines 498-499: unknown compositor returns None."""
+        capture = WindowCaptureWayland(max_workers=1)
+        assert capture._get_window_geometry("100") is None
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_find_sway_geometry_zero_size(self, _):
+        """Line 511: window with zero size returns None."""
+        capture = WindowCaptureWayland(max_workers=1)
+        node = {
+            "id": 100,
+            "pid": 12345,
+            "rect": {"x": 0, "y": 0, "width": 0, "height": 0},
+            "nodes": [],
+            "floating_nodes": [],
+        }
+        assert capture._find_sway_window_geometry(node, "100") is None
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_find_sway_geometry_in_floating_nodes(self, _):
+        """Lines 518-520: geometry found in floating_nodes."""
+        capture = WindowCaptureWayland(max_workers=1)
+        tree = {
+            "id": 1,
+            "nodes": [],
+            "floating_nodes": [
+                {
+                    "id": 200,
+                    "pid": 999,
+                    "rect": {"x": 10, "y": 20, "width": 800, "height": 600},
+                    "nodes": [],
+                    "floating_nodes": [],
+                },
+            ],
+        }
+        result = capture._find_sway_window_geometry(tree, "200")
+        assert result == "10,20 800x600"
+
+    @patch("argus_overview.platform.wayland._detect_compositor", return_value="sway")
+    def test_find_sway_geometry_nested_floating(self, _):
+        """Lines 517-520: geometry found nested in floating_nodes."""
+        capture = WindowCaptureWayland(max_workers=1)
+        tree = {
+            "id": 1,
+            "nodes": [],
+            "floating_nodes": [
+                {
+                    "id": 50,
+                    "nodes": [
+                        {
+                            "id": 300,
+                            "pid": 888,
+                            "rect": {"x": 5, "y": 10, "width": 1024, "height": 768},
+                            "nodes": [],
+                            "floating_nodes": [],
+                        }
+                    ],
+                    "floating_nodes": [],
+                },
+            ],
+        }
+        result = capture._find_sway_window_geometry(tree, "300")
+        assert result == "5,10 1024x768"

@@ -8938,3 +8938,61 @@ class TestStopCaptureLoopNoSkip:
             tab.status_timer.stop.assert_called_once()
             mock_frame1.session_timer.stop.assert_called_once()
             mock_frame2.session_timer.stop.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# Coverage Push: _on_window_activated outer exception handler (lines 1760-1761)
+# ---------------------------------------------------------------------------
+
+
+class TestOnWindowActivatedException:
+    """Tests for _on_window_activated when activate_window raises an exception."""
+
+    def test_on_window_activated_catches_runtime_error(self):
+        """Lines 1760-1761: RuntimeError from capture_system.activate_window is caught."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = False
+            tab.capture_system = MagicMock()
+            tab.capture_system.activate_window.side_effect = RuntimeError("X11 gone")
+
+            tab._on_window_activated("0x123")
+
+            tab.logger.error.assert_called_once()
+            assert "Error activating window" in str(tab.logger.error.call_args)
+
+    def test_on_window_activated_catches_os_error(self):
+        """Lines 1760-1761: OSError from capture_system.activate_window is caught."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = False
+            tab.capture_system = MagicMock()
+            tab.capture_system.activate_window.side_effect = OSError("No display")
+
+            tab._on_window_activated("0x123")
+
+            tab.logger.error.assert_called_once()
+
+    def test_on_window_activated_catches_value_error(self):
+        """Lines 1760-1761: ValueError from capture_system.activate_window is caught."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = False
+            tab.capture_system = MagicMock()
+            tab.capture_system.activate_window.side_effect = ValueError("bad id")
+
+            tab._on_window_activated("0x123")
+
+            tab.logger.error.assert_called_once()
