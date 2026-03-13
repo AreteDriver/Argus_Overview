@@ -54,6 +54,57 @@
   </branding>
 
   <releases>
+    <release version="3.0.6" date="2026-03-13">
+      <description>
+        <p>Cross-platform release with intel and coverage improvements</p>
+        <ul>
+          <li>Cross-platform support: single unified codebase for Linux and Windows</li>
+          <li>Platform abstraction layer (X11 + Win32)</li>
+          <li>Intel channel parser with threat level assessment and alert sounds</li>
+          <li>CI/CD for Linux AppImage and Windows PyInstaller builds</li>
+          <li>Test coverage improved to 96% (1892 tests)</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.0.3" date="2026-02-02">
+      <description>
+        <p>Test coverage and stability improvements</p>
+        <ul>
+          <li>Overall coverage improved from 93% to 94% (1827 tests)</li>
+          <li>Added Python 3.12 skipif decorators for PySide6 segfault-prone tests</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.0.2" date="2026-02-02">
+      <description>
+        <p>CI build fixes and version unification</p>
+        <ul>
+          <li>Resolved Linux AppImage build failures with xvfb-run wrapper</li>
+          <li>Unified version display across all UI components</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.0.1" date="2026-02-02">
+      <description>
+        <p>Intel alert sounds and Windows build support</p>
+        <ul>
+          <li>Four new audio alert files for different threat levels</li>
+          <li>Windows PyInstaller spec file and CI/CD workflow</li>
+          <li>Test coverage improved to 93% (1798 tests)</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.0.0" date="2026-02-01">
+      <description>
+        <p>Major release: cross-platform support</p>
+        <ul>
+          <li>Single unified codebase supporting both Linux and Windows</li>
+          <li>Platform abstraction layer with clean separation (base, linux, windows)</li>
+          <li>Platform-specific dependencies via extras (pip install argus-overview[linux])</li>
+          <li>Windows version now built from same codebase (separate repo archived)</li>
+        </ul>
+      </description>
+    </release>
     <release version="2.8.3" date="2026-01-16">
       <description>
         <p>Documentation and packaging updates</p>

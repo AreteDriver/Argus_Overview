@@ -92,6 +92,23 @@ def _clear_singleton_cache() -> None:
     _singleton_cache.clear()
 
 
+def _is_pure_wayland() -> bool:
+    """Check if running in pure Wayland (no XWayland).
+
+    Returns:
+        True if pure Wayland session where X11 tools won't work.
+    """
+    if sys.platform not in ("linux", "linux2"):
+        return False
+    try:
+        from ..utils.display_server import DisplayServer, detect_display_server
+
+        info = detect_display_server()
+        return info.server == DisplayServer.WAYLAND
+    except ImportError:
+        return False
+
+
 def get_window_manager() -> WindowManager:
     """Get the platform-appropriate WindowManager singleton.
 
@@ -108,6 +125,10 @@ def get_window_manager() -> WindowManager:
             from .windows import WindowManagerWindows
 
             _singleton_cache[key] = WindowManagerWindows()
+        elif platform == "linux" and _is_pure_wayland():
+            from .wayland import WindowManagerWayland
+
+            _singleton_cache[key] = WindowManagerWayland()
         elif platform == "linux":
             from .linux import WindowManagerLinux
 
@@ -136,6 +157,10 @@ def get_window_capture(max_workers: int = 4) -> WindowCapture:
             from .windows import WindowCaptureWindows
 
             _singleton_cache[key] = WindowCaptureWindows(max_workers=max_workers)
+        elif platform == "linux" and _is_pure_wayland():
+            from .wayland import WindowCaptureWayland
+
+            _singleton_cache[key] = WindowCaptureWayland(max_workers=max_workers)
         elif platform == "linux":
             from .linux import WindowCaptureLinux
 
@@ -161,6 +186,10 @@ def get_screen_manager() -> ScreenManager:
             from .windows import ScreenManagerWindows
 
             _singleton_cache[key] = ScreenManagerWindows()
+        elif platform == "linux" and _is_pure_wayland():
+            from .wayland import ScreenManagerWayland
+
+            _singleton_cache[key] = ScreenManagerWayland()
         elif platform == "linux":
             from .linux import ScreenManagerLinux
 
@@ -186,6 +215,10 @@ def get_eve_path_resolver() -> EVEPathResolver:
             from .windows import EVEPathResolverWindows
 
             _singleton_cache[key] = EVEPathResolverWindows()
+        elif platform == "linux" and _is_pure_wayland():
+            from .wayland import EVEPathResolverWayland
+
+            _singleton_cache[key] = EVEPathResolverWayland()
         elif platform == "linux":
             from .linux import EVEPathResolverLinux
 
@@ -211,6 +244,10 @@ def get_hotkey_helper() -> HotkeyHelper:
             from .windows import HotkeyHelperWindows
 
             _singleton_cache[key] = HotkeyHelperWindows()
+        elif platform == "linux" and _is_pure_wayland():
+            from .wayland import HotkeyHelperWayland
+
+            _singleton_cache[key] = HotkeyHelperWayland()
         elif platform == "linux":
             from .linux import HotkeyHelperLinux
 

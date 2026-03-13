@@ -99,7 +99,7 @@ modules:
     buildsystem: simple
     build-commands:
       # Install application from wheel
-      - pip3 install --prefix=/app --no-deps argus_overview-2.8.3-py3-none-any.whl
+      - pip3 install --prefix=/app --no-deps argus_overview-3.0.6-py3-none-any.whl
       # Install desktop file
       - install -Dm644 io.github.aretedriver.ArgusOverview.desktop /app/share/applications/io.github.aretedriver.ArgusOverview.desktop
       # Install icons
@@ -110,8 +110,9 @@ modules:
       - install -Dm644 io.github.aretedriver.ArgusOverview.metainfo.xml /app/share/metainfo/io.github.aretedriver.ArgusOverview.metainfo.xml
     sources:
       - type: file
-        path: ../dist/argus_overview-2.8.3-py3-none-any.whl
-        sha256: dddd78db1405f8052f92802658bd4b6e7045c60bd7157439620cf1341e1470b9
+        path: ../dist/argus_overview-3.0.6-py3-none-any.whl
+        # TODO: update sha256 after building v3.0.6 wheel
+        sha256: 0000000000000000000000000000000000000000000000000000000000000000
       - type: file
         path: io.github.aretedriver.ArgusOverview.desktop
       - type: file

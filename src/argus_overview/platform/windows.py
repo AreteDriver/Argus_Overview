@@ -234,20 +234,21 @@ class WindowCaptureWindows(WindowCapture):
         self.request_queue: Queue[Any] = Queue()
         self.result_queue: Queue[Any] = Queue()
         self.workers: list[threading.Thread] = []
-        self._running = False
+        self._stop_event = threading.Event()
+        self._stop_event.set()  # Start in stopped state
         self._window_mgr = WindowManagerWindows()
 
     @property
     def running(self) -> bool:
         """Check if workers are running."""
-        return self._running
+        return not self._stop_event.is_set()
 
     def start(self):
         """Start worker threads."""
-        if self._running:
+        if not self._stop_event.is_set():
             return
 
-        self._running = True
+        self._stop_event.clear()
         for i in range(self.max_workers):
             worker = threading.Thread(target=self._worker, daemon=True, name=f"CaptureWorker-{i}")
             worker.start()
@@ -257,7 +258,7 @@ class WindowCaptureWindows(WindowCapture):
 
     def stop(self):
         """Stop worker threads."""
-        self._running = False
+        self._stop_event.set()
         # Clear queues
         while not self.request_queue.empty():
             try:
@@ -269,7 +270,7 @@ class WindowCaptureWindows(WindowCapture):
 
     def _worker(self):
         """Worker thread that processes capture requests."""
-        while self._running:
+        while not self._stop_event.is_set():
             try:
                 request = self.request_queue.get(timeout=0.1)
                 if request is None:
@@ -288,14 +289,13 @@ class WindowCaptureWindows(WindowCapture):
 
     def capture_window_async(self, window_id: str, scale: float = 1.0) -> str:
         """Request async window capture."""
-        request_id = str(uuid.uuid4())
-        try:
-            hwnd_int = int(window_id, 16)
-            self.request_queue.put((request_id, hwnd_int, scale))
-            return request_id
-        except ValueError:
-            logger.warning(f"Invalid window ID for capture: {window_id}")
+        if not self._window_mgr.is_valid_window_id(window_id):
+            logger.warning(f"Invalid window ID format for capture: {window_id}")
             return ""
+        request_id = str(uuid.uuid4())
+        hwnd_int = int(window_id, 16)
+        self.request_queue.put((request_id, hwnd_int, scale))
+        return request_id
 
     def get_result(self, timeout: float = 0.1) -> tuple[str, str, Image.Image] | None:
         """Get capture result if available."""
@@ -316,6 +316,10 @@ class WindowCaptureWindows(WindowCapture):
             else:
                 hwnd = window_id
 
+            # Skip minimized windows (matches Linux's map_state check)
+            if win32gui.IsIconic(hwnd):
+                return None
+
             # Get window dimensions
             left, top, right, bottom = win32gui.GetWindowRect(hwnd)
             width = right - left
@@ -324,46 +328,58 @@ class WindowCaptureWindows(WindowCapture):
             if width <= 0 or height <= 0:
                 return None
 
-            # Get window DC
-            hwndDC = win32gui.GetWindowDC(hwnd)
-            mfcDC = win32ui.CreateDCFromHandle(hwndDC)
-            saveDC = mfcDC.CreateCompatibleDC()
+            # Track GDI resources for cleanup
+            hwndDC = None
+            mfcDC = None
+            saveDC = None
+            saveBitMap = None
 
-            # Create bitmap
-            saveBitMap = win32ui.CreateBitmap()
-            saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
-            saveDC.SelectObject(saveBitMap)
+            try:
+                # Get window DC
+                hwndDC = win32gui.GetWindowDC(hwnd)
+                mfcDC = win32ui.CreateDCFromHandle(hwndDC)
+                saveDC = mfcDC.CreateCompatibleDC()
 
-            # Copy window content to bitmap (PW_RENDERFULLCONTENT = 3)
-            windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 3)
+                # Create bitmap
+                saveBitMap = win32ui.CreateBitmap()
+                saveBitMap.CreateCompatibleBitmap(mfcDC, width, height)
+                saveDC.SelectObject(saveBitMap)
 
-            # Convert to PIL Image
-            bmpinfo = saveBitMap.GetInfo()
-            bmpstr = saveBitMap.GetBitmapBits(True)
+                # Copy window content to bitmap (PW_RENDERFULLCONTENT = 3)
+                windll.user32.PrintWindow(hwnd, saveDC.GetSafeHdc(), 3)
 
-            image = Image.frombuffer(
-                "RGB",
-                (bmpinfo["bmWidth"], bmpinfo["bmHeight"]),
-                bmpstr,
-                "raw",
-                "BGRX",
-                0,
-                1,
-            )
+                # Convert to PIL Image
+                bmpinfo = saveBitMap.GetInfo()
+                bmpstr = saveBitMap.GetBitmapBits(True)
 
-            # Scale if requested
-            if scale < 1.0:
-                new_width = int(width * scale)
-                new_height = int(height * scale)
-                image = image.resize((new_width, new_height), Image.LANCZOS)
+                image = Image.frombuffer(
+                    "RGB",
+                    (bmpinfo["bmWidth"], bmpinfo["bmHeight"]),
+                    bmpstr,
+                    "raw",
+                    "BGRX",
+                    0,
+                    1,
+                )
 
-            # Cleanup
-            win32gui.DeleteObject(saveBitMap.GetHandle())
-            saveDC.DeleteDC()
-            mfcDC.DeleteDC()
-            win32gui.ReleaseDC(hwnd, hwndDC)
+                # Scale if requested
+                if scale < 1.0:
+                    new_width = int(width * scale)
+                    new_height = int(height * scale)
+                    image = image.resize((new_width, new_height), Image.LANCZOS)
 
-            return image
+                return image
+
+            finally:
+                # Cleanup GDI resources regardless of success/failure
+                if saveBitMap is not None:
+                    win32gui.DeleteObject(saveBitMap.GetHandle())
+                if saveDC is not None:
+                    saveDC.DeleteDC()
+                if mfcDC is not None:
+                    mfcDC.DeleteDC()
+                if hwndDC is not None:
+                    win32gui.ReleaseDC(hwnd, hwndDC)
 
         except _WIN32_CALL_ERRORS as e:
             logger.error(f"Failed to capture window {window_id}: {e}")

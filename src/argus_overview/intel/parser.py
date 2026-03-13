@@ -309,44 +309,10 @@ class IntelParser:
         Args:
             known_systems: Optional set of known system names (lowercase)
         """
+        from .systems import load_systems
+
         self.logger = logging.getLogger(__name__)
-        self.known_systems: set[str] = known_systems or self._load_default_systems()
-
-    def _load_default_systems(self) -> set[str]:
-        """
-        Load a default set of known EVE system names.
-
-        Returns:
-            Set of known system names (lowercase)
-        """
-        # Common null-sec, low-sec, and high-sec systems
-        # In production, this would be loaded from EVE SDE
-        return {
-            # Trade hubs
-            "jita",
-            "amarr",
-            "dodixie",
-            "rens",
-            "hek",
-            # Famous null-sec systems
-            "hed-gp",
-            "1dq1-a",
-            "r1o-gn",
-            "b-r5rb",
-            "m-oee8",
-            "y-2anf",
-            "ge-8jv",
-            "f-eup9",
-            "4-hwwf",
-            "t-m0fa",
-            # Low-sec hotspots
-            "amamake",
-            "tama",
-            "rancer",
-            "old man star",
-            "asakai",
-            "rakapas",
-        }
+        self.known_systems: set[str] = known_systems or load_systems()
 
     def add_known_system(self, system: str):
         """Add a system to the known systems set."""
@@ -465,6 +431,12 @@ class IntelParser:
         for word in words:
             if word.lower() in self.known_systems:
                 return word
+
+        # Multi-word system names (e.g., "Old Man Star")
+        msg_lower = message.lower()
+        for system in self.known_systems:
+            if " " in system and system in msg_lower:
+                return system.title()
 
         return None
 

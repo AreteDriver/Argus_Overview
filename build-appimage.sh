@@ -1,20 +1,20 @@
 #!/bin/bash
-# Argus Overview v2.4 - AppImage Build Script
+# Argus Overview - AppImage Build Script
 # Builds a portable AppImage for Linux distribution
 
 set -e
 
-echo "================================================================"
-echo "Argus Overview v2.4 - AppImage Builder"
-echo "================================================================"
-echo ""
-
 # Get version from pyproject.toml
 VERSION=$(grep 'version = ' pyproject.toml | head -1 | cut -d'"' -f2)
+
+echo "================================================================"
+echo "Argus Overview v${VERSION} - AppImage Builder"
+echo "================================================================"
+echo ""
 echo "Building version: $VERSION"
 echo ""
 
-# Check dependencies
+# Check build dependencies
 echo "Checking build dependencies..."
 for cmd in python3 pip wget; do
     if ! command -v $cmd &> /dev/null; then
@@ -22,7 +22,16 @@ for cmd in python3 pip wget; do
         exit 1
     fi
 done
-echo "✓ Build dependencies found"
+echo "Build dependencies found"
+echo ""
+
+# Check runtime dependencies (warn only)
+echo "Checking runtime dependencies..."
+for cmd in wmctrl xdotool xrandr; do
+    if ! command -v $cmd &> /dev/null; then
+        echo "WARNING: $cmd not found. Required at runtime for X11 window management."
+    fi
+done
 echo ""
 
 # Create/activate virtual environment

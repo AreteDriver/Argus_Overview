@@ -33,6 +33,11 @@ dependencies = [
 linux = [
     "python-xlib>=0.33",
 ]
+wayland = [
+    # POC uses subprocess calls to wlroots tools (swaymsg, hyprctl, wlr-randr, grim).
+    # dbus-next is optional for future D-Bus portal integration.
+    "dbus-next>=0.2.3",
+]
 windows = [
     "pywin32>=306",
 ]

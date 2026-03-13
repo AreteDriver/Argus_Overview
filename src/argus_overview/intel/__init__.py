@@ -13,6 +13,7 @@ Components:
 from argus_overview.intel.alerts import AlertConfig, AlertDispatcher, AlertType
 from argus_overview.intel.log_watcher import ChatLogWatcher, ChatMessage
 from argus_overview.intel.parser import IntelParser, IntelReport, ThreatLevel
+from argus_overview.intel.systems import load_systems
 
 __all__ = [
     "ChatLogWatcher",
@@ -23,4 +24,5 @@ __all__ = [
     "AlertDispatcher",
     "AlertConfig",
     "AlertType",
+    "load_systems",
 ]

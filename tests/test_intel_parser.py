@@ -12,6 +12,7 @@ Tests cover:
 """
 
 from datetime import datetime
+from pathlib import Path
 
 from argus_overview.intel.parser import IntelParser, IntelReport, ThreatLevel
 
@@ -461,3 +462,79 @@ class TestIntelParserEdgeCases:
         with patch.object(type(parser), "CAPITAL_SHIPS", set()):
             level = parser._assess_threat(1, ["avatar"])
             assert level == ThreatLevel.CRITICAL
+
+
+class TestMultiWordSystemNames:
+    """Tests for multi-word system name extraction."""
+
+    def setup_method(self):
+        self.parser = IntelParser(known_systems={"old man star", "jita", "hed-gp"})
+
+    def test_multi_word_system_extracted(self):
+        """Multi-word system name should be extracted from message."""
+        report = self.parser.parse("Old Man Star hostile")
+        assert report is not None
+        assert report.system == "Old Man Star"
+
+    def test_multi_word_system_case_insensitive(self):
+        """Multi-word matching should be case insensitive."""
+        report = self.parser.parse("old man star hostile +3")
+        assert report is not None
+        assert report.system == "Old Man Star"
+
+    def test_multi_word_system_in_sentence(self):
+        """Multi-word system found mid-sentence."""
+        report = self.parser.parse("hostile gang in old man star heading out")
+        assert report is not None
+        assert report.system == "Old Man Star"
+
+    def test_single_word_still_works(self):
+        """Single-word known systems still match."""
+        report = self.parser.parse("Jita hostile")
+        assert report is not None
+        assert report.system == "Jita"
+
+
+class TestSDESystemLoading:
+    """Tests for SDE-based system loading in the parser."""
+
+    def test_parser_loads_sde_systems_by_default(self):
+        """Parser should load from SDE data by default."""
+        parser = IntelParser()
+        # SDE data includes systems not in the old hardcoded set
+        assert "perimeter" in parser.known_systems
+
+    def test_parser_custom_systems_override(self):
+        """Passing known_systems should skip SDE loading."""
+        parser = IntelParser(known_systems={"alpha", "beta"})
+        assert parser.known_systems == {"alpha", "beta"}
+        assert "jita" not in parser.known_systems
+
+    def test_parser_fallback_on_missing_json(self):
+        """Parser should still work if JSON file is gone."""
+        from unittest.mock import patch as _patch
+
+        with _patch("argus_overview.intel.systems.get_default_data_path") as mock_path:
+            mock_path.return_value = Path("/nonexistent/systems.json")
+            parser = IntelParser()
+            # Fallback set has core systems
+            assert "jita" in parser.known_systems
+
+
+class TestForceAuxiliaryShipDetection:
+    """Tests for multi-word ship name 'force auxiliary'."""
+
+    def setup_method(self):
+        self.parser = IntelParser()
+
+    def test_force_auxiliary_detected(self):
+        """'force auxiliary' multi-word ship should be detected."""
+        report = self.parser.parse("HED-GP hostile force auxiliary on gate")
+        assert report is not None
+        assert "force auxiliary" in report.ship_types
+
+    def test_force_auxiliary_threat_level(self):
+        """Force auxiliary is a capital — should be CRITICAL."""
+        report = self.parser.parse("HED-GP hostile force auxiliary")
+        assert report is not None
+        assert report.threat_level == ThreatLevel.CRITICAL
