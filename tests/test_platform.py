@@ -1680,3 +1680,99 @@ class TestIsPureWayland:
                         sys.modules["argus_overview.utils.display_server"] = saved
                     elif "argus_overview.utils.display_server" in sys.modules:
                         del sys.modules["argus_overview.utils.display_server"]
+
+
+class TestImportFallbacks:
+    """Tests for try/except ImportError branches in platform modules."""
+
+    def test_linux_has_xlib_false_when_import_fails(self):
+        """Cover linux.py lines 34-35: HAS_XLIB = False on ImportError."""
+        import importlib
+
+        # Save original module state
+        original_xlib = sys.modules.get("Xlib")
+        original_xlib_x = sys.modules.get("Xlib.X")
+        original_xlib_display = sys.modules.get("Xlib.display")
+
+        try:
+            # Setting to None forces ImportError on `import Xlib`
+            sys.modules["Xlib"] = None  # type: ignore[assignment]
+            sys.modules["Xlib.X"] = None  # type: ignore[assignment]
+            sys.modules["Xlib.display"] = None  # type: ignore[assignment]
+
+            import argus_overview.platform.linux as linux_mod
+
+            importlib.reload(linux_mod)
+
+            assert linux_mod.HAS_XLIB is False
+        finally:
+            # Restore original state
+            if original_xlib is not None:
+                sys.modules["Xlib"] = original_xlib
+            else:
+                sys.modules.pop("Xlib", None)
+            if original_xlib_x is not None:
+                sys.modules["Xlib.X"] = original_xlib_x
+            else:
+                sys.modules.pop("Xlib.X", None)
+            if original_xlib_display is not None:
+                sys.modules["Xlib.display"] = original_xlib_display
+            else:
+                sys.modules.pop("Xlib.display", None)
+
+            # Reload to restore normal state
+            importlib.reload(linux_mod)
+
+    def test_windows_has_win32_true_when_imports_succeed(self):
+        """Cover windows.py lines 32-38: HAS_WIN32 = True when Win32 available."""
+        import ctypes
+        import importlib
+
+        # Create mock Win32 modules
+        mock_pywintypes = MagicMock()
+        mock_pywintypes.error = type("error", (Exception,), {})
+        mock_win32api = MagicMock()
+        mock_win32con = MagicMock()
+        mock_win32gui = MagicMock()
+        mock_win32ui = MagicMock()
+
+        # ctypes exists on Linux but lacks windll — mock ctypes with windll
+        mock_ctypes = MagicMock(spec=ctypes)
+        mock_ctypes.windll = MagicMock()
+
+        # Save originals
+        saved = {}
+        mod_names = [
+            "pywintypes",
+            "win32api",
+            "win32con",
+            "win32gui",
+            "win32ui",
+            "ctypes",
+        ]
+        for mod_name in mod_names:
+            saved[mod_name] = sys.modules.get(mod_name)
+
+        try:
+            sys.modules["pywintypes"] = mock_pywintypes
+            sys.modules["win32api"] = mock_win32api
+            sys.modules["win32con"] = mock_win32con
+            sys.modules["win32gui"] = mock_win32gui
+            sys.modules["win32ui"] = mock_win32ui
+            sys.modules["ctypes"] = mock_ctypes
+
+            import argus_overview.platform.windows as win_mod
+
+            importlib.reload(win_mod)
+
+            assert win_mod.HAS_WIN32 is True
+        finally:
+            # Restore all originals
+            for mod_name in mod_names:
+                original = saved[mod_name]
+                if original is not None:
+                    sys.modules[mod_name] = original
+                else:
+                    sys.modules.pop(mod_name, None)
+
+            importlib.reload(win_mod)

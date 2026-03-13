@@ -110,9 +110,8 @@ modules:
       - install -Dm644 flatpak/io.github.aretedriver.ArgusOverview.metainfo.xml /app/share/metainfo/io.github.aretedriver.ArgusOverview.metainfo.xml
     sources:
       - type: file
-        # TODO: update PyPI URL after v3.1.0 wheel is published to PyPI
-        url: https://files.pythonhosted.org/packages/PLACEHOLDER/argus_overview-3.1.0-py3-none-any.whl
-        sha256: cf1d1238ecca2737b2b2a21712f06750f1739a7486f583707e12b880295ab77d
+        url: https://files.pythonhosted.org/packages/d9/d0/be9e45e6eb5b0b4cf8526da45e1f9a64bcedd1df84b22bd3b6670a00d96a/argus_overview-3.1.0-py3-none-any.whl
+        sha256: 42a554704dce3514a87240052766cac28e60dd4b5ee2d0647e64e3db7d7e106e
       - type: git
         url: https://github.com/AreteDriver/Argus_Overview.git
-        commit: 742e6de6374137739e51e4187218796e2c6e27e6
+        commit: a61feea9dd843c919013ba92b7dc74a98399bb83
