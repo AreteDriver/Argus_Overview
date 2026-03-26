@@ -557,6 +557,7 @@ MIT License - See LICENSE file
 
 ## 💬 **Support**
 
+- [Discord](https://discord.gg/fdzQkrt8) — Join the community
 - Check documentation
 - Review troubleshooting section
 - Check logs: `~/.config/argus-overview/argus-overview.log`

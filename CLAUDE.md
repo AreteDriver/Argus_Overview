@@ -192,6 +192,26 @@ EVE Online and the EVE logo are registered trademarks of CCP hf.
 This is a fan project, not affiliated with or endorsed by CCP hf.
 ```
 
+## CI/CD
+
+9 GitHub Actions workflows:
+- **ci.yml** — lint + test on push/PR
+- **build-linux.yml** — AppImage packaging
+- **build-windows.yml** — Windows portable build
+- **release.yml** — Tagged release automation
+- **codeql.yml** — Static analysis (CodeQL)
+- **secret-scan.yml** — gitleaks secret scanning
+- **security.yml** — Dependency audit (pip-audit, bandit)
+- **dependabot-auto-merge.yml** — Auto-merge patch updates
+- **auto-tag.yml** — Version tag on merge to main
+
+## Testing
+
+- **2,184 tests** via pytest
+- Python 3.10, 3.11, 3.12 matrix
+- Platform-specific tests guarded by `sys.platform` checks
+- Run: `pytest tests/ -v` or `pytest tests/ -v --cov=src/argus_overview`
+
 ## Git Conventions
 
 - Commit messages: Conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`)
