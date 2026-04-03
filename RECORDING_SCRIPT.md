@@ -97,7 +97,7 @@ ls -lh demo.gif
 ### Add to Repository
 ```bash
 # Copy to repo root
-cp demo.gif /home/arete/Argus_Overview/demo.gif
+cp demo.gif ./demo.gif
 
 # Update README.md (add at top after title)
 # ![Demo](demo.gif)
