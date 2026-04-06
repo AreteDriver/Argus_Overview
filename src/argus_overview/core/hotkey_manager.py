@@ -3,8 +3,15 @@
 import logging
 from collections.abc import Callable
 
-from pynput import keyboard
 from PySide6.QtCore import QObject, Signal
+
+try:
+    from pynput import keyboard
+
+    PYNPUT_AVAILABLE = True
+except ImportError:
+    keyboard = None
+    PYNPUT_AVAILABLE = False
 
 
 class HotkeyManager(QObject):
@@ -15,9 +22,14 @@ class HotkeyManager(QObject):
     def __init__(self):
         super().__init__()
         self.hotkeys: dict[str, dict] = {}
-        self.combo_listener: keyboard.GlobalHotKeys | None = None
-        self.key_listener: keyboard.Listener | None = None
+        self.combo_listener = None
+        self.key_listener = None
         self.logger = logging.getLogger(__name__)
+
+        if not PYNPUT_AVAILABLE:
+            self.logger.warning(
+                "pynput not available — global hotkeys disabled"
+            )
 
         # Track single-key hotkeys separately
         self.single_key_hotkeys: dict[str, dict] = {}  # key_char -> {name, callback}
@@ -52,6 +64,11 @@ class HotkeyManager(QObject):
 
     def register_hotkey(self, name: str, key_combo: str, callback: Callable) -> bool:
         """Register a global hotkey"""
+        if not PYNPUT_AVAILABLE:
+            self.logger.warning(
+                f"Cannot register hotkey '{name}': pynput not available"
+            )
+            return False
         try:
             # Normalize the combo for pynput
             normalized_combo = self._normalize_combo(key_combo)
@@ -115,6 +132,8 @@ class HotkeyManager(QObject):
 
     def _restart_listeners(self):
         """Restart all hotkey listeners"""
+        if not PYNPUT_AVAILABLE:
+            return
         # Stop existing listeners
         if self.combo_listener:
             try:
@@ -234,10 +253,14 @@ class HotkeyManager(QObject):
 
     def start(self):
         """Start listening"""
+        if not PYNPUT_AVAILABLE:
+            return
         self._restart_listeners()
 
     def pause(self):
         """Temporarily pause listeners (for key recording)"""
+        if not PYNPUT_AVAILABLE:
+            return
         self.logger.debug("Pausing hotkey listeners")
         if self.combo_listener:
             try:
@@ -255,11 +278,15 @@ class HotkeyManager(QObject):
 
     def resume(self):
         """Resume listeners after pause"""
+        if not PYNPUT_AVAILABLE:
+            return
         self.logger.debug("Resuming hotkey listeners")
         self._restart_listeners()
 
     def stop(self):
         """Stop listening"""
+        if not PYNPUT_AVAILABLE:
+            return
         if self.combo_listener:
             try:
                 self.combo_listener.stop()
