@@ -1829,7 +1829,7 @@ class TestWindowManagerProcessResults:
         with patch.object(WindowManager, "__init__", return_value=None):
             manager = WindowManager.__new__(WindowManager)
             manager.logger = MagicMock()
-            manager.pending_requests = {"req-1": "0x123"}
+            manager.pending_requests = {"req-1": ("0x123", 0.0)}
             manager._pending_lock = threading.Lock()
 
             mock_frame = MagicMock()
@@ -5723,8 +5723,13 @@ class TestWindowPreviewWidgetUpdateFrame:
             # Mock PIL Image
             mock_image = MagicMock()
             mock_image.size = (100, 75)
+            mock_image.width = 100
+            mock_image.height = 75
             mock_image.tobytes.return_value = b"\x00" * 100 * 75 * 4
             mock_image.mode = "RGBA"
+            mock_crop = MagicMock()
+            mock_crop.tobytes.return_value = b"\x00" * 100 * 32 * 4
+            mock_image.crop.return_value = mock_crop
 
             with patch("argus_overview.ui.main_tab.QImage"):
                 with patch("argus_overview.ui.main_tab.QPixmap.fromImage") as mock_pixmap:
@@ -5746,7 +5751,12 @@ class TestWindowPreviewWidgetUpdateFrame:
             widget.logger = MagicMock()
 
             mock_image = MagicMock()
+            mock_image.width = 100
+            mock_image.height = 75
             mock_image.tobytes.return_value = b"\xff" * 100
+            mock_crop = MagicMock()
+            mock_crop.tobytes.return_value = b"\xff" * 50
+            mock_image.crop.return_value = mock_crop
 
             with patch("argus_overview.ui.main_tab.pil_to_qimage", return_value=None):
                 widget.update_frame(mock_image)
@@ -5784,8 +5794,14 @@ class TestFrameFingerprintCache:
             widget.logger = MagicMock()
 
             frame_data = b"\xaa" * 5000
+            crop_data = b"\xaa" * 3200
             mock_image = MagicMock()
+            mock_image.width = 100
+            mock_image.height = 75
             mock_image.tobytes.return_value = frame_data
+            mock_crop = MagicMock()
+            mock_crop.tobytes.return_value = crop_data
+            mock_image.crop.return_value = mock_crop
 
             # First call — should render
             with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_pil:
@@ -5796,9 +5812,14 @@ class TestFrameFingerprintCache:
                     widget.update_frame(mock_image)
                 assert mock_pil.call_count == 1
 
-            # Second call with same data — should skip
+            # Second call with same crop data — should skip
             mock_image2 = MagicMock()
+            mock_image2.width = 100
+            mock_image2.height = 75
             mock_image2.tobytes.return_value = frame_data
+            mock_crop2 = MagicMock()
+            mock_crop2.tobytes.return_value = crop_data
+            mock_image2.crop.return_value = mock_crop2
 
             with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_pil2:
                 widget.update_frame(mock_image2)
@@ -5817,9 +5838,19 @@ class TestFrameFingerprintCache:
             widget.logger = MagicMock()
 
             mock_image1 = MagicMock()
+            mock_image1.width = 100
+            mock_image1.height = 75
             mock_image1.tobytes.return_value = b"\xaa" * 5000
+            mock_crop1 = MagicMock()
+            mock_crop1.tobytes.return_value = b"\xaa" * 3200
+            mock_image1.crop.return_value = mock_crop1
             mock_image2 = MagicMock()
+            mock_image2.width = 100
+            mock_image2.height = 75
             mock_image2.tobytes.return_value = b"\xbb" * 5000
+            mock_crop2 = MagicMock()
+            mock_crop2.tobytes.return_value = b"\xbb" * 3200
+            mock_image2.crop.return_value = mock_crop2
 
             with patch("argus_overview.ui.main_tab.pil_to_qimage") as mock_pil:
                 mock_pil.return_value = MagicMock()
@@ -5845,7 +5876,10 @@ class TestCaptureCycleSkipsPending:
             manager.logger = MagicMock()
             manager.capture_system = MagicMock()
             manager.capture_system.capture_window_async.return_value = "req-2"
-            manager.pending_requests = {"req-1": "0x123"}  # 0x123 already pending
+            import time as _time
+
+            now = _time.monotonic()
+            manager.pending_requests = {"req-1": ("0x123", now)}  # 0x123 already pending
             manager._pending_lock = threading.Lock()
             manager._process_capture_results = MagicMock()
 
@@ -5900,7 +5934,7 @@ class TestProcessResultsDedup:
         with patch.object(WindowManager, "__init__", return_value=None):
             manager = WindowManager.__new__(WindowManager)
             manager.logger = MagicMock()
-            manager.pending_requests = {"req-1": "0x123", "req-2": "0x123"}
+            manager.pending_requests = {"req-1": ("0x123", 0.0), "req-2": ("0x123", 0.0)}
             manager._pending_lock = threading.Lock()
 
             mock_frame = MagicMock()
@@ -5930,7 +5964,7 @@ class TestProcessResultsDedup:
         with patch.object(WindowManager, "__init__", return_value=None):
             manager = WindowManager.__new__(WindowManager)
             manager.logger = MagicMock()
-            manager.pending_requests = {"req-1": "0x123"}
+            manager.pending_requests = {"req-1": ("0x123", 0.0)}
             manager._pending_lock = threading.Lock()
 
             mock_frame = MagicMock()
@@ -5962,7 +5996,12 @@ class TestMemoryCleanup:
             widget.logger = MagicMock()
 
             mock_image = MagicMock()
+            mock_image.width = 100
+            mock_image.height = 75
             mock_image.tobytes.return_value = b"\x00" * 100
+            mock_crop = MagicMock()
+            mock_crop.tobytes.return_value = b"\x00" * 50
+            mock_image.crop.return_value = mock_crop
 
             with patch("argus_overview.ui.main_tab.pil_to_qimage", return_value=MagicMock()):
                 with patch(
@@ -5982,12 +6021,17 @@ class TestMemoryCleanup:
             widget.current_pixmap = None
             widget.logger = MagicMock()
 
-            frame_data = b"\xcc" * 100
-            # Set hash to match what we'll compute
-            widget._last_frame_hash = hash(frame_data[:4096])
+            crop_data = b"\xcc" * 100
+            # Set hash to match what the crop will compute
+            widget._last_frame_hash = hash(crop_data)
 
             mock_image = MagicMock()
-            mock_image.tobytes.return_value = frame_data
+            mock_image.width = 100
+            mock_image.height = 75
+            mock_image.tobytes.return_value = b"\xcc" * 500
+            mock_crop = MagicMock()
+            mock_crop.tobytes.return_value = crop_data
+            mock_image.crop.return_value = mock_crop
 
             widget.update_frame(mock_image)
 
@@ -6093,7 +6137,7 @@ class TestWindowManagerProcessResults:
             manager = WindowManager.__new__(WindowManager)
             frame = MagicMock()
             manager.preview_frames = {"0x12345": frame}
-            manager.pending_requests = {"req1": "0x12345"}
+            manager.pending_requests = {"req1": ("0x12345", 0.0)}
             manager._pending_lock = threading.Lock()
             manager.capture_system = MagicMock()
             manager.logger = MagicMock()
@@ -8231,7 +8275,7 @@ class TestWindowManagerFrameProcessingError:
             mgr.settings_manager = mock_settings
             mgr.logger = MagicMock()
             mgr.refresh_rate = 30
-            mgr.pending_requests = {"req1": "0x12345"}
+            mgr.pending_requests = {"req1": ("0x12345", 0.0)}
             mgr._pending_lock = threading.Lock()
 
             # Create a mock frame that raises an exception

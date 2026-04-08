@@ -42,6 +42,14 @@ def create_mock_window():
         window, char
     )
     window._cycle_window = lambda direction=1: MainWindowV21._cycle_window(window, direction)
+    window._perform_cycle = lambda: MainWindowV21._perform_cycle(window)
+    window._pending_cycle_direction = None
+
+    # Mock timer that fires immediately for test determinism
+    mock_timer = MagicMock()
+    mock_timer.start = lambda *a, **kw: MainWindowV21._perform_cycle(window)
+    window._cycle_timer = mock_timer
+
     window._cycle_next = lambda: MainWindowV21._cycle_next(window)
     window._cycle_prev = lambda: MainWindowV21._cycle_prev(window)
     window._activate_window = lambda wid: MainWindowV21._activate_window(window, wid)
@@ -2330,6 +2338,7 @@ class TestMainWindowV21InitPartial:
             stack.enter_context(patch(f"{mod}.QTabWidget"))
             stack.enter_context(patch(f"{mod}.QVBoxLayout"))
             stack.enter_context(patch(f"{mod}.QWidget"))
+            stack.enter_context(patch(f"{mod}.QTimer"))
 
             window = MainWindowV21()
 

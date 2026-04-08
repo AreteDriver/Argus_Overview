@@ -2,6 +2,12 @@
 Hotkey Edit Widget - Captures actual keypresses for hotkey assignment.
 
 Allows setting any key combination including F13-F20, special keys, etc.
+
+Threading model:
+    pynput key listeners run on a background thread.  All Qt widget
+    updates are bounced to the GUI thread via private signals
+    (_display_update_requested, _finalize_requested) so that
+    ``QLineEdit.setText`` is never called from the listener thread.
 """
 
 import logging
@@ -31,6 +37,10 @@ class HotkeyEdit(QWidget):
     recordingStarted = Signal()  # noqa: N815
     recordingStopped = Signal()  # noqa: N815
 
+    # Private signals for thread-safe GUI updates from listener thread
+    _display_update_requested = Signal(str)
+    _finalize_requested = Signal()
+
     def __init__(self, parent: QWidget | None = None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
@@ -42,6 +52,10 @@ class HotkeyEdit(QWidget):
         self._timeout_timer = QTimer(self)
         self._timeout_timer.setSingleShot(True)
         self._timeout_timer.timeout.connect(self._stop_recording)
+
+        # Connect thread-safe signals (queued connection to GUI thread)
+        self._display_update_requested.connect(self._do_display_update)
+        self._finalize_requested.connect(self._do_finalize)
 
         self._setup_ui()
 
@@ -130,23 +144,26 @@ class HotkeyEdit(QWidget):
             self.display.setPlaceholderText("Click Record to set hotkey")
 
     def _on_key_press(self, key):
-        """Handle key press during recording."""
+        """Handle key press during recording (called on listener thread)."""
         if not self._recording:
             return
 
         key_str = self._key_to_string(key)
         if key_str:
             self._pressed_keys.add(key_str)
-            self._update_display()
+            # Bounce display update to GUI thread via signal
+            display_str = self._format_pressed_keys()
+            self._display_update_requested.emit(display_str)
 
     def _on_key_release(self, key):
-        """Handle key release - finalize the hotkey."""
-        if not self._recording:
+        """Handle key release - finalize the hotkey (called on listener thread)."""
+        if not self._recording or not self._pressed_keys:
             return
 
-        # When a key is released, capture the combo
-        if self._pressed_keys:
-            self._finalize_hotkey()
+        # Snapshot keys before clearing — _do_finalize reads this on GUI thread
+        self._finalized_keys = self._pressed_keys.copy()
+        self._pressed_keys.clear()  # Prevent duplicate signals from remaining key releases
+        self._finalize_requested.emit()
 
     def _key_to_string(self, key) -> str | None:
         """Convert pynput key to string format."""
@@ -172,34 +189,35 @@ class HotkeyEdit(QWidget):
 
         return None
 
-    def _update_display(self):
-        """Update display with current pressed keys."""
-        if not self._pressed_keys:
-            return
+    @staticmethod
+    def _format_keys(keys: set[str]) -> str:
+        """Format a set of keys into display string (thread-safe, no GUI calls)."""
+        if not keys:
+            return ""
 
-        # Sort: modifiers first, then other keys
         modifiers = {"ctrl", "alt", "shift", "cmd", "super", "win"}
-        mod_keys = sorted([k for k in self._pressed_keys if k in modifiers])
-        other_keys = sorted([k for k in self._pressed_keys if k not in modifiers])
+        mod_keys = sorted([k for k in keys if k in modifiers])
+        other_keys = sorted([k for k in keys if k not in modifiers])
 
         parts = mod_keys + other_keys
-        display_str = "+".join(f"<{p}>" for p in parts)
+        return "+".join(f"<{p}>" for p in parts)
+
+    def _format_pressed_keys(self) -> str:
+        """Format currently pressed keys (convenience wrapper)."""
+        return self._format_keys(self._pressed_keys)
+
+    def _do_display_update(self, display_str: str):
+        """Update display widget (runs on GUI thread via signal)."""
         self.display.setText(display_str)
 
-    def _finalize_hotkey(self):
-        """Finalize and save the captured hotkey."""
-        if not self._pressed_keys:
+    def _do_finalize(self):
+        """Finalize and save the captured hotkey (runs on GUI thread via signal)."""
+        keys = getattr(self, "_finalized_keys", self._pressed_keys)
+        if not keys:
             self._stop_recording()
             return
 
-        # Sort: modifiers first, then other keys
-        modifiers = {"ctrl", "alt", "shift", "cmd", "super", "win"}
-        mod_keys = sorted([k for k in self._pressed_keys if k in modifiers])
-        other_keys = sorted([k for k in self._pressed_keys if k not in modifiers])
-
-        parts = mod_keys + other_keys
-        self._hotkey = "+".join(f"<{p}>" for p in parts)
-
+        self._hotkey = self._format_keys(keys)
         self.display.setText(self._hotkey)
         self.hotkeyChanged.emit(self._hotkey)
         self.logger.info(f"Hotkey captured: {self._hotkey}")

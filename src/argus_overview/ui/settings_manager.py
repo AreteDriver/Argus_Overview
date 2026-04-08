@@ -286,11 +286,19 @@ class SettingsManager:
             with open(import_path) as f:
                 import_data = json.load(f)
 
+            if not isinstance(import_data, dict):
+                self.logger.error("Import file is not a JSON object")
+                return False
+
             # Extract settings (handle both old and new format)
             if "settings" in import_data:
                 imported_settings = import_data["settings"]
             else:
                 imported_settings = import_data
+
+            if not isinstance(imported_settings, dict):
+                self.logger.error("Imported settings is not a JSON object")
+                return False
 
             # Merge with defaults (preserve structure)
             self.settings = self._merge_settings(
@@ -339,7 +347,7 @@ class SettingsManager:
 
     def validate(self) -> bool:
         """
-        Validate current settings
+        Validate current settings and clamp out-of-range values.
 
         Returns:
             bool: True if valid
@@ -347,15 +355,28 @@ class SettingsManager:
         try:
             # Check refresh rate is reasonable
             refresh_rate = self.get("performance.default_refresh_rate", 30)
-            if not (1 <= refresh_rate <= 60):
+            if not isinstance(refresh_rate, (int, float)) or not (1 <= refresh_rate <= 60):
                 self.logger.warning(f"Invalid refresh rate: {refresh_rate}, resetting to 30")
                 self.set("performance.default_refresh_rate", 30)
 
             # Check worker count is reasonable
             workers = self.get("performance.capture_workers", 4)
-            if not (1 <= workers <= 16):
+            if not isinstance(workers, int) or not (1 <= workers <= 16):
                 self.logger.warning(f"Invalid worker count: {workers}, resetting to 4")
                 self.set("performance.capture_workers", 4)
+
+            # Check auto-discovery interval is positive
+            interval = self.get("general.auto_discovery_interval", 5)
+            if not isinstance(interval, (int, float)) or interval < 1:
+                self.logger.warning(f"Invalid discovery interval: {interval}, resetting to 5")
+                self.set("general.auto_discovery_interval", 5)
+
+            # Validate hotkey formats (non-empty strings with valid key names)
+            for key in ("hotkeys.cycle_next", "hotkeys.cycle_prev"):
+                combo = self.get(key, "")
+                if combo and not isinstance(combo, str):
+                    self.logger.warning(f"Invalid hotkey format for {key}, clearing")
+                    self.set(key, "")
 
             return True
 
