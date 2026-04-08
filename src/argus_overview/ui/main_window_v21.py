@@ -925,6 +925,10 @@ class MainWindowV21(QMainWindow):
         # Clear window assignment in character manager
         self.character_manager.unassign_window(char_name)
 
+        # Remove preview frame so capture loop stops hitting dead window
+        if hasattr(self, "main_tab") and hasattr(self.main_tab, "window_manager"):
+            self.main_tab.window_manager.remove_window(window_id)
+
         # Update characters tab if it exists and has the method
         if hasattr(self, "characters_tab") and hasattr(
             self.characters_tab, "update_character_status"
