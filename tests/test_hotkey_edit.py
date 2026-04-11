@@ -138,7 +138,7 @@ class TestHotkeyEditFinalize:
         widget = HotkeyEdit()
         widget._pressed_keys = {"f13"}
         widget._recording = True
-        widget._finalize_hotkey()
+        widget._do_finalize()
         assert widget.text() == "<f13>"
 
     def test_finalize_hotkey_with_modifier(self, qapp):
@@ -146,7 +146,7 @@ class TestHotkeyEditFinalize:
         widget = HotkeyEdit()
         widget._pressed_keys = {"ctrl", "f13"}
         widget._recording = True
-        widget._finalize_hotkey()
+        widget._do_finalize()
         # Modifiers should come first
         assert "ctrl" in widget.text()
         assert "f13" in widget.text()
@@ -159,7 +159,7 @@ class TestHotkeyEditFinalize:
 
         widget._pressed_keys = {"f14"}
         widget._recording = True
-        widget._finalize_hotkey()
+        widget._do_finalize()
 
         assert len(signal_received) == 1
         assert "<f14>" in signal_received[0]
@@ -172,7 +172,8 @@ class TestHotkeyEditUpdateDisplay:
         """Test that modifiers appear before other keys."""
         widget = HotkeyEdit()
         widget._pressed_keys = {"a", "ctrl", "shift"}
-        widget._update_display()
+        display_str = widget._format_pressed_keys()
+        widget._do_display_update(display_str)
 
         text = widget.display.text()
         ctrl_pos = text.find("ctrl")
@@ -187,7 +188,8 @@ class TestHotkeyEditUpdateDisplay:
         """Test update display with no pressed keys."""
         widget = HotkeyEdit()
         widget._pressed_keys = set()
-        widget._update_display()
+        display_str = widget._format_pressed_keys()
+        widget._do_display_update(display_str)
         # Should not crash, display unchanged
         assert widget.display.text() == "" or "Record" in widget.display.placeholderText()
 
@@ -328,7 +330,7 @@ class TestHotkeyEditFinalizeEmpty:
         widget._recording = True
         widget._pressed_keys = set()  # Empty
 
-        widget._finalize_hotkey()
+        widget._do_finalize()
 
         assert not widget._recording
 

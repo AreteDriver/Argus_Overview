@@ -45,7 +45,7 @@ Lifecycle:
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Slot
+from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
 
@@ -96,6 +96,11 @@ class MainWindowV21(QMainWindow):
         # v2.2: Window cycling state
         self.cycling_index = 0  # Current position in cycling group
         self.current_cycling_group = "Default"  # Active cycling group name
+        self._pending_cycle_direction: int | None = None
+        self._cycle_timer = QTimer(self)
+        self._cycle_timer.setSingleShot(True)
+        self._cycle_timer.setInterval(80)  # 80ms debounce — fast enough to feel instant
+        self._cycle_timer.timeout.connect(self._perform_cycle)
 
         # v2.2: Theme manager
         self.theme_manager = get_theme_manager()
@@ -270,6 +275,20 @@ class MainWindowV21(QMainWindow):
 
         return members
 
+    def _add_to_default_cycling_group(self, char_name: str):
+        """Add a character to the Default cycling group if not already present."""
+        groups = self.settings_manager.get("cycling_groups", {})
+        if "Default" not in groups:
+            groups["Default"] = []
+        if char_name not in groups["Default"]:
+            groups["Default"].append(char_name)
+            self.settings_manager.set("cycling_groups", groups, auto_save=True)
+            # Refresh the hotkeys tab UI if it exists
+            if hasattr(self, "hotkeys_tab") and self.hotkeys_tab.current_group == "Default":
+                self.hotkeys_tab._load_group_members("Default")
+                self.hotkeys_tab.cycling_groups = groups
+            self.logger.info(f"Added {char_name} to Default cycling group")
+
     def _get_window_id_for_character(self, char_name: str) -> str | None:
         """Get window ID for a character name"""
         if hasattr(self, "main_tab") and hasattr(self.main_tab, "window_manager"):
@@ -308,13 +327,21 @@ class MainWindowV21(QMainWindow):
 
     @Slot()
     def _cycle_next(self):
-        """Cycle to next window in group"""
-        self._cycle_window(direction=1)
+        """Queue cycle to next window (debounced to prevent subprocess flood)."""
+        self._pending_cycle_direction = 1
+        self._cycle_timer.start()
 
     @Slot()
     def _cycle_prev(self):
-        """Cycle to previous window in group"""
-        self._cycle_window(direction=-1)
+        """Queue cycle to previous window (debounced to prevent subprocess flood)."""
+        self._pending_cycle_direction = -1
+        self._cycle_timer.start()
+
+    def _perform_cycle(self):
+        """Execute the queued cycle (called by debounce timer)."""
+        if self._pending_cycle_direction is not None:
+            self._cycle_window(direction=self._pending_cycle_direction)
+            self._pending_cycle_direction = None
 
     def _activate_window(self, window_id: str):
         """Activate a window by ID, optionally minimizing previous EVE window.
@@ -458,6 +485,9 @@ class MainWindowV21(QMainWindow):
                     )
                     self.main_tab.preview_layout.addWidget(frame)
                     self.main_tab._update_status()
+
+                    # Auto-add to Default cycling group
+                    self._add_to_default_cycling_group(char_name)
 
                     # Show notification
                     if self.settings_manager.get("general.show_notifications", True):
@@ -692,6 +722,7 @@ class MainWindowV21(QMainWindow):
                 "hotkeys_tab",
                 [
                     ("group_changed", self.main_tab.refresh_layout_groups),
+                    ("hotkeys_changed", self._register_cycling_hotkeys),
                 ],
             ),
             # system_tray signals
@@ -738,6 +769,28 @@ class MainWindowV21(QMainWindow):
                     getattr(source, signal_name).disconnect(slot)
                 except (RuntimeError, TypeError):
                     pass  # Already disconnected or widget destroyed
+
+        # Disconnect alert dispatcher border flash signal
+        if hasattr(self, "intel_tab"):
+            try:
+                alert_dispatcher = self.intel_tab.get_alert_dispatcher()
+                alert_dispatcher.border_flash_requested.disconnect(
+                    self._flash_preview_borders
+                )
+            except (RuntimeError, TypeError, AttributeError):
+                pass
+
+        # Disconnect all preview frame signals (dynamic connections)
+        if hasattr(self, "main_tab") and hasattr(self.main_tab, "window_manager"):
+            for frame in self.main_tab.window_manager.preview_frames.values():
+                for sig_name, slot in [
+                    ("window_activated", self.main_tab._on_window_activated),
+                    ("window_removed", self.main_tab._on_window_removed),
+                ]:
+                    try:
+                        getattr(frame, sig_name).disconnect(slot)
+                    except (RuntimeError, TypeError):
+                        pass
 
         # Hotkey recording pause/resume signals
         if hasattr(self, "hotkeys_tab"):
@@ -871,6 +924,10 @@ class MainWindowV21(QMainWindow):
 
         # Clear window assignment in character manager
         self.character_manager.unassign_window(char_name)
+
+        # Remove preview frame so capture loop stops hitting dead window
+        if hasattr(self, "main_tab") and hasattr(self.main_tab, "window_manager"):
+            self.main_tab.window_manager.remove_window(window_id)
 
         # Update characters tab if it exists and has the method
         if hasattr(self, "characters_tab") and hasattr(

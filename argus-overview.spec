@@ -34,10 +34,15 @@ hiddenimports = [
     'argus_overview.platform.base',
     'pynput.keyboard._xorg',
     'pynput.mouse._xorg',
+    'pynput._util',
+    'pynput._util.xorg',
+    'pynput._util.xorg_keysyms',
     'Xlib',
     'Xlib.display',
     'Xlib.X',
     'Xlib.Xatom',
+    'Xlib.ext',
+    'Xlib.ext.xtest',
 ]
 
 # Exclude these modules (not needed, reduce size)

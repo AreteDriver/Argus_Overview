@@ -485,11 +485,12 @@ class TestStartComboListener:
             # Should not raise
             manager._start_combo_listener()
 
-    def test_wrapper_calls_callback_and_emits_signal(self):
-        """Tests the wrapper callback calls the original callback and emits signal"""
+    def test_wrapper_emits_invoke_signal(self):
+        """Tests the wrapper emits _invoke_callback signal for GUI-thread dispatch"""
         manager = HotkeyManager()
         callback = MagicMock()
         manager.combo_hotkeys = {"<ctrl>+a": {"name": "test_hotkey", "callback": callback}}
+        manager.hotkeys = {"test_hotkey": {"combo": "<ctrl>+a", "callback": callback}}
 
         # Capture the wrapper that gets created
         captured_wrapper = None
@@ -510,11 +511,16 @@ class TestStartComboListener:
         ):
             manager._start_combo_listener()
 
-            # Call the wrapper
+            # Call the wrapper (simulates listener thread firing)
             assert captured_wrapper is not None
             captured_wrapper()
 
-            # Verify callback was called
+            # Process the queued signal (simulates event loop)
+            from PySide6.QtCore import QCoreApplication
+
+            QCoreApplication.processEvents()
+
+            # Verify callback was dispatched on GUI thread
             callback.assert_called_once()
             # Verify signal was emitted with hotkey name
             assert signal_received == ["test_hotkey"]

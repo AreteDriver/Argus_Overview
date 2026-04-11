@@ -26,7 +26,7 @@ from .base import (
     WindowManager,
 )
 
-# python-xlib for direct X11 capture (optional, falls back to ImageMagick)
+# python-xlib for direct X11 capture and activation (optional, falls back to subprocess)
 try:
     from Xlib import X, display as xlib_display  # noqa: I001
 
@@ -147,7 +147,9 @@ def run_x11_subprocess(
         cmd_str,
         last_error,
     )
-    raise last_error  # type: ignore[misc]
+    if last_error is None:
+        raise RuntimeError(f"X11 command exhausted {max_attempts} retries: {cmd_str}")
+    raise last_error
 
 
 class WindowManagerLinux(WindowManager):
@@ -190,38 +192,32 @@ class WindowManagerLinux(WindowManager):
     def move_window(
         self, window_id: str, x: int, y: int, w: int, h: int, timeout: float = 2.0
     ) -> bool:
-        """Move and resize a window using xdotool."""
+        """Move and resize a window using xdotool.
+
+        Skips the ``--sync`` flag because Wine/Proton windows (EVE)
+        never acknowledge it, causing guaranteed 2 s timeouts that
+        freeze the UI.  A short sleep after each fire-and-forget
+        call gives the WM time to process the request.
+        """
         if not self.is_valid_window_id(window_id):
             logger.warning("Invalid window ID format for move: %s", window_id)
             return False
 
         try:
-            # Try with --sync first, fallback for Wine/Proton windows
-            try:
-                run_x11_subprocess(
-                    ["xdotool", "windowmove", "--sync", window_id, str(x), str(y)],
-                    timeout=timeout,
-                )
-            except subprocess.TimeoutExpired:
-                run_x11_subprocess(
-                    ["xdotool", "windowmove", window_id, str(x), str(y)],
-                    timeout=timeout,
-                )
-                time.sleep(0.1)
+            run_x11_subprocess(
+                ["xdotool", "windowmove", window_id, str(x), str(y)],
+                timeout=timeout,
+                max_attempts=2,
+            )
 
             # Skip resize when w/h <= 0 (position-only move)
             if w > 0 and h > 0:
-                try:
-                    run_x11_subprocess(
-                        ["xdotool", "windowsize", "--sync", window_id, str(w), str(h)],
-                        timeout=timeout,
-                    )
-                except subprocess.TimeoutExpired:
-                    run_x11_subprocess(
-                        ["xdotool", "windowsize", window_id, str(w), str(h)],
-                        timeout=timeout,
-                    )
-                    time.sleep(0.1)
+                time.sleep(0.05)  # Let WM process the move before resize
+                run_x11_subprocess(
+                    ["xdotool", "windowsize", window_id, str(w), str(h)],
+                    timeout=timeout,
+                    max_attempts=2,
+                )
 
             return True
 
@@ -230,16 +226,54 @@ class WindowManagerLinux(WindowManager):
             return False
 
     def activate_window(self, window_id: str, timeout: float = 2.0) -> bool:
-        """Activate/focus a window using wmctrl."""
+        """Activate/focus a window.
+
+        Uses python-xlib ``_NET_ACTIVE_WINDOW`` message for sub-millisecond
+        activation when available, falling back to wmctrl subprocess.
+        """
         if not self.is_valid_window_id(window_id):
             logger.warning("Invalid window ID format: %s", window_id)
             return False
+
+        if HAS_XLIB:
+            try:
+                return self._activate_xlib(window_id)
+            except Exception as e:
+                logger.debug(
+                    "Xlib activation failed for %s: %s, falling back to wmctrl", window_id, e
+                )
+
         try:
             run_x11_subprocess(["wmctrl", "-i", "-a", window_id], timeout=timeout)
             return True
         except (OSError, subprocess.SubprocessError) as e:
             logger.warning("Failed to activate window %s: %s", window_id, e)
             return False
+
+    @staticmethod
+    def _activate_xlib(window_id: str) -> bool:
+        """Activate window via _NET_ACTIVE_WINDOW EWMH message (no subprocess)."""
+        disp = xlib_display.Display()
+        try:
+            root = disp.screen().root
+            wid = int(window_id, 16)
+            window = disp.create_resource_object("window", wid)
+
+            # Send _NET_ACTIVE_WINDOW client message to root (EWMH standard)
+            net_active = disp.intern_atom("_NET_ACTIVE_WINDOW")
+            event = xlib_display.event.ClientMessage(
+                window=window,
+                client_type=net_active,
+                data=(32, [2, X.CurrentTime, 0, 0, 0]),  # source=2 (pager)
+            )
+            root.send_event(
+                event,
+                event_mask=X.SubstructureRedirectMask | X.SubstructureNotifyMask,
+            )
+            disp.flush()
+            return True
+        finally:
+            disp.close()
 
     def minimize_window(self, window_id: str) -> bool:
         """Minimize a window using xdotool."""
@@ -426,7 +460,7 @@ class WindowCaptureLinux(WindowCapture):
                 try:
                     _thread_local.display.close()
                 except Exception:
-                    pass
+                    pass  # Display may be in any state — just discard it
                 del _thread_local.display
             return None
 

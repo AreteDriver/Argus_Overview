@@ -1,23 +1,41 @@
-"""Global hotkey management - supports both modifier combos and single keys"""
+"""Global hotkey management - supports both modifier combos and single keys.
+
+Threading model:
+    pynput listeners run on background threads.  All callbacks are
+    dispatched to the Qt GUI thread via the ``_invoke_callback`` signal
+    (auto-queued connection) so that slot methods can safely modify
+    widgets without cross-thread crashes.
+"""
 
 import logging
 from collections.abc import Callable
 
-from pynput import keyboard
 from PySide6.QtCore import QObject, Signal
+
+try:
+    from pynput import keyboard
+
+    PYNPUT_AVAILABLE = True
+except ImportError:
+    keyboard = None
+    PYNPUT_AVAILABLE = False
 
 
 class HotkeyManager(QObject):
     """Manages global hotkeys - supports single keys and modifier combinations"""
 
     hotkey_triggered = Signal(str)
+    _invoke_callback = Signal(str)  # hotkey name → looked up and called on GUI thread
 
     def __init__(self):
         super().__init__()
         self.hotkeys: dict[str, dict] = {}
-        self.combo_listener: keyboard.GlobalHotKeys | None = None
-        self.key_listener: keyboard.Listener | None = None
+        self.combo_listener = None
+        self.key_listener = None
         self.logger = logging.getLogger(__name__)
+
+        if not PYNPUT_AVAILABLE:
+            self.logger.warning("pynput not available — global hotkeys disabled")
 
         # Track single-key hotkeys separately
         self.single_key_hotkeys: dict[str, dict] = {}  # key_char -> {name, callback}
@@ -25,6 +43,9 @@ class HotkeyManager(QObject):
 
         # Track currently pressed modifiers
         self.pressed_modifiers: set[str] = set()
+
+        # Connect callback dispatcher (queued → runs on GUI thread)
+        self._invoke_callback.connect(self._dispatch_callback)
 
     def _normalize_combo(self, key_combo: str) -> str:
         """Normalize hotkey combo for pynput compatibility.
@@ -52,6 +73,9 @@ class HotkeyManager(QObject):
 
     def register_hotkey(self, name: str, key_combo: str, callback: Callable) -> bool:
         """Register a global hotkey"""
+        if not PYNPUT_AVAILABLE:
+            self.logger.warning(f"Cannot register hotkey '{name}': pynput not available")
+            return False
         try:
             # Normalize the combo for pynput
             normalized_combo = self._normalize_combo(key_combo)
@@ -115,6 +139,8 @@ class HotkeyManager(QObject):
 
     def _restart_listeners(self):
         """Restart all hotkey listeners"""
+        if not PYNPUT_AVAILABLE:
+            return
         # Stop existing listeners
         if self.combo_listener:
             try:
@@ -138,17 +164,25 @@ class HotkeyManager(QObject):
         if self.single_key_hotkeys:
             self._start_key_listener()
 
+    def _dispatch_callback(self, hotkey_name: str):
+        """Dispatch hotkey callback on the GUI thread (connected via queued signal)."""
+        if hotkey_name in self.hotkeys:
+            try:
+                self.hotkeys[hotkey_name]["callback"]()
+                self.hotkey_triggered.emit(hotkey_name)
+            except (RuntimeError, TypeError, ValueError) as e:
+                self.logger.error(f"Error in hotkey callback '{hotkey_name}': {e}")
+
     def _start_combo_listener(self):
         """Start the GlobalHotKeys listener for modifier combinations"""
         hotkey_map = {}
         for combo, info in self.combo_hotkeys.items():
-            callback = info["callback"]
             name = info["name"]
 
-            def make_callback(cb=callback, hk_name=name):
+            def make_callback(hk_name=name):
                 def wrapper():
-                    cb()
-                    self.hotkey_triggered.emit(hk_name)
+                    # Bounce to GUI thread via signal (listener runs on bg thread)
+                    self._invoke_callback.emit(hk_name)
 
                 return wrapper
 
@@ -196,7 +230,7 @@ class HotkeyManager(QObject):
         return None
 
     def _on_key_press(self, key):
-        """Handle key press for single-key hotkeys"""
+        """Handle key press for single-key hotkeys (called on listener thread)"""
         try:
             # Track modifiers - don't process further if it was a modifier
             if self._track_modifier_press(key):
@@ -210,11 +244,8 @@ class HotkeyManager(QObject):
             key_char = self._get_key_char(key)
             if key_char and key_char in self.single_key_hotkeys:
                 info = self.single_key_hotkeys[key_char]
-                try:
-                    info["callback"]()
-                    self.hotkey_triggered.emit(info["name"])
-                except (RuntimeError, TypeError, ValueError) as e:
-                    self.logger.error(f"Error in hotkey callback: {e}")
+                # Bounce to GUI thread via signal (listener runs on bg thread)
+                self._invoke_callback.emit(info["name"])
 
         except (AttributeError, TypeError, RuntimeError) as e:
             self.logger.debug(f"Key press handling error: {e}")
@@ -234,10 +265,14 @@ class HotkeyManager(QObject):
 
     def start(self):
         """Start listening"""
+        if not PYNPUT_AVAILABLE:
+            return
         self._restart_listeners()
 
     def pause(self):
         """Temporarily pause listeners (for key recording)"""
+        if not PYNPUT_AVAILABLE:
+            return
         self.logger.debug("Pausing hotkey listeners")
         if self.combo_listener:
             try:
@@ -255,11 +290,15 @@ class HotkeyManager(QObject):
 
     def resume(self):
         """Resume listeners after pause"""
+        if not PYNPUT_AVAILABLE:
+            return
         self.logger.debug("Resuming hotkey listeners")
         self._restart_listeners()
 
     def stop(self):
         """Stop listening"""
+        if not PYNPUT_AVAILABLE:
+            return
         if self.combo_listener:
             try:
                 self.combo_listener.stop()
