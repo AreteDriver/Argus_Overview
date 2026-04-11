@@ -373,9 +373,7 @@ class LayoutManager:
             }
             if num_windows > 1:
                 side_width = screen_width - main_width - spacing * 3
-                side_height = (screen_height - spacing * num_windows) // (
-                    num_windows - 1
-                )
+                side_height = (screen_height - spacing * num_windows) // (num_windows - 1)
                 side_x = screen_x + main_width + spacing * 2
                 for i, window_id in enumerate(windows[1:4]):
                     layouts[window_id] = {

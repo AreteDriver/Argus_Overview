@@ -250,9 +250,7 @@ class WindowCaptureWindows(WindowCapture):
 
         self._stop_event.clear()
         for i in range(self.max_workers):
-            worker = threading.Thread(
-                target=self._worker, daemon=True, name=f"CaptureWorker-{i}"
-            )
+            worker = threading.Thread(target=self._worker, daemon=True, name=f"CaptureWorker-{i}")
             worker.start()
             self.workers.append(worker)
 
@@ -306,9 +304,7 @@ class WindowCaptureWindows(WindowCapture):
         except Empty:
             return None
 
-    def capture_window_sync(
-        self, window_id: str, scale: float = 1.0
-    ) -> Image.Image | None:
+    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Image.Image | None:
         """Synchronous window capture using Windows GDI."""
         if not HAS_WIN32:
             return None

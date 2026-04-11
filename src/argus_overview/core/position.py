@@ -77,9 +77,7 @@ class PositionManager:
         # If we have a preset position for this window, use it
         if preset_positions and window_id in preset_positions:
             pos = preset_positions[window_id]
-            self.logger.debug(
-                f"Using preset position for {window_id}: ({pos.x}, {pos.y})"
-            )
+            self.logger.debug(f"Using preset position for {window_id}: ({pos.x}, {pos.y})")
             return pos
 
         # Get screen geometry
@@ -127,9 +125,7 @@ class PositionManager:
                     width=self.DEFAULT_WIDTH,
                     height=self.DEFAULT_HEIGHT,
                 )
-                self.logger.debug(
-                    f"Placing below bottommost (new row): ({pos.x}, {pos.y})"
-                )
+                self.logger.debug(f"Placing below bottommost (new row): ({pos.x}, {pos.y})")
                 return self._snap_position(pos)
 
         # Fallback: stack with offset from first
@@ -162,9 +158,7 @@ class PositionManager:
             position: Current position
         """
         self.positions[window_id] = position
-        self.logger.debug(
-            f"Registered position for {window_id}: ({position.x}, {position.y})"
-        )
+        self.logger.debug(f"Registered position for {window_id}: ({position.x}, {position.y})")
 
     def update_position(self, window_id: str, position: ThumbnailPosition) -> bool:
         """

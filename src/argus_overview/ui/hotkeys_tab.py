@@ -232,9 +232,7 @@ class HotkeysTab(QWidget):
             selector_layout.addWidget(new_btn)
 
         # Delete group button (from registry)
-        delete_btn = toolbar_builder.create_button(
-            "delete_group", self._delete_current_group
-        )
+        delete_btn = toolbar_builder.create_button("delete_group", self._delete_current_group)
         if delete_btn:
             delete_btn.setText("Delete")  # Override label for this context
             selector_layout.addWidget(delete_btn)
@@ -267,9 +265,7 @@ class HotkeysTab(QWidget):
         if remove_btn:
             member_controls.addWidget(remove_btn)
 
-        clear_btn = toolbar_builder.create_button(
-            "clear_group", self._clear_group_members
-        )
+        clear_btn = toolbar_builder.create_button("clear_group", self._clear_group_members)
         if clear_btn:
             member_controls.addWidget(clear_btn)
 
@@ -315,9 +311,7 @@ class HotkeysTab(QWidget):
         hotkey_layout.addRow("Cycle Backward:", self.cycle_backward_edit)
 
         # Save hotkeys button (from registry)
-        save_hotkeys_btn = toolbar_builder.create_button(
-            "save_hotkeys", self._save_hotkeys
-        )
+        save_hotkeys_btn = toolbar_builder.create_button("save_hotkeys", self._save_hotkeys)
         if save_hotkeys_btn:
             hotkey_layout.addRow("", save_hotkeys_btn)
 
@@ -352,9 +346,7 @@ class HotkeysTab(QWidget):
 
     def _refresh_group_combo(self):
         """Refresh group selector dropdown"""
-        current = (
-            self.group_combo.currentText() if self.group_combo.count() > 0 else None
-        )
+        current = self.group_combo.currentText() if self.group_combo.count() > 0 else None
 
         self.group_combo.blockSignals(True)
         self.group_combo.clear()
@@ -416,9 +408,7 @@ class HotkeysTab(QWidget):
             return
 
         if self.current_group == "Default":
-            QMessageBox.warning(
-                self, "Cannot Delete", "Cannot delete the Default group."
-            )
+            QMessageBox.warning(self, "Cannot Delete", "Cannot delete the Default group.")
             return
 
         reply = QMessageBox.question(
@@ -460,9 +450,7 @@ class HotkeysTab(QWidget):
     def _load_active_windows(self):
         """Load all currently active EVE windows into the current group"""
         if not self.main_tab or not hasattr(self.main_tab, "window_manager"):
-            QMessageBox.warning(
-                self, "Error", "Cannot access active windows. Please try again."
-            )
+            QMessageBox.warning(self, "Error", "Cannot access active windows. Please try again.")
             return
 
         # Get active character names
@@ -472,9 +460,7 @@ class HotkeysTab(QWidget):
                 active_chars.append(frame.character_name)
 
         if not active_chars:
-            QMessageBox.information(
-                self, "No Active Windows", "No active EVE windows detected."
-            )
+            QMessageBox.information(self, "No Active Windows", "No active EVE windows detected.")
             return
 
         # Clear and add all active characters

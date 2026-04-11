@@ -80,9 +80,7 @@ class AlertDispatcher(QObject):
     overlay_requested = Signal(object)  # IntelReport
     alert_triggered = Signal(object, object)  # IntelReport, AlertType
 
-    def __init__(
-        self, config: AlertConfig | None = None, parent: QObject | None = None
-    ):
+    def __init__(self, config: AlertConfig | None = None, parent: QObject | None = None):
         """
         Initialize the alert dispatcher.
 
@@ -117,15 +115,11 @@ class AlertDispatcher(QObject):
         if not self._should_alert(report):
             return
 
-        self.logger.info(
-            f"Dispatching alert: {report.system} - {report.threat_level.value}"
-        )
+        self.logger.info(f"Dispatching alert: {report.system} - {report.threat_level.value}")
 
         # Visual border flash
         if self.config.visual_border:
-            color = self.config.threat_colors.get(
-                report.threat_level, self.config.border_color
-            )
+            color = self.config.threat_colors.get(report.threat_level, self.config.border_color)
             self.border_flash_requested.emit(color, self.config.border_duration_ms)
             self.alert_triggered.emit(report, AlertType.VISUAL_BORDER)
 
@@ -203,9 +197,7 @@ class AlertDispatcher(QObject):
         """
         audio_file = self.config.audio_file or self._default_audio(report.threat_level)
         if audio_file and audio_file.exists():
-            thread = threading.Thread(
-                target=self._play_sound, args=(audio_file,), daemon=True
-            )
+            thread = threading.Thread(target=self._play_sound, args=(audio_file,), daemon=True)
             thread.start()
         else:
             self.logger.debug(f"No audio file found for {report.threat_level}")
@@ -282,9 +274,7 @@ class AlertDispatcher(QObject):
             if report.jumps_from_current is not None:
                 body += f" ({report.jumps_from_current} jumps)"
 
-            urgency = (
-                "critical" if report.threat_level == ThreatLevel.CRITICAL else "normal"
-            )
+            urgency = "critical" if report.threat_level == ThreatLevel.CRITICAL else "normal"
 
             subprocess.run(
                 [

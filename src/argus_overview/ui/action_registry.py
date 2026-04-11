@@ -25,9 +25,7 @@ from typing import Any
 class ActionScope(Enum):
     """Scope of an action - where it can be triggered from"""
 
-    GLOBAL = (
-        auto()
-    )  # Available anywhere (quit, show/hide, reload config, profile switch)
+    GLOBAL = auto()  # Available anywhere (quit, show/hide, reload config, profile switch)
     TAB = auto()  # Primary workflow for specific tab
     OBJECT = auto()  # Operates on selected item/window/character
 
@@ -46,9 +44,7 @@ class PrimaryHome(Enum):
     CYCLE_CONTROL_TOOLBAR = "cycle_control_toolbar"
     SYNC_TOOLBAR = "sync_toolbar"
     INTEL_TOOLBAR = "intel_toolbar"
-    SETTINGS_PANEL = (
-        "settings_panel"  # Settings tab is special - uses panels not toolbar
-    )
+    SETTINGS_PANEL = "settings_panel"  # Settings tab is special - uses panels not toolbar
     HELP_MENU = "help_menu"
 
     # Object actions (Tier 3)
@@ -757,9 +753,7 @@ class ActionRegistry:
 
         self._actions[action.id] = action
         self._by_home[action.primary_home].append(action.id)
-        self.logger.debug(
-            f"Registered action: {action.id} -> {action.primary_home.value}"
-        )
+        self.logger.debug(f"Registered action: {action.id} -> {action.primary_home.value}")
 
     def get(self, action_id: str) -> ActionSpec | None:
         """Get action by ID"""
@@ -854,9 +848,7 @@ def audit_actions(registry: ActionRegistry | None = None) -> dict[str, Any]:
     # Check for missing handlers (warning, not failure)
     for action in actions:
         if not action.handler_name:
-            results["issues"].append(
-                f"Action '{action.id}' has no handler_name defined"
-            )
+            results["issues"].append(f"Action '{action.id}' has no handler_name defined")
 
     return results
 
@@ -885,9 +877,7 @@ def print_audit_report(results: dict | None = None):
     if results["duplicates"]:
         print("\n!!! DUPLICATES FOUND (FAIL) !!!")
         for dup in results["duplicates"]:
-            print(
-                f"  Action '{dup['action_id']}' appears in: {', '.join(dup['homes'])}"
-            )
+            print(f"  Action '{dup['action_id']}' appears in: {', '.join(dup['homes'])}")
     else:
         print("\n[OK] No duplicate actions across primary homes")
 

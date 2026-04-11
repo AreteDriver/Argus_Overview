@@ -96,9 +96,7 @@ class MainWindowV21(QMainWindow):
 
         # v2.2: Auto-discovery
         self.auto_discovery = AutoDiscovery(
-            interval_seconds=self.settings_manager.get(
-                "general.auto_discovery_interval", 5
-            )
+            interval_seconds=self.settings_manager.get("general.auto_discovery_interval", 5)
         )
 
         # v2.2: Window cycling state
@@ -153,17 +151,13 @@ class MainWindowV21(QMainWindow):
         self._register_hotkeys()
 
         # Start systems
-        self.logger.info(
-            "Starting capture system, hotkey manager, and auto-discovery..."
-        )
+        self.logger.info("Starting capture system, hotkey manager, and auto-discovery...")
         self.capture_system.start()
         self.hotkey_manager.start()
 
         # v2.2: Start auto-discovery if enabled
         if self.settings_manager.get("general.auto_discovery", True):
-            self.auto_discovery.new_character_found.connect(
-                self._on_new_character_discovered
-            )
+            self.auto_discovery.new_character_found.connect(self._on_new_character_discovered)
             self.auto_discovery.character_gone.connect(self._on_character_gone)
             self.auto_discovery.start()
 
@@ -195,36 +189,24 @@ class MainWindowV21(QMainWindow):
     def _register_hotkeys(self):
         """Register global hotkeys (v2.2)"""
         # Minimize all
-        minimize_combo = self.settings_manager.get(
-            "hotkeys.minimize_all", "<ctrl>+<shift>+m"
-        )
+        minimize_combo = self.settings_manager.get("hotkeys.minimize_all", "<ctrl>+<shift>+m")
         self.hotkey_manager.register_hotkey(
             "minimize_all", minimize_combo, self._minimize_all_windows
         )
 
         # Restore all
-        restore_combo = self.settings_manager.get(
-            "hotkeys.restore_all", "<ctrl>+<shift>+r"
-        )
-        self.hotkey_manager.register_hotkey(
-            "restore_all", restore_combo, self._restore_all_windows
-        )
+        restore_combo = self.settings_manager.get("hotkeys.restore_all", "<ctrl>+<shift>+r")
+        self.hotkey_manager.register_hotkey("restore_all", restore_combo, self._restore_all_windows)
 
         # Toggle thumbnails
-        toggle_combo = self.settings_manager.get(
-            "hotkeys.toggle_thumbnails", "<ctrl>+<shift>+t"
-        )
+        toggle_combo = self.settings_manager.get("hotkeys.toggle_thumbnails", "<ctrl>+<shift>+t")
         self.hotkey_manager.register_hotkey(
             "toggle_thumbnails", toggle_combo, self._toggle_thumbnails
         )
 
         # Toggle lock
-        lock_combo = self.settings_manager.get(
-            "hotkeys.toggle_lock", "<ctrl>+<shift>+l"
-        )
-        self.hotkey_manager.register_hotkey(
-            "toggle_lock", lock_combo, self._toggle_lock
-        )
+        lock_combo = self.settings_manager.get("hotkeys.toggle_lock", "<ctrl>+<shift>+l")
+        self.hotkey_manager.register_hotkey("toggle_lock", lock_combo, self._toggle_lock)
 
         # Register per-character hotkeys
         char_hotkeys = self.settings_manager.get("character_hotkeys", {})
@@ -233,9 +215,7 @@ class MainWindowV21(QMainWindow):
             def make_callback(name=char_name):
                 return lambda: self._activate_character(name)
 
-            self.hotkey_manager.register_hotkey(
-                f"char_{char_name}", combo, make_callback()
-            )
+            self.hotkey_manager.register_hotkey(f"char_{char_name}", combo, make_callback())
 
         self.logger.info(f"Registered {len(char_hotkeys)} per-character hotkeys")
 
@@ -248,21 +228,13 @@ class MainWindowV21(QMainWindow):
         self.hotkey_manager.unregister_hotkey("cycle_next", restart=False)
         self.hotkey_manager.unregister_hotkey("cycle_prev", restart=False)
 
-        cycle_next_combo = self.settings_manager.get(
-            "hotkeys.cycle_next", "<ctrl>+<tab>"
-        )
-        cycle_prev_combo = self.settings_manager.get(
-            "hotkeys.cycle_prev", "<ctrl>+<shift>+<tab>"
-        )
+        cycle_next_combo = self.settings_manager.get("hotkeys.cycle_next", "<ctrl>+<tab>")
+        cycle_prev_combo = self.settings_manager.get("hotkeys.cycle_prev", "<ctrl>+<shift>+<tab>")
 
         if cycle_next_combo:
-            self.hotkey_manager.register_hotkey(
-                "cycle_next", cycle_next_combo, self._cycle_next
-            )
+            self.hotkey_manager.register_hotkey("cycle_next", cycle_next_combo, self._cycle_next)
         if cycle_prev_combo:
-            self.hotkey_manager.register_hotkey(
-                "cycle_prev", cycle_prev_combo, self._cycle_prev
-            )
+            self.hotkey_manager.register_hotkey("cycle_prev", cycle_prev_combo, self._cycle_prev)
 
         self.logger.info(
             f"Registered cycling hotkeys: next={cycle_next_combo}, prev={cycle_prev_combo}"
@@ -318,10 +290,7 @@ class MainWindowV21(QMainWindow):
             groups["Default"].append(char_name)
             self.settings_manager.set("cycling_groups", groups, auto_save=True)
             # Refresh the hotkeys tab UI if it exists
-            if (
-                hasattr(self, "hotkeys_tab")
-                and self.hotkeys_tab.current_group == "Default"
-            ):
+            if hasattr(self, "hotkeys_tab") and self.hotkeys_tab.current_group == "Default":
                 self.hotkeys_tab._load_group_members("Default")
                 self.hotkeys_tab.cycling_groups = groups
             self.logger.info(f"Added {char_name} to Default cycling group")
@@ -358,9 +327,7 @@ class MainWindowV21(QMainWindow):
                 )
                 return
 
-            self.logger.warning(
-                f"Character '{char_name}' not found in active windows, skipping"
-            )
+            self.logger.warning(f"Character '{char_name}' not found in active windows, skipping")
 
         self.logger.warning("No active windows found in cycling group")
 
@@ -393,9 +360,7 @@ class MainWindowV21(QMainWindow):
 
         try:
             # Check if auto-minimize is enabled
-            auto_minimize = self.settings_manager.get(
-                "performance.auto_minimize_inactive", False
-            )
+            auto_minimize = self.settings_manager.get("performance.auto_minimize_inactive", False)
 
             if auto_minimize:
                 # Get the last activated EVE window
@@ -404,14 +369,10 @@ class MainWindowV21(QMainWindow):
                 if (
                     last_eve_window
                     and last_eve_window != window_id
-                    and self.capture_system._window_mgr.is_valid_window_id(
-                        last_eve_window
-                    )
+                    and self.capture_system._window_mgr.is_valid_window_id(last_eve_window)
                 ):
                     self.capture_system.minimize_window(last_eve_window)
-                    self.logger.info(
-                        f"Auto-minimized previous EVE window: {last_eve_window}"
-                    )
+                    self.logger.info(f"Auto-minimized previous EVE window: {last_eve_window}")
 
             # Track this as the last activated EVE window
             self.settings_manager.set_last_activated_window(window_id)
@@ -428,9 +389,7 @@ class MainWindowV21(QMainWindow):
         preset = self.layout_manager.get_preset(profile_name)
         if preset:
             self.system_tray.set_current_profile(profile_name)
-            self.system_tray.show_notification(
-                "Profile Loaded", f"Loaded: {profile_name}"
-            )
+            self.system_tray.show_notification("Profile Loaded", f"Loaded: {profile_name}")
 
     @Slot()
     def _show_settings(self):
@@ -462,9 +421,7 @@ class MainWindowV21(QMainWindow):
         else:
             self.auto_discovery.stop()
 
-        self.system_tray.show_notification(
-            "Config Reloaded", "Settings have been reloaded"
-        )
+        self.system_tray.show_notification("Config Reloaded", "Settings have been reloaded")
         self.logger.info("Configuration reloaded successfully")
 
     @Slot()
@@ -486,11 +443,7 @@ class MainWindowV21(QMainWindow):
         if not method:
             return
 
-        count = sum(
-            1
-            for wid in self.main_tab.window_manager.preview_frames.keys()
-            if method(wid)
-        )
+        count = sum(1 for wid in self.main_tab.window_manager.preview_frames.keys() if method(wid))
         action_past = "Minimized" if action == "minimize" else "Restored"
         self.logger.info(f"{action_past} {count} EVE windows")
         self.system_tray.show_notification(
@@ -519,9 +472,7 @@ class MainWindowV21(QMainWindow):
         self.logger.warning(f"Character not found: {char_name}")
 
     @Slot(str, str, str)
-    def _on_new_character_discovered(
-        self, char_name: str, window_id: str, window_title: str
-    ):
+    def _on_new_character_discovered(self, char_name: str, window_id: str, window_title: str):
         """Handle new character discovered by auto-discovery (v2.2)"""
         self.logger.info(f"Auto-discovered new character: {char_name}")
 
@@ -597,9 +548,7 @@ class MainWindowV21(QMainWindow):
     def _set_window_icon(self):
         """Set the application window icon"""
         icon_paths = [
-            Path(__file__).parent.parent.parent.parent
-            / "assets"
-            / "icon.png",  # src/../assets
+            Path(__file__).parent.parent.parent.parent / "assets" / "icon.png",  # src/../assets
             Path.home()
             / ".local"
             / "share"
@@ -671,18 +620,10 @@ class MainWindowV21(QMainWindow):
         self.hotkeys_tab.hotkeys_changed.connect(self._register_cycling_hotkeys)
 
         # Pause/resume hotkey listeners during key recording to avoid X11 conflicts
-        self.hotkeys_tab.cycle_forward_edit.recordingStarted.connect(
-            self.hotkey_manager.pause
-        )
-        self.hotkeys_tab.cycle_forward_edit.recordingStopped.connect(
-            self.hotkey_manager.resume
-        )
-        self.hotkeys_tab.cycle_backward_edit.recordingStarted.connect(
-            self.hotkey_manager.pause
-        )
-        self.hotkeys_tab.cycle_backward_edit.recordingStopped.connect(
-            self.hotkey_manager.resume
-        )
+        self.hotkeys_tab.cycle_forward_edit.recordingStarted.connect(self.hotkey_manager.pause)
+        self.hotkeys_tab.cycle_forward_edit.recordingStopped.connect(self.hotkey_manager.resume)
+        self.hotkeys_tab.cycle_backward_edit.recordingStarted.connect(self.hotkey_manager.pause)
+        self.hotkeys_tab.cycle_backward_edit.recordingStopped.connect(self.hotkey_manager.resume)
 
     def _create_intel_tab(self):
         """Create Intel tab (chat log monitoring and alerts)"""
@@ -735,9 +676,7 @@ class MainWindowV21(QMainWindow):
         """Create Sync tab (EVE settings sync) - formerly 'Settings Sync'"""
         from argus_overview.ui.settings_sync_tab import SettingsSyncTab
 
-        self.settings_sync_tab = SettingsSyncTab(
-            self.settings_sync, self.character_manager
-        )
+        self.settings_sync_tab = SettingsSyncTab(self.settings_sync, self.character_manager)
         self.tabs.addTab(self.settings_sync_tab, "Sync")
 
     def _create_settings_tab(self):
@@ -841,9 +780,7 @@ class MainWindowV21(QMainWindow):
         if hasattr(self, "intel_tab"):
             try:
                 alert_dispatcher = self.intel_tab.get_alert_dispatcher()
-                alert_dispatcher.border_flash_requested.disconnect(
-                    self._flash_preview_borders
-                )
+                alert_dispatcher.border_flash_requested.disconnect(self._flash_preview_borders)
             except (RuntimeError, TypeError, AttributeError):
                 pass
 
@@ -924,9 +861,7 @@ class MainWindowV21(QMainWindow):
             # Store previous values for restoration
             if not hasattr(self, "_low_power_previous"):
                 self._low_power_previous = {
-                    "fps": self.settings_manager.get(
-                        "performance.default_refresh_rate", 30
-                    ),
+                    "fps": self.settings_manager.get("performance.default_refresh_rate", 30),
                 }
 
             # Set FPS to 5

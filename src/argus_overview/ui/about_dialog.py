@@ -51,9 +51,7 @@ class AboutDialog(QDialog):
         layout.addSpacing(20)
 
         # Description
-        description = QLabel(
-            "The Complete Professional Multi-Boxing Solution\nfor EVE Online"
-        )
+        description = QLabel("The Complete Professional Multi-Boxing Solution\nfor EVE Online")
         description.setAlignment(Qt.AlignmentFlag.AlignCenter)
         description.setWordWrap(True)
         layout.addWidget(description)

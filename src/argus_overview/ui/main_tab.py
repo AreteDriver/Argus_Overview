@@ -195,9 +195,7 @@ PATTERN_POSITIONS = {
 }
 
 
-def get_pattern_positions(
-    pattern: str, count: int, grid_cols: int = 4
-) -> list[tuple[int, int]]:
+def get_pattern_positions(pattern: str, count: int, grid_cols: int = 4) -> list[tuple[int, int]]:
     """Get grid positions for a layout pattern.
 
     Args:
@@ -377,9 +375,7 @@ class ArrangementGrid(QWidget):
         self.grid_layout.addWidget(tile, row, col)
 
     def get_arrangement(self) -> dict[str, tuple[int, int]]:
-        return {
-            name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()
-        }
+        return {name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()}
 
     def auto_arrange_grid(self, pattern: str):
         """Auto-arrange tiles based on pattern"""
@@ -422,9 +418,7 @@ class ArrangementGrid(QWidget):
         """Handle drop - add character to grid at drop position"""
         # Get character name from drag data
         if event.mimeData().hasFormat("application/x-eve-character"):
-            char_name = (
-                event.mimeData().data("application/x-eve-character").data().decode()
-            )
+            char_name = event.mimeData().data("application/x-eve-character").data().decode()
         elif event.mimeData().hasText():
             char_name = event.mimeData().text()
         else:
@@ -658,21 +652,15 @@ class WindowPreviewWidget(QWidget):
     def _load_settings(self):
         """Load settings from settings_manager"""
         if self.settings_manager:
-            self._opacity_on_hover = self.settings_manager.get(
-                "thumbnails.opacity_on_hover", 0.3
-            )
-            self._zoom_on_hover = self.settings_manager.get(
-                "thumbnails.zoom_on_hover", 1.5
-            )
+            self._opacity_on_hover = self.settings_manager.get("thumbnails.opacity_on_hover", 0.3)
+            self._zoom_on_hover = self.settings_manager.get("thumbnails.zoom_on_hover", 1.5)
             self._show_activity_indicator = self.settings_manager.get(
                 "thumbnails.show_activity_indicator", True
             )
             self._show_session_timer = self.settings_manager.get(
                 "thumbnails.show_session_timer", False
             )
-            self._positions_locked = self.settings_manager.get(
-                "thumbnails.lock_positions", False
-            )
+            self._positions_locked = self.settings_manager.get("thumbnails.lock_positions", False)
 
             # Load custom label
             labels = self.settings_manager.get("character_labels", {})
@@ -968,15 +956,13 @@ class WindowManager:
 
         # State
         self.preview_frames: dict[str, WindowPreviewWidget] = {}
-        self.pending_requests: dict[str, tuple[str, float]] = (
-            {}
-        )  # request_id -> (window_id, timestamp)
+        self.pending_requests: dict[
+            str, tuple[str, float]
+        ] = {}  # request_id -> (window_id, timestamp)
         self._pending_lock = threading.Lock()  # Protect pending_requests access
         # Read refresh rate from settings (default 5 FPS for efficiency)
         if settings_manager:
-            self.refresh_rate = settings_manager.get(
-                "performance.default_refresh_rate", 5
-            )
+            self.refresh_rate = settings_manager.get("performance.default_refresh_rate", 5)
         else:
             self.refresh_rate = 5  # Low default for efficiency
 
@@ -990,9 +976,7 @@ class WindowManager:
         """Start the 30 FPS capture loop"""
         interval = 1000 // self.refresh_rate  # ms
         self.capture_timer.start(interval)
-        self.logger.info(
-            f"Capture loop started at {self.refresh_rate} FPS ({interval}ms interval)"
-        )
+        self.logger.info(f"Capture loop started at {self.refresh_rate} FPS ({interval}ms interval)")
 
     def stop_capture_loop(self):
         """Stop the capture loop"""
@@ -1011,9 +995,7 @@ class WindowManager:
             self.stop_capture_loop()
             self.start_capture_loop()
 
-    def add_window(
-        self, window_id: str, character_name: str
-    ) -> WindowPreviewWidget | None:
+    def add_window(self, window_id: str, character_name: str) -> WindowPreviewWidget | None:
         """
         Add window to preview
 
@@ -1065,9 +1047,7 @@ class WindowManager:
 
         # Build set of windows with pending requests; prune stale entries
         with self._pending_lock:
-            stale = [
-                rid for rid, (_, ts) in self.pending_requests.items() if now - ts > 5.0
-            ]
+            stale = [rid for rid, (_, ts) in self.pending_requests.items() if now - ts > 5.0]
             for rid in stale:
                 del self.pending_requests[rid]
             pending_windows = {wid for wid, _ in self.pending_requests.values()}
@@ -1143,9 +1123,7 @@ class MainTab(QWidget):
     thumbnails_toggled = Signal(bool)  # visible
     layout_applied = Signal(str)  # pattern name
 
-    def __init__(
-        self, capture_system, character_manager, settings_manager=None, parent=None
-    ):
+    def __init__(self, capture_system, character_manager, settings_manager=None, parent=None):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.capture_system = capture_system
@@ -1173,9 +1151,7 @@ class MainTab(QWidget):
         self._load_cycling_groups()
 
         # Create window manager
-        self.window_manager = WindowManager(
-            character_manager, capture_system, settings_manager
-        )
+        self.window_manager = WindowManager(character_manager, capture_system, settings_manager)
 
         self._setup_ui()
 
@@ -1183,15 +1159,10 @@ class MainTab(QWidget):
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         # Start capture loop (unless disabled for GPU/CPU savings)
-        if not (
-            settings_manager
-            and settings_manager.get("performance.disable_previews", False)
-        ):
+        if not (settings_manager and settings_manager.get("performance.disable_previews", False)):
             self.window_manager.start_capture_loop()
         else:
-            self.logger.info(
-                "Previews disabled - capture loop not started (GPU/CPU savings)"
-            )
+            self.logger.info("Previews disabled - capture loop not started (GPU/CPU savings)")
 
         self.logger.info("Main tab initialized")
 
@@ -1226,9 +1197,7 @@ class MainTab(QWidget):
 
         # Container for preview frames with flow/grid layout
         self.preview_container = QWidget()
-        self.preview_layout = FlowLayout(
-            margin=15, spacing=15
-        )  # Grid-style flow layout
+        self.preview_layout = FlowLayout(margin=15, spacing=15)  # Grid-style flow layout
         self.preview_container.setLayout(self.preview_layout)
 
         scroll.setWidget(self.preview_container)
@@ -1277,9 +1246,7 @@ class MainTab(QWidget):
         toolbar_layout.addStretch()
 
         # Add lock button (store reference for state updates)
-        self.lock_btn = toolbar_builder.create_button(
-            "lock_positions", self._toggle_lock
-        )
+        self.lock_btn = toolbar_builder.create_button("lock_positions", self._toggle_lock)
         if self.lock_btn:
             toolbar_layout.addWidget(self.lock_btn)
 
@@ -1293,9 +1260,7 @@ class MainTab(QWidget):
             toolbar_layout.addWidget(self.minimize_inactive_btn)
 
         # Add refresh button
-        refresh_btn = toolbar_builder.create_button(
-            "refresh_capture", self._refresh_all
-        )
+        refresh_btn = toolbar_builder.create_button("refresh_capture", self._refresh_all)
         if refresh_btn:
             toolbar_layout.addWidget(refresh_btn)
 
@@ -1306,9 +1271,7 @@ class MainTab(QWidget):
         self.refresh_rate_spin = QSpinBox()
         self.refresh_rate_spin.setRange(1, 60)
         self.refresh_rate_spin.setValue(30)
-        self.refresh_rate_spin.setToolTip(
-            "Capture framerate (higher = smoother but more CPU)"
-        )
+        self.refresh_rate_spin.setToolTip("Capture framerate (higher = smoother but more CPU)")
         self.refresh_rate_spin.valueChanged.connect(self._on_refresh_rate_changed)
         toolbar_layout.addWidget(self.refresh_rate_spin)
 
@@ -1339,9 +1302,7 @@ class MainTab(QWidget):
         self.layout_source_combo = QComboBox()
         self._refresh_layout_sources()
         self.layout_source_combo.setMinimumWidth(120)
-        self.layout_source_combo.currentTextChanged.connect(
-            self._on_layout_source_changed
-        )
+        self.layout_source_combo.currentTextChanged.connect(self._on_layout_source_changed)
         controls_row.addWidget(self.layout_source_combo)
 
         # Pattern selector
@@ -1455,8 +1416,7 @@ class MainTab(QWidget):
 
         current = (
             self.layout_source_combo.currentText()
-            if hasattr(self, "layout_source_combo")
-            and self.layout_source_combo.count() > 0
+            if hasattr(self, "layout_source_combo") and self.layout_source_combo.count() > 0
             else None
         )
 
@@ -1563,15 +1523,11 @@ class MainTab(QWidget):
 
         if success:
             pattern = self.pattern_combo.currentText()
-            self.status_label.setText(
-                f"Applied {pattern} layout to {len(window_map)} windows"
-            )
+            self.status_label.setText(f"Applied {pattern} layout to {len(window_map)} windows")
             self.layout_applied.emit(pattern)
             self.logger.info(f"Applied {pattern} layout to {len(window_map)} windows")
         else:
-            QMessageBox.warning(
-                self, "Error", "Failed to apply layout. Check logs for details."
-            )
+            QMessageBox.warning(self, "Error", "Failed to apply layout. Check logs for details.")
 
     def refresh_layout_groups(self):
         """Called when groups change in hotkeys tab"""
@@ -1631,9 +1587,7 @@ class MainTab(QWidget):
                 f"One-click import: Added {added_count}, skipped {skipped_count} duplicates"
             )
         elif skipped_count > 0:
-            self.status_label.setText(
-                f"All {skipped_count} EVE windows already imported"
-            )
+            self.status_label.setText(f"All {skipped_count} EVE windows already imported")
         else:
             self.status_label.setText("No new EVE windows found")
 
@@ -1659,13 +1613,9 @@ class MainTab(QWidget):
 
         # Save to settings
         if self.settings_manager:
-            self.settings_manager.set(
-                "thumbnails.lock_positions", self._positions_locked
-            )
+            self.settings_manager.set("thumbnails.lock_positions", self._positions_locked)
 
-        self.logger.info(
-            f"Positions {'locked' if self._positions_locked else 'unlocked'}"
-        )
+        self.logger.info(f"Positions {'locked' if self._positions_locked else 'unlocked'}")
 
     def toggle_thumbnails_visibility(self):
         """Toggle visibility of all thumbnails"""
@@ -1675,9 +1625,7 @@ class MainTab(QWidget):
             frame.setVisible(self._thumbnails_visible)
 
         self.thumbnails_toggled.emit(self._thumbnails_visible)
-        self.logger.info(
-            f"Thumbnails {'shown' if self._thumbnails_visible else 'hidden'}"
-        )
+        self.logger.info(f"Thumbnails {'shown' if self._thumbnails_visible else 'hidden'}")
 
     def _create_status_bar(self) -> QWidget:
         """Create status bar"""
@@ -1697,9 +1645,7 @@ class MainTab(QWidget):
         # Update status periodically
         self.status_timer = QTimer()
         self.status_timer.timeout.connect(self._update_status)
-        self.status_timer.start(
-            2000
-        )  # Every 2 seconds (status display doesn't need 1s updates)
+        self.status_timer.start(2000)  # Every 2 seconds (status display doesn't need 1s updates)
 
         return status_bar
 
@@ -1712,24 +1658,18 @@ class MainTab(QWidget):
             raise
 
         return [
-            (wid, title)
-            for wid, title in windows
-            if wid not in self.window_manager.preview_frames
+            (wid, title) for wid, title in windows if wid not in self.window_manager.preview_frames
         ]
 
     def _add_window_to_preview(self, window_id: str, window_title: str) -> bool:
         """Add a single window to preview. Returns True if successful."""
         # Extract character name from window title
-        char_name = (
-            window_title.replace("EVE -", "").replace("EVE Online -", "").strip()
-        )
+        char_name = window_title.replace("EVE -", "").replace("EVE Online -", "").strip()
         if not char_name:
             char_name = f"Unknown ({window_id})"
 
         # Try auto-assign to character
-        assignments = self.character_manager.auto_assign_windows(
-            [(window_id, window_title)]
-        )
+        assignments = self.character_manager.auto_assign_windows([(window_id, window_title)])
         if assignments:
             for detected_name, wid in assignments.items():
                 if wid == window_id:
@@ -1822,16 +1762,10 @@ class MainTab(QWidget):
                 if last_window and last_window != window_id:
                     # Minimize the previous EVE window
                     try:
-                        run_x11_subprocess(
-                            ["xdotool", "windowminimize", last_window], timeout=2
-                        )
-                        self.logger.info(
-                            f"Auto-minimized previous EVE window: {last_window}"
-                        )
+                        run_x11_subprocess(["xdotool", "windowminimize", last_window], timeout=2)
+                        self.logger.info(f"Auto-minimized previous EVE window: {last_window}")
                     except (OSError, subprocess.SubprocessError) as e:
-                        self.logger.warning(
-                            f"Failed to auto-minimize window {last_window}: {e}"
-                        )
+                        self.logger.warning(f"Failed to auto-minimize window {last_window}: {e}")
 
             # Track this as the last activated EVE window
             if self.settings_manager:
@@ -1894,9 +1828,7 @@ class MainTab(QWidget):
             new_value = not current
 
             if self.settings_manager:
-                self.settings_manager.set(
-                    "performance.auto_minimize_inactive", new_value
-                )
+                self.settings_manager.set("performance.auto_minimize_inactive", new_value)
 
             self._windows_minimized = new_value
             self._update_minimize_button_style()
@@ -1918,12 +1850,8 @@ class MainTab(QWidget):
                         if window_id != focused_id:
                             if self.capture_system.minimize_window(window_id):
                                 minimized_count += 1
-                    self.logger.info(
-                        f"Auto-minimize enabled, minimized {minimized_count} windows"
-                    )
-                    self.status_label.setText(
-                        f"Auto-minimize ON ({minimized_count} minimized)"
-                    )
+                    self.logger.info(f"Auto-minimize enabled, minimized {minimized_count} windows")
+                    self.status_label.setText(f"Auto-minimize ON ({minimized_count} minimized)")
                 else:
                     self.status_label.setText("Auto-minimize ON")
             else:
@@ -1932,12 +1860,8 @@ class MainTab(QWidget):
                 for window_id in self.window_manager.preview_frames.keys():
                     if self.capture_system.restore_window(window_id):
                         restored_count += 1
-                self.logger.info(
-                    f"Auto-minimize disabled, restored {restored_count} windows"
-                )
-                self.status_label.setText(
-                    f"Auto-minimize OFF ({restored_count} restored)"
-                )
+                self.logger.info(f"Auto-minimize disabled, restored {restored_count} windows")
+                self.status_label.setText(f"Auto-minimize OFF ({restored_count} restored)")
 
         except (OSError, RuntimeError, ValueError) as e:
             self.logger.error(f"Error toggling auto-minimize: {e}")
@@ -1982,9 +1906,7 @@ class MainTab(QWidget):
         # Update status to show filtered count
         total = len(self.window_manager.preview_frames)
         if search_text and visible_count < total:
-            self.status_label.setText(
-                f"Showing {visible_count}/{total} windows (filtered)"
-            )
+            self.status_label.setText(f"Showing {visible_count}/{total} windows (filtered)")
         else:
             self._update_status()
 
@@ -1994,9 +1916,7 @@ class MainTab(QWidget):
         self.active_count_label.setText(f"Active: {count}")
 
         if count == 0:
-            self.status_label.setText(
-                "No windows in preview - Click 'Add Window' to start"
-            )
+            self.status_label.setText("No windows in preview - Click 'Add Window' to start")
         else:
             self.status_label.setText(
                 f"Capturing {count} window(s) at {self.window_manager.refresh_rate} FPS"
@@ -2050,9 +1970,7 @@ class MainTab(QWidget):
             window_id, frame = windows[index]
             # Activate the window
             if self.capture_system.activate_window(window_id):
-                self.logger.info(
-                    f"Activated window {index + 1}: {frame.character_name}"
-                )
+                self.logger.info(f"Activated window {index + 1}: {frame.character_name}")
                 self.status_label.setText(f"Activated: {frame.character_name}")
             else:
                 self.logger.warning(f"Failed to activate window {index + 1}")

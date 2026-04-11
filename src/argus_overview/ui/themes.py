@@ -253,9 +253,7 @@ class ThemeManager:
 
         # Base colors
         palette.setColor(QPalette.ColorRole.Base, QColor(colors.base))
-        palette.setColor(
-            QPalette.ColorRole.AlternateBase, QColor(colors.alternate_base)
-        )
+        palette.setColor(QPalette.ColorRole.AlternateBase, QColor(colors.alternate_base))
 
         # Text colors
         palette.setColor(QPalette.ColorRole.Text, QColor(colors.text))
@@ -267,9 +265,7 @@ class ThemeManager:
 
         # Highlight colors
         palette.setColor(QPalette.ColorRole.Highlight, QColor(colors.highlight))
-        palette.setColor(
-            QPalette.ColorRole.HighlightedText, QColor(colors.highlighted_text)
-        )
+        palette.setColor(QPalette.ColorRole.HighlightedText, QColor(colors.highlighted_text))
 
         # Link color
         palette.setColor(QPalette.ColorRole.Link, QColor(colors.link))

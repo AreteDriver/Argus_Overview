@@ -268,9 +268,7 @@ class WindowManagerWayland(WindowManager):
                 result = _run_swaymsg([f"[con_id={window_id}] focus"])
                 return result is not None
             elif self._compositor == "hyprland":
-                result = _run_hyprctl(
-                    ["dispatch", "focuswindow", f"address:{window_id}"]
-                )
+                result = _run_hyprctl(["dispatch", "focuswindow", f"address:{window_id}"])
                 return result is not None
         except Exception as e:
             logger.warning("Failed to activate window %s: %s", window_id, e)
@@ -310,9 +308,7 @@ class WindowManagerWayland(WindowManager):
                 result = _run_swaymsg([f"[con_id={window_id}] focus"])
                 return result is not None
             elif self._compositor == "hyprland":
-                result = _run_hyprctl(
-                    ["dispatch", "movetoworkspace", f"e+0,address:{window_id}"]
-                )
+                result = _run_hyprctl(["dispatch", "movetoworkspace", f"e+0,address:{window_id}"])
                 return result is not None
         except Exception as e:
             logger.warning("Failed to restore window %s: %s", window_id, e)
@@ -462,9 +458,7 @@ class WindowCaptureWayland(WindowCapture):
         except Empty:
             return None
 
-    def capture_window_sync(
-        self, window_id: str, scale: float = 1.0
-    ) -> Image.Image | None:
+    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Image.Image | None:
         """Synchronous window capture using grim.
 
         On Sway, captures the window's geometry region using grim -g.

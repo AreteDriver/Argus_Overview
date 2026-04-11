@@ -226,9 +226,7 @@ class ArrangementGrid(QWidget):
 
     def get_arrangement(self) -> dict[str, tuple[int, int]]:
         """Get current arrangement as dict"""
-        return {
-            name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()
-        }
+        return {name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()}
 
     def auto_arrange_grid(self, pattern: str):
         """Auto-arrange tiles based on pattern"""
@@ -367,9 +365,7 @@ class LayoutsTab(QWidget):
 
     layout_applied = Signal(str)
 
-    def __init__(
-        self, layout_manager, main_tab, settings_manager=None, character_manager=None
-    ):
+    def __init__(self, layout_manager, main_tab, settings_manager=None, character_manager=None):
         super().__init__()
         self.layout_manager = layout_manager
         self.main_tab = main_tab
@@ -494,9 +490,7 @@ class LayoutsTab(QWidget):
 
         # Stacking checkbox
         self.stack_checkbox = QCheckBox("Stack Windows")
-        self.stack_checkbox.setToolTip(
-            "Place all windows at the same position (overlapping)"
-        )
+        self.stack_checkbox.setToolTip("Place all windows at the same position (overlapping)")
         monitor_layout.addWidget(self.stack_checkbox)
 
         layout.addLayout(monitor_layout)
@@ -547,9 +541,7 @@ class LayoutsTab(QWidget):
 
         # Apply to active windows button
         self.apply_active_btn = QPushButton("Apply to Active Windows")
-        self.apply_active_btn.setToolTip(
-            "Apply layout to currently detected EVE windows"
-        )
+        self.apply_active_btn.setToolTip("Apply layout to currently detected EVE windows")
         self.apply_active_btn.clicked.connect(self._apply_to_active_windows)
         self.apply_active_btn.setStyleSheet("""
             QPushButton {
@@ -571,9 +563,7 @@ class LayoutsTab(QWidget):
         """Refresh group list from settings"""
         self._load_groups()
 
-        current = (
-            self.group_combo.currentText() if self.group_combo.count() > 0 else None
-        )
+        current = self.group_combo.currentText() if self.group_combo.count() > 0 else None
 
         self.group_combo.blockSignals(True)
         self.group_combo.clear()
@@ -703,9 +693,7 @@ class LayoutsTab(QWidget):
             )
             self.layout_applied.emit(self.pattern_combo.currentText())
         else:
-            QMessageBox.warning(
-                self, "Error", "Failed to apply layout. Check logs for details."
-            )
+            QMessageBox.warning(self, "Error", "Failed to apply layout. Check logs for details.")
 
     def refresh_groups_from_settings(self):
         """Called when groups change in hotkeys tab"""

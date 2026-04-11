@@ -79,9 +79,7 @@ class SystemTray(QObject):
 
         # Try to load icon from assets (4 levels up from ui/tray.py to project root)
         icon_paths = [
-            Path(__file__).parent.parent.parent.parent
-            / "assets"
-            / "icon_48.png",  # src/../assets
+            Path(__file__).parent.parent.parent.parent / "assets" / "icon_48.png",  # src/../assets
             Path(__file__).parent.parent.parent.parent / "assets" / "icon.png",
             Path.home()
             / ".local"

@@ -75,9 +75,7 @@ class EVESettingsSync:
             self.logger.info(f"Scanning logs at: {logs_dir}")
             self._process_log_files(logs_dir)
 
-        self.logger.info(
-            f"Loaded {len(self.character_id_to_name)} character names from logs"
-        )
+        self.logger.info(f"Loaded {len(self.character_id_to_name)} character names from logs")
 
     def _process_log_files(self, logs_dir: Path):
         """Process all log files in directory to extract character names."""
@@ -128,9 +126,7 @@ class EVESettingsSync:
                     if not server_dir.is_dir():
                         continue
                     for settings_dir in server_dir.iterdir():
-                        if settings_dir.is_dir() and settings_dir.name.startswith(
-                            "settings"
-                        ):
+                        if settings_dir.is_dir() and settings_dir.name.startswith("settings"):
                             yield settings_dir, base_path
             except OSError as e:
                 self.logger.debug(f"Error iterating {base_path}: {e}")
@@ -149,9 +145,7 @@ class EVESettingsSync:
             self.logger.debug(f"Error reading log {log_file}: {e}")
         return None
 
-    def _create_char_info(
-        self, char_file: Path, settings_dir: Path
-    ) -> EVECharacterInfo | None:
+    def _create_char_info(self, char_file: Path, settings_dir: Path) -> EVECharacterInfo | None:
         """Create EVECharacterInfo from a core_char_*.dat file."""
         match = re.search(r"core_char_(\d+)\.dat$", char_file.name)
         if not match:
@@ -223,16 +217,12 @@ class EVESettingsSync:
                 char_settings = self._parse_char_file(char_file, settings_dir)
                 if char_settings:
                     found_characters.append(char_settings)
-                    self.character_settings[char_settings.character_name] = (
-                        char_settings
-                    )
+                    self.character_settings[char_settings.character_name] = char_settings
 
         self.logger.info(f"Found {len(found_characters)} character settings")
         return found_characters
 
-    def _parse_char_file(
-        self, char_file: Path, settings_dir: Path
-    ) -> EVECharacterSettings | None:
+    def _parse_char_file(self, char_file: Path, settings_dir: Path) -> EVECharacterSettings | None:
         """Parse a core_char_*.dat file to extract character settings
 
         Args:
@@ -342,9 +332,7 @@ class EVESettingsSync:
             self.logger.error(f"Backup failed: {e}")
             raise
 
-    def _copy_settings(
-        self, source: EVECharacterSettings, target: EVECharacterSettings
-    ) -> bool:
+    def _copy_settings(self, source: EVECharacterSettings, target: EVECharacterSettings) -> bool:
         """Copy settings from source character to target character
 
         Since all characters share the same settings directory, this copies
@@ -403,9 +391,7 @@ class EVESettingsSync:
             "has_settings": char_settings.has_settings,
             "total_files": len(settings_files),
             "last_modified": (
-                max((f.stat().st_mtime for f in settings_files), default=0)
-                if settings_files
-                else 0
+                max((f.stat().st_mtime for f in settings_files), default=0) if settings_files else 0
             ),
         }
 
@@ -415,8 +401,4 @@ class EVESettingsSync:
         Returns:
             List of character names
         """
-        return [
-            name
-            for name, settings in self.character_settings.items()
-            if settings.has_settings
-        ]
+        return [name for name, settings in self.character_settings.items() if settings.has_settings]

@@ -89,9 +89,7 @@ class SyncWorker(QThread):
             total = len(self.target_chars)
 
             for idx, target_char in enumerate(self.target_chars):
-                self.sync_progress.emit(
-                    target_char.character_name, int(idx / total * 100)
-                )
+                self.sync_progress.emit(target_char.character_name, int(idx / total * 100))
 
                 try:
                     success = self.settings_sync.sync_settings(
@@ -107,9 +105,7 @@ class SyncWorker(QThread):
                     self.sync_progress.emit(target_char.character_name, progress)
 
                 except (OSError, KeyError, TypeError, ValueError) as e:
-                    self.logger.error(
-                        f"Failed to sync {target_char.character_name}: {e}"
-                    )
+                    self.logger.error(f"Failed to sync {target_char.character_name}: {e}")
                     results[target_char.character_name] = False
 
             self.sync_complete.emit(results)
@@ -183,9 +179,7 @@ class SyncPreviewDialog(QDialog):
         # Get source files
         source_dir = Path(self.source_char.settings_dir)
         if not source_dir.exists():
-            QMessageBox.warning(
-                self, "Error", f"Source directory not found: {source_dir}"
-            )
+            QMessageBox.warning(self, "Error", f"Source directory not found: {source_dir}")
             return
 
         source_files = list(source_dir.glob("*.dat")) + list(source_dir.glob("*.yaml"))
@@ -210,9 +204,7 @@ class SyncPreviewDialog(QDialog):
                 self.preview_table.setItem(row, 1, source_item)
 
                 # Target date
-                target_date = (
-                    self._get_file_date(target_file) if target_file.exists() else "N/A"
-                )
+                target_date = self._get_file_date(target_file) if target_file.exists() else "N/A"
                 target_item = QTableWidgetItem(target_date)
                 self.preview_table.setItem(row, 2, target_item)
 
@@ -287,9 +279,7 @@ class SettingsSyncTab(QWidget):
         toolbar_builder = ToolbarBuilder()
 
         # Scan button (from registry)
-        self.scan_btn = toolbar_builder.create_button(
-            "scan_eve_settings", self._scan_settings
-        )
+        self.scan_btn = toolbar_builder.create_button("scan_eve_settings", self._scan_settings)
         if self.scan_btn:
             layout.addWidget(self.scan_btn)
 
@@ -375,16 +365,12 @@ class SettingsSyncTab(QWidget):
         toolbar_builder = ToolbarBuilder()
         action_layout = QVBoxLayout()
 
-        self.preview_btn = toolbar_builder.create_button(
-            "preview_sync", self._preview_sync
-        )
+        self.preview_btn = toolbar_builder.create_button("preview_sync", self._preview_sync)
         if self.preview_btn:
             self.preview_btn.setEnabled(False)
             action_layout.addWidget(self.preview_btn)
 
-        self.sync_btn = toolbar_builder.create_button(
-            "sync_settings", self._sync_settings
-        )
+        self.sync_btn = toolbar_builder.create_button("sync_settings", self._sync_settings)
         if self.sync_btn:
             self.sync_btn.setEnabled(False)
             action_layout.addWidget(self.sync_btn)
@@ -441,9 +427,7 @@ class SettingsSyncTab(QWidget):
         self.scan_worker.scan_complete.connect(
             self._on_scan_complete, Qt.ConnectionType.UniqueConnection
         )
-        self.scan_worker.scan_error.connect(
-            self._on_scan_error, Qt.ConnectionType.UniqueConnection
-        )
+        self.scan_worker.scan_error.connect(self._on_scan_error, Qt.ConnectionType.UniqueConnection)
         self.scan_worker.start()
 
     def _on_scan_progress(self, percentage: int, message: str):
@@ -481,9 +465,7 @@ class SettingsSyncTab(QWidget):
             self.scan_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
         self._log(f"ERROR: {error_msg}")
-        QMessageBox.critical(
-            self, "Scan Error", f"Failed to scan settings:\n{error_msg}"
-        )
+        QMessageBox.critical(self, "Scan Error", f"Failed to scan settings:\n{error_msg}")
 
     def _on_source_selected(self):
         """Handle source character selection"""
@@ -521,18 +503,14 @@ class SettingsSyncTab(QWidget):
         """Select characters from a team"""
         teams = self.character_manager.get_all_teams()
         if not teams:
-            QMessageBox.information(
-                self, "No Teams", "No teams available. Create a team first."
-            )
+            QMessageBox.information(self, "No Teams", "No teams available. Create a team first.")
             return
 
         # Simple dialog to select team
         from PySide6.QtWidgets import QInputDialog
 
         team_names = [team.name for team in teams]
-        team_name, ok = QInputDialog.getItem(
-            self, "Select Team", "Team:", team_names, 0, False
-        )
+        team_name, ok = QInputDialog.getItem(self, "Select Team", "Team:", team_names, 0, False)
 
         if ok and team_name:
             team = next((t for t in teams if t.name == team_name), None)
@@ -585,9 +563,7 @@ class SettingsSyncTab(QWidget):
                 target_chars.append(char)
 
         if not target_chars:
-            QMessageBox.warning(
-                self, "Error", "Please select at least one target character."
-            )
+            QMessageBox.warning(self, "Error", "Please select at least one target character.")
             return
 
         # Show preview dialog
@@ -612,9 +588,7 @@ class SettingsSyncTab(QWidget):
                 target_chars.append(char)
 
         if not target_chars:
-            QMessageBox.warning(
-                self, "Error", "Please select at least one target character."
-            )
+            QMessageBox.warning(self, "Error", "Please select at least one target character.")
             return
 
         # Confirm
@@ -652,9 +626,7 @@ class SettingsSyncTab(QWidget):
         self.sync_worker.sync_complete.connect(
             self._on_sync_complete, Qt.ConnectionType.UniqueConnection
         )
-        self.sync_worker.sync_error.connect(
-            self._on_sync_error, Qt.ConnectionType.UniqueConnection
-        )
+        self.sync_worker.sync_error.connect(self._on_sync_error, Qt.ConnectionType.UniqueConnection)
         self.sync_worker.start()
 
     def _on_sync_progress(self, character_name: str, percentage: int):
@@ -694,9 +666,7 @@ class SettingsSyncTab(QWidget):
             self.preview_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
         self._log(f"ERROR: {error_msg}")
-        QMessageBox.critical(
-            self, "Sync Error", f"Failed to sync settings:\n{error_msg}"
-        )
+        QMessageBox.critical(self, "Sync Error", f"Failed to sync settings:\n{error_msg}")
 
     def _add_custom_path(self):
         """Add custom EVE settings path"""

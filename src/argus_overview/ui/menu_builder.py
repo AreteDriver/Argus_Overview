@@ -75,9 +75,7 @@ class MenuBuilder:
         actions = self.registry.get_by_home(home)
 
         for action_spec in actions:
-            qt_action = self._create_action(
-                action_spec, menu, handlers.get(action_spec.id)
-            )
+            qt_action = self._create_action(action_spec, menu, handlers.get(action_spec.id))
             menu.addAction(qt_action)
 
         return menu
@@ -137,9 +135,7 @@ class MenuBuilder:
             else:
                 action_spec = self.registry.get(item)
                 if action_spec:
-                    qt_action = self._create_action(
-                        action_spec, menu, handlers.get(item)
-                    )
+                    qt_action = self._create_action(action_spec, menu, handlers.get(item))
                     menu.addAction(qt_action)
 
         return menu
@@ -178,9 +174,7 @@ class MenuBuilder:
             else:
                 action_spec = self.registry.get(item)
                 if action_spec:
-                    qt_action = self._create_action(
-                        action_spec, menu, handlers.get(item)
-                    )
+                    qt_action = self._create_action(action_spec, menu, handlers.get(item))
                     menu.addAction(qt_action)
 
         return menu
@@ -282,9 +276,7 @@ def build_toolbar_actions(
     builder = MenuBuilder(registry)
     actions = registry.get_by_home(home)
 
-    return [
-        builder._create_action(spec, None, handlers.get(spec.id)) for spec in actions
-    ]
+    return [builder._create_action(spec, None, handlers.get(spec.id)) for spec in actions]
 
 
 class ContextMenuBuilder:
@@ -298,9 +290,7 @@ class ContextMenuBuilder:
         self.logger = logging.getLogger(__name__)
         self.registry = registry or ActionRegistry.get_instance()
 
-    def _build_zoom_submenu(
-        self, menu: QMenu, zoom_handler: Callable | None, current_zoom: float
-    ):
+    def _build_zoom_submenu(self, menu: QMenu, zoom_handler: Callable | None, current_zoom: float):
         """Build the zoom level submenu with checkmark for current level."""
         zoom_menu = menu.addMenu("Zoom Level")
         for zoom in [0.2, 0.3, 0.4, 0.5]:
@@ -316,9 +306,7 @@ class ContextMenuBuilder:
                 zoom_action.triggered.connect(make_zoom_callback())
             zoom_menu.addAction(zoom_action)
 
-    def _add_registry_action(
-        self, menu: QMenu, action_id: str, handlers: dict[str, Callable]
-    ):
+    def _add_registry_action(self, menu: QMenu, action_id: str, handlers: dict[str, Callable]):
         """Add an action from registry to the menu."""
         spec = self.registry.get(action_id)
         if spec:
@@ -455,9 +443,7 @@ class ToolbarBuilder:
         # Use specified order or registry order
         if action_order:
             action_map = {a.id: a for a in actions}
-            ordered_actions = [
-                action_map[aid] for aid in action_order if aid in action_map
-            ]
+            ordered_actions = [action_map[aid] for aid in action_order if aid in action_map]
         else:
             ordered_actions = actions
 

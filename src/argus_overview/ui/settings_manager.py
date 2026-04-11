@@ -134,9 +134,7 @@ class SettingsManager:
                     loaded = json.load(f)
 
                 # Merge with defaults (add any new keys from updates)
-                self.settings = self._merge_settings(
-                    copy.deepcopy(self.DEFAULT_SETTINGS), loaded
-                )
+                self.settings = self._merge_settings(copy.deepcopy(self.DEFAULT_SETTINGS), loaded)
 
                 self.logger.info(f"Loaded settings from {self.settings_file}")
                 return self.settings
@@ -357,12 +355,8 @@ class SettingsManager:
         try:
             # Check refresh rate is reasonable
             refresh_rate = self.get("performance.default_refresh_rate", 30)
-            if not isinstance(refresh_rate, (int, float)) or not (
-                1 <= refresh_rate <= 60
-            ):
-                self.logger.warning(
-                    f"Invalid refresh rate: {refresh_rate}, resetting to 30"
-                )
+            if not isinstance(refresh_rate, (int, float)) or not (1 <= refresh_rate <= 60):
+                self.logger.warning(f"Invalid refresh rate: {refresh_rate}, resetting to 30")
                 self.set("performance.default_refresh_rate", 30)
 
             # Check worker count is reasonable
@@ -374,9 +368,7 @@ class SettingsManager:
             # Check auto-discovery interval is positive
             interval = self.get("general.auto_discovery_interval", 5)
             if not isinstance(interval, (int, float)) or interval < 1:
-                self.logger.warning(
-                    f"Invalid discovery interval: {interval}, resetting to 5"
-                )
+                self.logger.warning(f"Invalid discovery interval: {interval}, resetting to 5")
                 self.set("general.auto_discovery_interval", 5)
 
             # Validate hotkey formats (non-empty strings with valid key names)
