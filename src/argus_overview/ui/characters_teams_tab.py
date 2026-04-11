@@ -531,7 +531,9 @@ class TeamBuilder(QWidget):
                 self.current_team = team
             else:
                 QMessageBox.warning(
-                    self, "Error", f"Failed to create team '{team.name}'.\nTeam may already exist."
+                    self,
+                    "Error",
+                    f"Failed to create team '{team.name}'.\nTeam may already exist.",
                 )
 
         self.team_modified.emit()

@@ -550,7 +550,9 @@ class AdvancedPanel(QWidget):
     def _clear_cache(self):
         """Clear application cache"""
         QMessageBox.information(
-            self, "Clear Cache", "Cache clearing will be implemented in a future update."
+            self,
+            "Clear Cache",
+            "Cache clearing will be implemented in a future update.",
         )
 
     def _export_settings(self):

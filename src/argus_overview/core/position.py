@@ -60,7 +60,9 @@ class PositionManager:
         self.locked = False
 
     def get_next_position(
-        self, window_id: str, preset_positions: dict[str, ThumbnailPosition] | None = None
+        self,
+        window_id: str,
+        preset_positions: dict[str, ThumbnailPosition] | None = None,
     ) -> ThumbnailPosition:
         """
         Calculate position for a new thumbnail.
@@ -84,7 +86,10 @@ class PositionManager:
         # If no existing thumbnails, start at top-left with margin
         if not self.positions:
             pos = ThumbnailPosition(
-                x=self.MARGIN, y=self.MARGIN, width=self.DEFAULT_WIDTH, height=self.DEFAULT_HEIGHT
+                x=self.MARGIN,
+                y=self.MARGIN,
+                width=self.DEFAULT_WIDTH,
+                height=self.DEFAULT_HEIGHT,
             )
             self.logger.debug(f"First thumbnail position: ({pos.x}, {pos.y})")
             return self._snap_position(pos)
@@ -98,7 +103,10 @@ class PositionManager:
             # Check if it fits on screen
             if new_x + self.DEFAULT_WIDTH <= screen.width() - self.MARGIN:
                 pos = ThumbnailPosition(
-                    x=new_x, y=new_y, width=self.DEFAULT_WIDTH, height=self.DEFAULT_HEIGHT
+                    x=new_x,
+                    y=new_y,
+                    width=self.DEFAULT_WIDTH,
+                    height=self.DEFAULT_HEIGHT,
                 )
                 self.logger.debug(f"Placing to right of rightmost: ({pos.x}, {pos.y})")
                 return self._snap_position(pos)
@@ -112,7 +120,10 @@ class PositionManager:
             # Check if it fits on screen
             if new_y + self.DEFAULT_HEIGHT <= screen.height() - self.MARGIN:
                 pos = ThumbnailPosition(
-                    x=new_x, y=new_y, width=self.DEFAULT_WIDTH, height=self.DEFAULT_HEIGHT
+                    x=new_x,
+                    y=new_y,
+                    width=self.DEFAULT_WIDTH,
+                    height=self.DEFAULT_HEIGHT,
                 )
                 self.logger.debug(f"Placing below bottommost (new row): ({pos.x}, {pos.y})")
                 return self._snap_position(pos)
@@ -132,7 +143,10 @@ class PositionManager:
 
         # Ultimate fallback
         return ThumbnailPosition(
-            x=self.MARGIN, y=self.MARGIN, width=self.DEFAULT_WIDTH, height=self.DEFAULT_HEIGHT
+            x=self.MARGIN,
+            y=self.MARGIN,
+            width=self.DEFAULT_WIDTH,
+            height=self.DEFAULT_HEIGHT,
         )
 
     def register_position(self, window_id: str, position: ThumbnailPosition):

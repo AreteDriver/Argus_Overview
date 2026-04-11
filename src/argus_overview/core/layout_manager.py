@@ -312,7 +312,11 @@ class LayoutManager:
         }
 
     def calculate_grid_layout(
-        self, pattern: GridPattern, windows: list[str], screen_geometry: dict, spacing: int = 10
+        self,
+        pattern: GridPattern,
+        windows: list[str],
+        screen_geometry: dict,
+        spacing: int = 10,
     ) -> dict[str, dict]:
         """Calculate grid layout positions
 
@@ -395,7 +399,11 @@ class LayoutManager:
         }
 
     def auto_arrange(
-        self, windows: list[str], pattern: GridPattern, screen_geometry: dict, spacing: int = 10
+        self,
+        windows: list[str],
+        pattern: GridPattern,
+        screen_geometry: dict,
+        spacing: int = 10,
     ) -> dict[str, dict]:
         """Auto-arrange windows in a grid pattern
 

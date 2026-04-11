@@ -556,7 +556,8 @@ class SettingsSyncTab(QWidget):
         target_chars = []
         for item in self.target_list.selectedItems():
             char = next(
-                (c for c in self.scanned_characters if c.character_name == item.text()), None
+                (c for c in self.scanned_characters if c.character_name == item.text()),
+                None,
             )
             if char:
                 target_chars.append(char)
@@ -580,7 +581,8 @@ class SettingsSyncTab(QWidget):
         target_chars = []
         for item in self.target_list.selectedItems():
             char = next(
-                (c for c in self.scanned_characters if c.character_name == item.text()), None
+                (c for c in self.scanned_characters if c.character_name == item.text()),
+                None,
             )
             if char:
                 target_chars.append(char)
@@ -613,7 +615,10 @@ class SettingsSyncTab(QWidget):
 
         # Create and start worker
         self.sync_worker = SyncWorker(
-            self.settings_sync, source_char, target_chars, backup=self.backup_checkbox.isChecked()
+            self.settings_sync,
+            source_char,
+            target_chars,
+            backup=self.backup_checkbox.isChecked(),
         )
         self.sync_worker.sync_progress.connect(
             self._on_sync_progress, Qt.ConnectionType.UniqueConnection

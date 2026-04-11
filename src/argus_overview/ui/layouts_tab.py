@@ -339,7 +339,9 @@ class GridApplier:
         except subprocess.TimeoutExpired:
             # Wine windows don't respond to sync, retry without it
             subprocess.run(
-                ["xdotool", "windowmove", window_id, str(x), str(y)], capture_output=True, timeout=2
+                ["xdotool", "windowmove", window_id, str(x), str(y)],
+                capture_output=True,
+                timeout=2,
             )
             time.sleep(0.1)  # Brief pause for window to settle
 
@@ -351,7 +353,9 @@ class GridApplier:
             )
         except subprocess.TimeoutExpired:
             subprocess.run(
-                ["xdotool", "windowsize", window_id, str(w), str(h)], capture_output=True, timeout=2
+                ["xdotool", "windowsize", window_id, str(w), str(h)],
+                capture_output=True,
+                timeout=2,
             )
             time.sleep(0.1)
 
@@ -590,7 +594,10 @@ class LayoutsTab(QWidget):
         if group_name == "All Active Windows":
             # Get all active windows from main_tab
             if hasattr(self.main_tab, "window_manager"):
-                for _window_id, frame in self.main_tab.window_manager.preview_frames.items():
+                for (
+                    _window_id,
+                    frame,
+                ) in self.main_tab.window_manager.preview_frames.items():
                     self.arrangement_grid.add_character(frame.character_name)
 
             self.info_label.setText("Showing all active windows")

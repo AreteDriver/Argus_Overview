@@ -956,7 +956,9 @@ class WindowManager:
 
         # State
         self.preview_frames: dict[str, WindowPreviewWidget] = {}
-        self.pending_requests: dict[str, tuple[str, float]] = {}  # request_id -> (window_id, timestamp)
+        self.pending_requests: dict[
+            str, tuple[str, float]
+        ] = {}  # request_id -> (window_id, timestamp)
         self._pending_lock = threading.Lock()  # Protect pending_requests access
         # Read refresh rate from settings (default 5 FPS for efficiency)
         if settings_manager:
@@ -1010,7 +1012,10 @@ class WindowManager:
 
         # Create preview widget with settings_manager for v2.2 features
         frame = WindowPreviewWidget(
-            window_id, character_name, self.capture_system, settings_manager=self.settings_manager
+            window_id,
+            character_name,
+            self.capture_system,
+            settings_manager=self.settings_manager,
         )
         self.preview_frames[window_id] = frame
 
@@ -1042,10 +1047,7 @@ class WindowManager:
 
         # Build set of windows with pending requests; prune stale entries
         with self._pending_lock:
-            stale = [
-                rid for rid, (_, ts) in self.pending_requests.items()
-                if now - ts > 5.0
-            ]
+            stale = [rid for rid, (_, ts) in self.pending_requests.items() if now - ts > 5.0]
             for rid in stale:
                 del self.pending_requests[rid]
             pending_windows = {wid for wid, _ in self.pending_requests.values()}
@@ -1698,7 +1700,9 @@ class MainTab(QWidget):
 
         if not available:
             QMessageBox.information(
-                self, "No Windows", "No windows found.\n\nMake sure EVE Online clients are running."
+                self,
+                "No Windows",
+                "No windows found.\n\nMake sure EVE Online clients are running.",
             )
             return
 

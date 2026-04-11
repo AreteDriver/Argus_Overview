@@ -400,8 +400,18 @@ class ToolbarBuilder:
     """
 
     # Actions that get special styling
-    PRIMARY_ACTIONS = {"import_windows", "apply_layout", "sync_settings", "save_hotkeys"}
-    SUCCESS_ACTIONS = {"scan_eve_folder", "new_group", "load_active_windows", "new_team"}
+    PRIMARY_ACTIONS = {
+        "import_windows",
+        "apply_layout",
+        "sync_settings",
+        "save_hotkeys",
+    }
+    SUCCESS_ACTIONS = {
+        "scan_eve_folder",
+        "new_group",
+        "load_active_windows",
+        "new_team",
+    }
     DANGER_ACTIONS = {"delete_group", "delete_character", "remove_all_windows"}
 
     def __init__(self, registry: ActionRegistry | None = None):

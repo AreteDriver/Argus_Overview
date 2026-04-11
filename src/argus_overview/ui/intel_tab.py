@@ -248,16 +248,22 @@ class IntelTab(QWidget):
         )
         self.settings_manager.set("intel.audio_enabled", self.alert_config.audio, auto_save=False)
         self.settings_manager.set(
-            "intel.system_notification", self.alert_config.system_notification, auto_save=False
+            "intel.system_notification",
+            self.alert_config.system_notification,
+            auto_save=False,
         )
         self.settings_manager.set(
-            "intel.min_threat_level", self.alert_config.min_threat_level, auto_save=False
+            "intel.min_threat_level",
+            self.alert_config.min_threat_level,
+            auto_save=False,
         )
         self.settings_manager.set(
             "intel.jumps_threshold", self.alert_config.jumps_threshold, auto_save=False
         )
         self.settings_manager.set(
-            "intel.cooldown_seconds", self.alert_config.cooldown_seconds, auto_save=False
+            "intel.cooldown_seconds",
+            self.alert_config.cooldown_seconds,
+            auto_save=False,
         )
 
         self.settings_manager.save_settings()

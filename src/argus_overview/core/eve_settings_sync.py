@@ -390,9 +390,9 @@ class EVESettingsSync:
             "settings_dir": str(char_settings.settings_dir),
             "has_settings": char_settings.has_settings,
             "total_files": len(settings_files),
-            "last_modified": max((f.stat().st_mtime for f in settings_files), default=0)
-            if settings_files
-            else 0,
+            "last_modified": (
+                max((f.stat().st_mtime for f in settings_files), default=0) if settings_files else 0
+            ),
         }
 
     def list_available_characters(self) -> list[str]:

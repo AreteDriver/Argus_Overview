@@ -47,7 +47,13 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
-from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QMainWindow,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
 # Import version and core modules
 from argus_overview import __version__
@@ -774,9 +780,7 @@ class MainWindowV21(QMainWindow):
         if hasattr(self, "intel_tab"):
             try:
                 alert_dispatcher = self.intel_tab.get_alert_dispatcher()
-                alert_dispatcher.border_flash_requested.disconnect(
-                    self._flash_preview_borders
-                )
+                alert_dispatcher.border_flash_requested.disconnect(self._flash_preview_borders)
             except (RuntimeError, TypeError, AttributeError):
                 pass
 
@@ -976,7 +980,8 @@ class MainWindowV21(QMainWindow):
                 self.logger.info("Minimizing to system tray")
                 self.hide()
                 self.system_tray.show_notification(
-                    "Still Running", "Argus Overview is still running in the system tray"
+                    "Still Running",
+                    "Argus Overview is still running in the system tray",
                 )
                 event.ignore()
                 return

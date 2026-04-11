@@ -240,7 +240,9 @@ class WindowManagerLinux(WindowManager):
                 return self._activate_xlib(window_id)
             except Exception as e:
                 logger.debug(
-                    "Xlib activation failed for %s: %s, falling back to wmctrl", window_id, e
+                    "Xlib activation failed for %s: %s, falling back to wmctrl",
+                    window_id,
+                    e,
                 )
 
         try:

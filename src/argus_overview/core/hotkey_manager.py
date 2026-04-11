@@ -86,7 +86,10 @@ class HotkeyManager(QObject):
                 key_char = normalized_combo.strip("<>").lower()
                 self.single_key_hotkeys[key_char] = {"name": name, "callback": callback}
             else:
-                self.combo_hotkeys[normalized_combo] = {"name": name, "callback": callback}
+                self.combo_hotkeys[normalized_combo] = {
+                    "name": name,
+                    "callback": callback,
+                }
 
             self._restart_listeners()
             self.logger.info(f"Registered hotkey '{name}': {normalized_combo}")

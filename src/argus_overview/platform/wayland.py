@@ -236,10 +236,20 @@ class WindowManagerWayland(WindowManager):
                 return True
 
             elif self._compositor == "hyprland":
-                _run_hyprctl(["dispatch", "movewindowpixel", f"exact {x} {y},address:{window_id}"])
+                _run_hyprctl(
+                    [
+                        "dispatch",
+                        "movewindowpixel",
+                        f"exact {x} {y},address:{window_id}",
+                    ]
+                )
                 if w > 0 and h > 0:
                     _run_hyprctl(
-                        ["dispatch", "resizewindowpixel", f"exact {w} {h},address:{window_id}"]
+                        [
+                            "dispatch",
+                            "resizewindowpixel",
+                            f"exact {w} {h},address:{window_id}",
+                        ]
                     )
                 return True
 
@@ -275,7 +285,11 @@ class WindowManagerWayland(WindowManager):
                 return result is not None
             elif self._compositor == "hyprland":
                 result = _run_hyprctl(
-                    ["dispatch", "movetoworkspacesilent", f"special,address:{window_id}"]
+                    [
+                        "dispatch",
+                        "movetoworkspacesilent",
+                        f"special,address:{window_id}",
+                    ]
                 )
                 return result is not None
         except Exception as e:

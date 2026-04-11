@@ -134,7 +134,10 @@ def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(), logging.FileHandler(log_dir / "argus-overview.log")],
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_dir / "argus-overview.log"),
+        ],
     )
 
 
