@@ -72,7 +72,9 @@ class SingleInstance:
             self.lock_path = Path(app_data) / "argus-overview" / f"{app_name}.lock"
         else:
             # Linux/macOS: Use ~/.config
-            self.lock_path = Path.home() / ".config" / "argus-overview" / f"{app_name}.lock"
+            self.lock_path = (
+                Path.home() / ".config" / "argus-overview" / f"{app_name}.lock"
+            )
 
         # Ensure directory exists
         self.lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -134,7 +136,10 @@ def setup_logging():
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        handlers=[logging.StreamHandler(), logging.FileHandler(log_dir / "argus-overview.log")],
+        handlers=[
+            logging.StreamHandler(),
+            logging.FileHandler(log_dir / "argus-overview.log"),
+        ],
     )
 
 

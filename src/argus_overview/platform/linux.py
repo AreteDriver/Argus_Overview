@@ -77,7 +77,9 @@ def _get_wmctrl_window_list() -> str:
             return _wmctrl_cache["result"]
 
     try:
-        result = subprocess.run(["wmctrl", "-l"], capture_output=True, text=True, timeout=2)
+        result = subprocess.run(
+            ["wmctrl", "-l"], capture_output=True, text=True, timeout=2
+        )
         if result.returncode == 0:
             with _wmctrl_cache_lock:
                 _wmctrl_cache["result"] = result.stdout
@@ -240,7 +242,9 @@ class WindowManagerLinux(WindowManager):
                 return self._activate_xlib(window_id)
             except Exception as e:
                 logger.debug(
-                    "Xlib activation failed for %s: %s, falling back to wmctrl", window_id, e
+                    "Xlib activation failed for %s: %s, falling back to wmctrl",
+                    window_id,
+                    e,
                 )
 
         try:
@@ -409,7 +413,9 @@ class WindowCaptureLinux(WindowCapture):
         except Empty:
             return None
 
-    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Image.Image | None:
+    def capture_window_sync(
+        self, window_id: str, scale: float = 1.0
+    ) -> Image.Image | None:
         """Synchronous window capture.
 
         Uses python-xlib for direct X11 capture when available,
@@ -452,7 +458,9 @@ class WindowCaptureLinux(WindowCapture):
             geom = window.get_geometry()
             raw = window.get_image(0, 0, geom.width, geom.height, X.ZPixmap, 0xFFFFFFFF)
             # Return RGBX directly — avoids a full-image copy from .convert("RGB")
-            return Image.frombytes("RGBX", (geom.width, geom.height), raw.data, "raw", "BGRX")
+            return Image.frombytes(
+                "RGBX", (geom.width, geom.height), raw.data, "raw", "BGRX"
+            )
         except Exception as e:
             logger.debug(f"Xlib capture failed for {window_id}: {e}")
             # Reset Display connection to avoid corrupted state on reuse
@@ -547,7 +555,9 @@ class EVEPathResolverLinux(EVEPathResolver):
         home = Path.home()
 
         # Steam/Proton paths (most common)
-        steam_base = home / ".steam" / "debian-installation" / "steamapps" / "compatdata"
+        steam_base = (
+            home / ".steam" / "debian-installation" / "steamapps" / "compatdata"
+        )
         steam_alt = home / ".local" / "share" / "Steam" / "steamapps" / "compatdata"
 
         eve_steam_paths = [
@@ -594,7 +604,15 @@ class EVEPathResolverLinux(EVEPathResolver):
             / "Application Data"
             / "CCP"
             / "EVE",
-            home / ".wine" / "drive_c" / "users" / home.name / "AppData" / "Local" / "CCP" / "EVE",
+            home
+            / ".wine"
+            / "drive_c"
+            / "users"
+            / home.name
+            / "AppData"
+            / "Local"
+            / "CCP"
+            / "EVE",
             home / "EVE" / "settings",
             home / ".local" / "share" / "CCP" / "EVE",
         ]
@@ -604,7 +622,9 @@ class EVEPathResolverLinux(EVEPathResolver):
     def get_eve_logs_paths(self) -> list[Path]:
         """Get candidate EVE game logs paths for Linux."""
         home = Path.home()
-        steam_base = home / ".steam" / "debian-installation" / "steamapps" / "compatdata"
+        steam_base = (
+            home / ".steam" / "debian-installation" / "steamapps" / "compatdata"
+        )
         steam_alt = home / ".local" / "share" / "Steam" / "steamapps" / "compatdata"
 
         return [

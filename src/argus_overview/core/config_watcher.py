@@ -89,7 +89,9 @@ class ConfigWatcher(QObject):
             self._observer.join(timeout=1.0)
             # Force cleanup if observer didn't stop gracefully
             if self._observer.is_alive():
-                self.logger.warning("Observer thread did not stop gracefully, forcing cleanup")
+                self.logger.warning(
+                    "Observer thread did not stop gracefully, forcing cleanup"
+                )
             self._observer = None
 
         self._poll_timer.stop()
@@ -103,7 +105,9 @@ class ConfigWatcher(QObject):
             handler = ConfigFileHandler(self._on_file_changed)
             self._observer = Observer()
             self._observer.daemon = True
-            self._observer.schedule(handler, str(self.config_path.parent), recursive=False)
+            self._observer.schedule(
+                handler, str(self.config_path.parent), recursive=False
+            )
             self._observer.start()
             self.logger.info("Using watchdog for config monitoring")
         except (OSError, RuntimeError) as e:

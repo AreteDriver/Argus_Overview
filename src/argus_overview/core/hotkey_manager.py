@@ -74,7 +74,9 @@ class HotkeyManager(QObject):
     def register_hotkey(self, name: str, key_combo: str, callback: Callable) -> bool:
         """Register a global hotkey"""
         if not PYNPUT_AVAILABLE:
-            self.logger.warning(f"Cannot register hotkey '{name}': pynput not available")
+            self.logger.warning(
+                f"Cannot register hotkey '{name}': pynput not available"
+            )
             return False
         try:
             # Normalize the combo for pynput
@@ -86,7 +88,10 @@ class HotkeyManager(QObject):
                 key_char = normalized_combo.strip("<>").lower()
                 self.single_key_hotkeys[key_char] = {"name": name, "callback": callback}
             else:
-                self.combo_hotkeys[normalized_combo] = {"name": name, "callback": callback}
+                self.combo_hotkeys[normalized_combo] = {
+                    "name": name,
+                    "callback": callback,
+                }
 
             self._restart_listeners()
             self.logger.info(f"Registered hotkey '{name}': {normalized_combo}")

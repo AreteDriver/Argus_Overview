@@ -25,7 +25,9 @@ def sanitize_character_name(name: str) -> str:
     sanitized = sanitized[:100]
 
     if not sanitized:
-        raise ValueError(f"Invalid character name: '{name}' produces empty name after sanitization")
+        raise ValueError(
+            f"Invalid character name: '{name}' produces empty name after sanitization"
+        )
 
     return sanitized
 
@@ -140,7 +142,9 @@ class CharacterManager:
                 with open(self.characters_file) as f:
                     data = json.load(f)
                     if not isinstance(data, dict):
-                        self.logger.warning("Characters file is not a JSON object, using defaults")
+                        self.logger.warning(
+                            "Characters file is not a JSON object, using defaults"
+                        )
                     else:
                         for name, char_data in data.items():
                             if self._validate_character_data(char_data):
@@ -160,7 +164,9 @@ class CharacterManager:
                 with open(self.teams_file) as f:
                     data = json.load(f)
                     if not isinstance(data, dict):
-                        self.logger.warning("Teams file is not a JSON object, using defaults")
+                        self.logger.warning(
+                            "Teams file is not a JSON object, using defaults"
+                        )
                     else:
                         for name, team_data in data.items():
                             if self._validate_team_data(team_data):
@@ -395,7 +401,9 @@ class CharacterManager:
 
             # Validate character_id is present
             if eve_char.character_id is None:
-                self.logger.warning(f"Skipping EVE character '{char_name}': missing character_id")
+                self.logger.warning(
+                    f"Skipping EVE character '{char_name}': missing character_id"
+                )
                 continue
 
             # Skip if already exists
@@ -403,9 +411,13 @@ class CharacterManager:
                 # Update last_seen if we have new data
                 try:
                     if eve_char.last_seen:
-                        self.characters[char_name].last_seen = eve_char.last_seen.isoformat()
+                        self.characters[char_name].last_seen = (
+                            eve_char.last_seen.isoformat()
+                        )
                 except AttributeError:
-                    self.logger.warning(f"Invalid last_seen for existing character '{char_name}'")
+                    self.logger.warning(
+                        f"Invalid last_seen for existing character '{char_name}'"
+                    )
                 continue
 
             # Build last_seen safely
@@ -414,7 +426,9 @@ class CharacterManager:
                 try:
                     last_seen_str = eve_char.last_seen.isoformat()
                 except AttributeError:
-                    self.logger.warning(f"Invalid last_seen for '{char_name}', ignoring timestamp")
+                    self.logger.warning(
+                        f"Invalid last_seen for '{char_name}', ignoring timestamp"
+                    )
 
             # Create new character entry
             character = Character(

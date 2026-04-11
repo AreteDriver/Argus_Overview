@@ -49,7 +49,9 @@ class CharacterTable(QTableWidget):
 
         # Setup table
         self.setColumnCount(6)
-        self.setHorizontalHeaderLabels(["Name", "Account", "Role", "Status", "Window ID", "Notes"])
+        self.setHorizontalHeaderLabels(
+            ["Name", "Account", "Role", "Status", "Window ID", "Notes"]
+        )
 
         # Configure columns
         header = self.horizontalHeader()
@@ -173,7 +175,9 @@ class CharacterTable(QTableWidget):
 class CharacterDialog(QDialog):
     """Dialog for adding/editing characters"""
 
-    def __init__(self, character_manager, character: Character | None = None, parent=None):
+    def __init__(
+        self, character_manager, character: Character | None = None, parent=None
+    ):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.character_manager = character_manager
@@ -257,7 +261,9 @@ class CharacterDialog(QDialog):
         # Check uniqueness (only when adding new)
         if not self.character:
             if self.character_manager.get_character(name):
-                QMessageBox.warning(self, "Duplicate Name", f"Character '{name}' already exists.")
+                QMessageBox.warning(
+                    self, "Duplicate Name", f"Character '{name}' already exists."
+                )
                 return False
 
         # Warn if account has 3 characters
@@ -295,7 +301,9 @@ class CharacterDialog(QDialog):
             return self.character
         else:
             # Create new
-            return Character(name=name, account=account, role=role, is_main=is_main, notes=notes)
+            return Character(
+                name=name, account=account, role=role, is_main=is_main, notes=notes
+            )
 
 
 class TeamBuilder(QWidget):
@@ -356,7 +364,9 @@ class TeamBuilder(QWidget):
         members_layout = QVBoxLayout()
         members_group.setLayout(members_layout)
 
-        members_layout.addWidget(QLabel("Drag characters from the table or use the button below:"))
+        members_layout.addWidget(
+            QLabel("Drag characters from the table or use the button below:")
+        )
 
         # Add member button
         add_btn = QPushButton("Add Selected Character")
@@ -401,7 +411,9 @@ class TeamBuilder(QWidget):
 
     def _choose_color(self):
         """Open color picker"""
-        color = QColorDialog.getColor(QColor(self.team_color), self, "Choose Team Color")
+        color = QColorDialog.getColor(
+            QColor(self.team_color), self, "Choose Team Color"
+        )
         if color.isValid():
             self._set_color(color.name())
 
@@ -517,7 +529,9 @@ class TeamBuilder(QWidget):
             for char_name in new_chars - old_chars:
                 self.character_manager.add_character_to_team(team.name, char_name)
 
-            QMessageBox.information(self, "Success", f"Team '{team.name}' updated successfully!")
+            QMessageBox.information(
+                self, "Success", f"Team '{team.name}' updated successfully!"
+            )
         else:
             # Create new
             if self.character_manager.create_team(team):
@@ -531,7 +545,9 @@ class TeamBuilder(QWidget):
                 self.current_team = team
             else:
                 QMessageBox.warning(
-                    self, "Error", f"Failed to create team '{team.name}'.\nTeam may already exist."
+                    self,
+                    "Error",
+                    f"Failed to create team '{team.name}'.\nTeam may already exist.",
                 )
 
         self.team_modified.emit()
@@ -545,13 +561,17 @@ class TeamBuilder(QWidget):
             return False
 
         if self.member_list.count() == 0:
-            QMessageBox.warning(self, "Invalid Input", "Team must have at least one member.")
+            QMessageBox.warning(
+                self, "Invalid Input", "Team must have at least one member."
+            )
             return False
 
         # Check uniqueness (only when creating new)
         if not self.current_team:
             if self.character_manager.get_team(name):
-                QMessageBox.warning(self, "Duplicate Name", f"Team '{name}' already exists.")
+                QMessageBox.warning(
+                    self, "Duplicate Name", f"Team '{name}' already exists."
+                )
                 return False
 
         return True
@@ -595,7 +615,9 @@ class CharactersTeamsTab(QWidget):
     team_selected = Signal(object)  # Team object
     characters_imported = Signal(int)  # number imported
 
-    def __init__(self, character_manager, layout_manager, settings_sync=None, parent=None):
+    def __init__(
+        self, character_manager, layout_manager, settings_sync=None, parent=None
+    ):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.character_manager = character_manager
@@ -653,7 +675,9 @@ class CharactersTeamsTab(QWidget):
         if edit_btn:
             toolbar_layout.addWidget(edit_btn)
 
-        delete_btn = toolbar_builder.create_button("delete_character", self._delete_character)
+        delete_btn = toolbar_builder.create_button(
+            "delete_character", self._delete_character
+        )
         if delete_btn:
             toolbar_layout.addWidget(delete_btn)
 
@@ -661,7 +685,9 @@ class CharactersTeamsTab(QWidget):
 
         # Scan EVE Folder button (if settings_sync available)
         if self.settings_sync is not None:
-            scan_btn = toolbar_builder.create_button("scan_eve_folder", self._scan_eve_folder)
+            scan_btn = toolbar_builder.create_button(
+                "scan_eve_folder", self._scan_eve_folder
+            )
             if scan_btn:
                 toolbar_layout.addWidget(scan_btn)
 
@@ -739,7 +765,9 @@ class CharactersTeamsTab(QWidget):
         """Edit selected character"""
         selected = self.character_table.get_selected_characters()
         if not selected:
-            QMessageBox.information(self, "No Selection", "Please select a character to edit.")
+            QMessageBox.information(
+                self, "No Selection", "Please select a character to edit."
+            )
             return
 
         char_name = selected[0]
@@ -764,7 +792,9 @@ class CharactersTeamsTab(QWidget):
         """Delete selected character"""
         selected = self.character_table.get_selected_characters()
         if not selected:
-            QMessageBox.information(self, "No Selection", "Please select a character to delete.")
+            QMessageBox.information(
+                self, "No Selection", "Please select a character to delete."
+            )
             return
 
         char_name = selected[0]
@@ -826,11 +856,15 @@ class CharactersTeamsTab(QWidget):
             # Emit signal
             self.characters_imported.emit(imported)
 
-            self.logger.info(f"EVE folder scan complete: {imported} new characters imported")
+            self.logger.info(
+                f"EVE folder scan complete: {imported} new characters imported"
+            )
 
         except (OSError, KeyError, TypeError, ValueError) as e:
             self.logger.error(f"EVE folder scan failed: {e}")
-            QMessageBox.critical(self, "Scan Failed", f"Failed to scan EVE folder:\n{str(e)}")
+            QMessageBox.critical(
+                self, "Scan Failed", f"Failed to scan EVE folder:\n{str(e)}"
+            )
 
     def _on_team_selected(self, team_name: str):
         """Handle team selection from dropdown"""

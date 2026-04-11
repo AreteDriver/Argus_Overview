@@ -78,8 +78,12 @@ class IntelLogTable(QTableWidget):
         # Column sizing
         header = self.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Time
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Threat
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # System
+        header.setSectionResizeMode(
+            1, QHeaderView.ResizeMode.ResizeToContents
+        )  # Threat
+        header.setSectionResizeMode(
+            2, QHeaderView.ResizeMode.ResizeToContents
+        )  # System
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Count
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)  # Ships
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Message
@@ -207,8 +211,12 @@ class IntelTab(QWidget):
             visual_border=self.settings_manager.get("intel.visual_border", True),
             visual_overlay=self.settings_manager.get("intel.visual_overlay", True),
             audio=self.settings_manager.get("intel.audio_enabled", True),
-            system_notification=self.settings_manager.get("intel.system_notification", False),
-            min_threat_level=self.settings_manager.get("intel.min_threat_level", "warning"),
+            system_notification=self.settings_manager.get(
+                "intel.system_notification", False
+            ),
+            min_threat_level=self.settings_manager.get(
+                "intel.min_threat_level", "warning"
+            ),
             jumps_threshold=self.settings_manager.get("intel.jumps_threshold", 5),
             cooldown_seconds=self.settings_manager.get("intel.cooldown_seconds", 5),
         )
@@ -246,18 +254,26 @@ class IntelTab(QWidget):
         self.settings_manager.set(
             "intel.visual_overlay", self.alert_config.visual_overlay, auto_save=False
         )
-        self.settings_manager.set("intel.audio_enabled", self.alert_config.audio, auto_save=False)
         self.settings_manager.set(
-            "intel.system_notification", self.alert_config.system_notification, auto_save=False
+            "intel.audio_enabled", self.alert_config.audio, auto_save=False
         )
         self.settings_manager.set(
-            "intel.min_threat_level", self.alert_config.min_threat_level, auto_save=False
+            "intel.system_notification",
+            self.alert_config.system_notification,
+            auto_save=False,
+        )
+        self.settings_manager.set(
+            "intel.min_threat_level",
+            self.alert_config.min_threat_level,
+            auto_save=False,
         )
         self.settings_manager.set(
             "intel.jumps_threshold", self.alert_config.jumps_threshold, auto_save=False
         )
         self.settings_manager.set(
-            "intel.cooldown_seconds", self.alert_config.cooldown_seconds, auto_save=False
+            "intel.cooldown_seconds",
+            self.alert_config.cooldown_seconds,
+            auto_save=False,
         )
 
         self.settings_manager.save_settings()
@@ -413,7 +429,9 @@ class IntelTab(QWidget):
         idx = self.threat_level_combo.findText(self.alert_config.min_threat_level)
         if idx >= 0:
             self.threat_level_combo.setCurrentIndex(idx)
-        self.threat_level_combo.currentTextChanged.connect(self._on_alert_setting_changed)
+        self.threat_level_combo.currentTextChanged.connect(
+            self._on_alert_setting_changed
+        )
         alert_layout.addRow("Min Threat Level:", self.threat_level_combo)
 
         # Jumps threshold
@@ -442,7 +460,9 @@ class IntelTab(QWidget):
         self.current_system_edit.textChanged.connect(self._on_current_system_changed)
         location_layout.addRow("Current System:", self.current_system_edit)
 
-        location_note = QLabel("Set your current system to enable jump distance filtering")
+        location_note = QLabel(
+            "Set your current system to enable jump distance filtering"
+        )
         location_note.setStyleSheet("color: #888; font-size: 10px;")
         location_note.setWordWrap(True)
         location_layout.addRow(location_note)
@@ -576,7 +596,9 @@ class IntelTab(QWidget):
         )
 
         if report:
-            self.logger.debug(f"Intel detected: {report.system} - {report.threat_level.value}")
+            self.logger.debug(
+                f"Intel detected: {report.system} - {report.threat_level.value}"
+            )
 
             # Add to table
             self.intel_table.add_report(report)
@@ -637,7 +659,9 @@ class IntelTab(QWidget):
         # Copy system
         if report.system:
             copy_system = menu.addAction("Copy System Name")
-            copy_system.triggered.connect(lambda: self._copy_to_clipboard(report.system))
+            copy_system.triggered.connect(
+                lambda: self._copy_to_clipboard(report.system)
+            )
 
         # Copy message
         copy_msg = menu.addAction("Copy Message")

@@ -181,7 +181,9 @@ class WindowCapture(ABC):
         """
 
     @abstractmethod
-    def capture_window_sync(self, window_id: str, scale: float = 1.0) -> Image.Image | None:
+    def capture_window_sync(
+        self, window_id: str, scale: float = 1.0
+    ) -> Image.Image | None:
         """Synchronous window capture.
 
         Args:

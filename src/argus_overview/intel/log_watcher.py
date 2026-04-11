@@ -156,7 +156,9 @@ class ChatLogWatcher(QObject):
         # Filter by monitored channels if specified
         if self.monitored_channels:
             log_files = [
-                f for f in log_files if self._extract_channel_name(f) in self.monitored_channels
+                f
+                for f in log_files
+                if self._extract_channel_name(f) in self.monitored_channels
             ]
 
         return sorted(log_files, key=lambda f: f.stat().st_mtime, reverse=True)
@@ -306,7 +308,9 @@ class ChatLogWatcher(QObject):
 
         self._running = True
         self.poll_timer.start(self.poll_interval_ms)
-        self.logger.info(f"Started chat log watcher (interval: {self.poll_interval_ms}ms)")
+        self.logger.info(
+            f"Started chat log watcher (interval: {self.poll_interval_ms}ms)"
+        )
 
     def stop(self):
         """Stop watching."""

@@ -226,7 +226,9 @@ class ArrangementGrid(QWidget):
 
     def get_arrangement(self) -> dict[str, tuple[int, int]]:
         """Get current arrangement as dict"""
-        return {name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()}
+        return {
+            name: (tile.grid_row, tile.grid_col) for name, tile in self.tiles.items()
+        }
 
     def auto_arrange_grid(self, pattern: str):
         """Auto-arrange tiles based on pattern"""
@@ -339,7 +341,9 @@ class GridApplier:
         except subprocess.TimeoutExpired:
             # Wine windows don't respond to sync, retry without it
             subprocess.run(
-                ["xdotool", "windowmove", window_id, str(x), str(y)], capture_output=True, timeout=2
+                ["xdotool", "windowmove", window_id, str(x), str(y)],
+                capture_output=True,
+                timeout=2,
             )
             time.sleep(0.1)  # Brief pause for window to settle
 
@@ -351,7 +355,9 @@ class GridApplier:
             )
         except subprocess.TimeoutExpired:
             subprocess.run(
-                ["xdotool", "windowsize", window_id, str(w), str(h)], capture_output=True, timeout=2
+                ["xdotool", "windowsize", window_id, str(w), str(h)],
+                capture_output=True,
+                timeout=2,
             )
             time.sleep(0.1)
 
@@ -361,7 +367,9 @@ class LayoutsTab(QWidget):
 
     layout_applied = Signal(str)
 
-    def __init__(self, layout_manager, main_tab, settings_manager=None, character_manager=None):
+    def __init__(
+        self, layout_manager, main_tab, settings_manager=None, character_manager=None
+    ):
         super().__init__()
         self.layout_manager = layout_manager
         self.main_tab = main_tab
@@ -486,7 +494,9 @@ class LayoutsTab(QWidget):
 
         # Stacking checkbox
         self.stack_checkbox = QCheckBox("Stack Windows")
-        self.stack_checkbox.setToolTip("Place all windows at the same position (overlapping)")
+        self.stack_checkbox.setToolTip(
+            "Place all windows at the same position (overlapping)"
+        )
         monitor_layout.addWidget(self.stack_checkbox)
 
         layout.addLayout(monitor_layout)
@@ -537,7 +547,9 @@ class LayoutsTab(QWidget):
 
         # Apply to active windows button
         self.apply_active_btn = QPushButton("Apply to Active Windows")
-        self.apply_active_btn.setToolTip("Apply layout to currently detected EVE windows")
+        self.apply_active_btn.setToolTip(
+            "Apply layout to currently detected EVE windows"
+        )
         self.apply_active_btn.clicked.connect(self._apply_to_active_windows)
         self.apply_active_btn.setStyleSheet("""
             QPushButton {
@@ -559,7 +571,9 @@ class LayoutsTab(QWidget):
         """Refresh group list from settings"""
         self._load_groups()
 
-        current = self.group_combo.currentText() if self.group_combo.count() > 0 else None
+        current = (
+            self.group_combo.currentText() if self.group_combo.count() > 0 else None
+        )
 
         self.group_combo.blockSignals(True)
         self.group_combo.clear()
@@ -590,7 +604,10 @@ class LayoutsTab(QWidget):
         if group_name == "All Active Windows":
             # Get all active windows from main_tab
             if hasattr(self.main_tab, "window_manager"):
-                for _window_id, frame in self.main_tab.window_manager.preview_frames.items():
+                for (
+                    _window_id,
+                    frame,
+                ) in self.main_tab.window_manager.preview_frames.items():
                     self.arrangement_grid.add_character(frame.character_name)
 
             self.info_label.setText("Showing all active windows")
@@ -686,7 +703,9 @@ class LayoutsTab(QWidget):
             )
             self.layout_applied.emit(self.pattern_combo.currentText())
         else:
-            QMessageBox.warning(self, "Error", "Failed to apply layout. Check logs for details.")
+            QMessageBox.warning(
+                self, "Error", "Failed to apply layout. Check logs for details."
+            )
 
     def refresh_groups_from_settings(self):
         """Called when groups change in hotkeys tab"""

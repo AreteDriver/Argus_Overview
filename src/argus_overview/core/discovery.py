@@ -159,7 +159,9 @@ class AutoDiscovery(QObject):
 
                 if is_new:
                     # New character found
-                    self.logger.info(f"New EVE character detected: {char_name} ({window_id})")
+                    self.logger.info(
+                        f"New EVE character detected: {char_name} ({window_id})"
+                    )
 
                     # Add to known characters
                     self.known_characters[window_id] = DiscoveredCharacter(
@@ -261,7 +263,9 @@ class AutoDiscovery(QObject):
             List of active DiscoveredCharacter
         """
         return [
-            char for wid, char in self.known_characters.items() if wid in self.active_window_ids
+            char
+            for wid, char in self.known_characters.items()
+            if wid in self.active_window_ids
         ]
 
     def force_scan(self) -> int:

@@ -168,15 +168,31 @@ class HotkeyEdit(QWidget):
     def _key_to_string(self, key) -> str | None:
         """Convert pynput key to string format."""
         # Modifier keys
-        if key == keyboard.Key.ctrl_l or key == keyboard.Key.ctrl_r or key == keyboard.Key.ctrl:
+        if (
+            key == keyboard.Key.ctrl_l
+            or key == keyboard.Key.ctrl_r
+            or key == keyboard.Key.ctrl
+        ):
             return "ctrl"
-        if key == keyboard.Key.alt_l or key == keyboard.Key.alt_r or key == keyboard.Key.alt:
+        if (
+            key == keyboard.Key.alt_l
+            or key == keyboard.Key.alt_r
+            or key == keyboard.Key.alt
+        ):
             return "alt"
         if key == keyboard.Key.alt_gr:
             return "alt"
-        if key == keyboard.Key.shift_l or key == keyboard.Key.shift_r or key == keyboard.Key.shift:
+        if (
+            key == keyboard.Key.shift_l
+            or key == keyboard.Key.shift_r
+            or key == keyboard.Key.shift
+        ):
             return "shift"
-        if key == keyboard.Key.cmd or key == keyboard.Key.cmd_l or key == keyboard.Key.cmd_r:
+        if (
+            key == keyboard.Key.cmd
+            or key == keyboard.Key.cmd_l
+            or key == keyboard.Key.cmd_r
+        ):
             return "cmd"
 
         # Special keys

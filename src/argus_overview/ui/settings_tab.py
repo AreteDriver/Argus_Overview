@@ -188,7 +188,9 @@ class GeneralPanel(QWidget):
         # Auto-save interval
         self.auto_save_spin = QSpinBox()
         self.auto_save_spin.setRange(1, 60)
-        self.auto_save_spin.setValue(self.settings_manager.get("general.auto_save_interval", 5))
+        self.auto_save_spin.setValue(
+            self.settings_manager.get("general.auto_save_interval", 5)
+        )
         self.auto_save_spin.setSuffix(" min")
         self.auto_save_spin.valueChanged.connect(
             lambda v: self.setting_changed.emit("general.auto_save_interval", v)
@@ -229,7 +231,9 @@ class PerformancePanel(QWidget):
             "• Reduces CPU/GPU load significantly\n\n"
             "Use when running multiple EVE clients."
         )
-        self.low_power_check.setStyleSheet("QCheckBox { font-weight: bold; color: #e67e22; }")
+        self.low_power_check.setStyleSheet(
+            "QCheckBox { font-weight: bold; color: #e67e22; }"
+        )
         form.addRow("⚡ Low Power Mode:", self.low_power_check)
 
         # Disable previews (GPU/CPU saver)
@@ -264,7 +268,9 @@ class PerformancePanel(QWidget):
         # Capture workers
         self.workers_spin = QSpinBox()
         self.workers_spin.setRange(1, 16)
-        self.workers_spin.setValue(self.settings_manager.get("performance.capture_workers", 4))
+        self.workers_spin.setValue(
+            self.settings_manager.get("performance.capture_workers", 4)
+        )
         self.workers_spin.valueChanged.connect(
             lambda v: self.setting_changed.emit("performance.capture_workers", v)
         )
@@ -272,7 +278,9 @@ class PerformancePanel(QWidget):
 
         # Caching
         self.caching_check = QCheckBox()
-        self.caching_check.setChecked(self.settings_manager.get("performance.enable_caching", True))
+        self.caching_check.setChecked(
+            self.settings_manager.get("performance.enable_caching", True)
+        )
         self.caching_check.stateChanged.connect(
             lambda: self.setting_changed.emit(
                 "performance.enable_caching", self.caching_check.isChecked()
@@ -283,7 +291,9 @@ class PerformancePanel(QWidget):
         # Cache size
         self.cache_size_spin = QSpinBox()
         self.cache_size_spin.setRange(10, 1000)
-        self.cache_size_spin.setValue(self.settings_manager.get("performance.cache_size_mb", 100))
+        self.cache_size_spin.setValue(
+            self.settings_manager.get("performance.cache_size_mb", 100)
+        )
         self.cache_size_spin.setSuffix(" MB")
         self.cache_size_spin.valueChanged.connect(
             lambda v: self.setting_changed.emit("performance.cache_size_mb", v)
@@ -293,7 +303,9 @@ class PerformancePanel(QWidget):
         # Capture quality
         self.quality_combo = QComboBox()
         self.quality_combo.addItems(["low", "medium", "high"])
-        current_quality = self.settings_manager.get("performance.capture_quality", "medium")
+        current_quality = self.settings_manager.get(
+            "performance.capture_quality", "medium"
+        )
         self.quality_combo.setCurrentText(current_quality)
         self.quality_combo.currentTextChanged.connect(
             lambda v: self.setting_changed.emit("performance.capture_quality", v)
@@ -340,7 +352,9 @@ class HotkeysPanel(QWidget):
         self.hotkeys_table.setColumnWidth(0, 200)
         self.hotkeys_table.setColumnWidth(1, 150)
         self.hotkeys_table.setColumnWidth(2, 80)
-        self.hotkeys_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.hotkeys_table.setSelectionBehavior(
+            QTableWidget.SelectionBehavior.SelectRows
+        )
         layout.addWidget(self.hotkeys_table)
 
         # Buttons
@@ -382,7 +396,9 @@ class HotkeysPanel(QWidget):
         """Edit selected hotkey"""
         selected = self.hotkeys_table.selectedItems()
         if not selected:
-            QMessageBox.information(self, "No Selection", "Please select a hotkey to edit.")
+            QMessageBox.information(
+                self, "No Selection", "Please select a hotkey to edit."
+            )
             return
 
         row = self.hotkeys_table.currentRow()
@@ -402,7 +418,9 @@ class HotkeysPanel(QWidget):
         """Reset selected hotkey to default"""
         selected = self.hotkeys_table.selectedItems()
         if not selected:
-            QMessageBox.information(self, "No Selection", "Please select a hotkey to reset.")
+            QMessageBox.information(
+                self, "No Selection", "Please select a hotkey to reset."
+            )
             return
 
         QMessageBox.information(
@@ -429,7 +447,9 @@ class AppearancePanel(QWidget):
         # Theme
         self.theme_combo = QComboBox()
         self.theme_combo.addItems(["dark", "light", "system"])
-        self.theme_combo.setCurrentText(self.settings_manager.get("appearance.theme", "dark"))
+        self.theme_combo.setCurrentText(
+            self.settings_manager.get("appearance.theme", "dark")
+        )
         self.theme_combo.currentTextChanged.connect(
             lambda v: self.setting_changed.emit("appearance.theme", v)
         )
@@ -438,7 +458,9 @@ class AppearancePanel(QWidget):
         # Font size
         self.font_size_spin = QSpinBox()
         self.font_size_spin.setRange(8, 16)
-        self.font_size_spin.setValue(self.settings_manager.get("appearance.font_size", 10))
+        self.font_size_spin.setValue(
+            self.settings_manager.get("appearance.font_size", 10)
+        )
         self.font_size_spin.setSuffix(" pt")
         self.font_size_spin.valueChanged.connect(
             lambda v: self.setting_changed.emit("appearance.font_size", v)
@@ -447,7 +469,9 @@ class AppearancePanel(QWidget):
 
         # Compact mode
         self.compact_check = QCheckBox()
-        self.compact_check.setChecked(self.settings_manager.get("appearance.compact_mode", False))
+        self.compact_check.setChecked(
+            self.settings_manager.get("appearance.compact_mode", False)
+        )
         self.compact_check.stateChanged.connect(
             lambda: self.setting_changed.emit(
                 "appearance.compact_mode", self.compact_check.isChecked()
@@ -457,9 +481,13 @@ class AppearancePanel(QWidget):
 
         # Accent color
         accent_layout = QHBoxLayout()
-        self.accent_color = self.settings_manager.get("appearance.accent_color", "#4287f5")
+        self.accent_color = self.settings_manager.get(
+            "appearance.accent_color", "#4287f5"
+        )
         self.accent_btn = QPushButton()
-        self.accent_btn.setStyleSheet(f"background-color: {self.accent_color}; min-height: 30px;")
+        self.accent_btn.setStyleSheet(
+            f"background-color: {self.accent_color}; min-height: 30px;"
+        )
         self.accent_btn.clicked.connect(self._pick_accent_color)
         accent_layout.addWidget(self.accent_btn)
         accent_layout.addStretch()
@@ -473,7 +501,9 @@ class AppearancePanel(QWidget):
 
     def _pick_accent_color(self):
         """Pick accent color"""
-        color = QColorDialog.getColor(QColor(self.accent_color), self, "Select Accent Color")
+        color = QColorDialog.getColor(
+            QColor(self.accent_color), self, "Select Accent Color"
+        )
         if color.isValid():
             self.accent_color = color.name()
             self.accent_btn.setStyleSheet(
@@ -501,7 +531,9 @@ class AdvancedPanel(QWidget):
         # Log level
         self.log_level_combo = QComboBox()
         self.log_level_combo.addItems(["DEBUG", "INFO", "WARNING", "ERROR"])
-        self.log_level_combo.setCurrentText(self.settings_manager.get("advanced.log_level", "INFO"))
+        self.log_level_combo.setCurrentText(
+            self.settings_manager.get("advanced.log_level", "INFO")
+        )
         self.log_level_combo.currentTextChanged.connect(
             lambda v: self.setting_changed.emit("advanced.log_level", v)
         )
@@ -509,16 +541,22 @@ class AdvancedPanel(QWidget):
 
         # Config directory
         self.config_dir_label = QLabel(
-            self.settings_manager.get("advanced.config_directory", "~/.config/argus-overview")
+            self.settings_manager.get(
+                "advanced.config_directory", "~/.config/argus-overview"
+            )
         )
         self.config_dir_label.setStyleSheet("color: #888;")
         form.addRow("Config directory:", self.config_dir_label)
 
         # Enable debug
         self.debug_check = QCheckBox()
-        self.debug_check.setChecked(self.settings_manager.get("advanced.enable_debug", False))
+        self.debug_check.setChecked(
+            self.settings_manager.get("advanced.enable_debug", False)
+        )
         self.debug_check.stateChanged.connect(
-            lambda: self.setting_changed.emit("advanced.enable_debug", self.debug_check.isChecked())
+            lambda: self.setting_changed.emit(
+                "advanced.enable_debug", self.debug_check.isChecked()
+            )
         )
         form.addRow("Enable debug:", self.debug_check)
 
@@ -550,7 +588,9 @@ class AdvancedPanel(QWidget):
     def _clear_cache(self):
         """Clear application cache"""
         QMessageBox.information(
-            self, "Clear Cache", "Cache clearing will be implemented in a future update."
+            self,
+            "Clear Cache",
+            "Cache clearing will be implemented in a future update.",
         )
 
     def _export_settings(self):
@@ -565,7 +605,9 @@ class AdvancedPanel(QWidget):
                 from pathlib import Path
 
                 self.settings_manager.export_config(Path(filename))
-                QMessageBox.information(self, "Success", f"Settings exported to {filename}")
+                QMessageBox.information(
+                    self, "Success", f"Settings exported to {filename}"
+                )
             except (OSError, TypeError, ValueError) as e:
                 QMessageBox.critical(self, "Error", f"Failed to export settings: {e}")
 

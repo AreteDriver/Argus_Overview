@@ -71,7 +71,9 @@ def detect_display_server() -> DisplayInfo:
         # Unknown session type - try to detect via tool availability
         has_x11 = _check_x11_tools_work()
         if has_x11:
-            server = DisplayServer.X11 if not wayland_display else DisplayServer.XWAYLAND
+            server = (
+                DisplayServer.X11 if not wayland_display else DisplayServer.XWAYLAND
+            )
         else:
             server = DisplayServer.WAYLAND if wayland_display else DisplayServer.UNKNOWN
 
@@ -83,7 +85,9 @@ def detect_display_server() -> DisplayInfo:
         x11_display=x11_display,
     )
 
-    logger.info(f"Detected display server: {info.server.value}, X11 access: {info.has_x11_access}")
+    logger.info(
+        f"Detected display server: {info.server.value}, X11 access: {info.has_x11_access}"
+    )
     return info
 
 
