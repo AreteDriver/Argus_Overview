@@ -30,6 +30,16 @@ tar -xzf Argus-Overview-*-Linux.tar.gz && cd argus-overview-linux
 
 > Cross-platform support (Windows native, Mac) planned for v3. Community interest in Qt/Rust port welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## First Launch
+
+Argus is designed to get you from launch to usable cycling quickly:
+
+1. Start Argus with your EVE clients already running when possible.
+2. Let Argus auto-import detected clients on startup, or click `Import Windows` in the `Overview` tab.
+3. Use `Cycle Control` to tune hotkeys and groups only after the windows you care about are visible.
+
+If you prefer a hands-on setup flow, use `Add Window` in `Overview` for manual control and disable startup auto-import in `Settings`.
+
 ---
 
 ## Screenshots

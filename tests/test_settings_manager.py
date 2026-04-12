@@ -81,6 +81,8 @@ class TestDefaultSettings:
         assert "start_with_system" in general
         assert "minimize_to_tray" in general
         assert "auto_discovery" in general
+        assert "auto_import_on_startup" in general
+        assert "show_setup_guidance" in general
 
     def test_default_settings_has_performance(self):
         """Test that DEFAULT_SETTINGS has performance section"""
@@ -98,6 +100,34 @@ class TestDefaultSettings:
         assert "thumbnails" in SettingsManager.DEFAULT_SETTINGS
         thumbs = SettingsManager.DEFAULT_SETTINGS["thumbnails"]
         assert "opacity_on_hover" in thumbs
+
+
+class TestEnsureCharacter:
+    """Tests for lightweight character bootstrapping."""
+
+    def test_ensure_character_creates_missing_record(self, tmp_path):
+        """Test ensure_character creates a minimal character entry when absent."""
+        from argus_overview.core.character_manager import AUTO_CREATED_NOTE, CharacterManager
+
+        manager = CharacterManager(config_dir=tmp_path)
+
+        result = manager.ensure_character("New Pilot")
+
+        assert result is True
+        assert "New Pilot" in manager.characters
+        assert manager.characters["New Pilot"].notes == AUTO_CREATED_NOTE
+
+    def test_ensure_character_is_noop_for_existing_record(self, tmp_path):
+        """Test ensure_character leaves existing records intact."""
+        from argus_overview.core.character_manager import Character, CharacterManager
+
+        manager = CharacterManager(config_dir=tmp_path)
+        manager.add_character(Character(name="Existing Pilot"))
+
+        result = manager.ensure_character("Existing Pilot")
+
+        assert result is True
+        assert manager.characters["Existing Pilot"].name == "Existing Pilot"
         assert "default_width" in thumbs
 
     def test_default_settings_has_hotkeys(self):

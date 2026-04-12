@@ -58,6 +58,7 @@ from PySide6.QtWidgets import (
 # Import version and core modules
 from argus_overview import __version__
 from argus_overview.core.character_manager import CharacterManager
+from argus_overview.core.cycle_controller import CycleController
 from argus_overview.core.discovery import AutoDiscovery
 from argus_overview.core.eve_settings_sync import EVESettingsSync
 from argus_overview.core.hotkey_manager import HotkeyManager
@@ -78,6 +79,21 @@ class MainWindowV21(QMainWindow):
         self.logger = logging.getLogger(__name__)
         self.setWindowTitle(f"Argus Overview v{__version__}")
         self.setMinimumSize(1000, 700)
+        self._is_quitting = False
+        self._auto_discovery_connected = False
+        self._tab_indexes: dict[str, int] = {}
+        self._bulk_import_active = False
+        self._bulk_import_dirty_characters = False
+        self._bulk_import_dirty_groups = False
+        self._pending_discovery_names: list[str] = []
+        self._discovery_notification_timer = QTimer(self)
+        self._discovery_notification_timer.setSingleShot(True)
+        self._discovery_notification_timer.setInterval(1200)
+        self._discovery_notification_timer.timeout.connect(self._flush_discovery_notifications)
+        self._status_refresh_timer = QTimer(self)
+        self._status_refresh_timer.setSingleShot(True)
+        self._status_refresh_timer.setInterval(150)
+        self._status_refresh_timer.timeout.connect(self._flush_main_tab_status_refresh)
 
         # Set window icon
         self._set_window_icon()
@@ -93,6 +109,7 @@ class MainWindowV21(QMainWindow):
         # Initialize capture system with settings (after settings_manager)
         capture_workers = self.settings_manager.get("performance.capture_workers", 4)
         self.capture_system = WindowCaptureThreaded(max_workers=capture_workers)
+        self.cycle_controller = CycleController(self.capture_system, self.settings_manager)
 
         # v2.2: Auto-discovery
         self.auto_discovery = AutoDiscovery(
@@ -156,10 +173,8 @@ class MainWindowV21(QMainWindow):
         self.hotkey_manager.start()
 
         # v2.2: Start auto-discovery if enabled
-        if self.settings_manager.get("general.auto_discovery", True):
-            self.auto_discovery.new_character_found.connect(self._on_new_character_discovered)
-            self.auto_discovery.character_gone.connect(self._on_character_gone)
-            self.auto_discovery.start()
+        self._ensure_auto_discovery_state()
+        QTimer.singleShot(250, self._run_startup_assistant)
 
         self.logger.info("Main window v2.2 initialized successfully")
 
@@ -185,6 +200,52 @@ class MainWindowV21(QMainWindow):
         # Show tray icon
         self.system_tray.show()
         self.logger.info("System tray initialized (ActionRegistry)")
+
+    def _connect_auto_discovery(self):
+        """Ensure auto-discovery signals are connected exactly once."""
+        if self._auto_discovery_connected:
+            return
+
+        self.auto_discovery.new_character_found.connect(
+            self._on_new_character_discovered,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        self.auto_discovery.character_gone.connect(
+            self._on_character_gone,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        self._auto_discovery_connected = True
+
+    def _disconnect_auto_discovery(self):
+        """Disconnect auto-discovery signals if they were connected."""
+        if not self._auto_discovery_connected:
+            return
+
+        try:
+            self.auto_discovery.new_character_found.disconnect(self._on_new_character_discovered)
+        except (RuntimeError, TypeError):
+            pass
+
+        try:
+            self.auto_discovery.character_gone.disconnect(self._on_character_gone)
+        except (RuntimeError, TypeError):
+            pass
+
+        self._auto_discovery_connected = False
+
+    def _ensure_auto_discovery_state(self):
+        """Synchronize auto-discovery wiring and runtime state with settings."""
+        enabled = self.settings_manager.get("general.auto_discovery", True)
+        interval = self.settings_manager.get("general.auto_discovery_interval", 5)
+
+        self.auto_discovery.set_interval(interval)
+
+        if enabled:
+            self._connect_auto_discovery()
+            if not self.auto_discovery.scan_timer.isActive():
+                self.auto_discovery.start()
+        else:
+            self.auto_discovery.stop()
 
     def _register_hotkeys(self):
         """Register global hotkeys (v2.2)"""
@@ -281,19 +342,73 @@ class MainWindowV21(QMainWindow):
 
         return members
 
-    def _add_to_default_cycling_group(self, char_name: str):
+    def _add_to_default_cycling_group(self, char_name: str, auto_save: bool = True):
         """Add a character to the Default cycling group if not already present."""
         groups = self.settings_manager.get("cycling_groups", {})
         if "Default" not in groups:
             groups["Default"] = []
         if char_name not in groups["Default"]:
             groups["Default"].append(char_name)
-            self.settings_manager.set("cycling_groups", groups, auto_save=True)
+            self.settings_manager.set("cycling_groups", groups, auto_save=auto_save)
             # Refresh the hotkeys tab UI if it exists
             if hasattr(self, "hotkeys_tab") and self.hotkeys_tab.current_group == "Default":
                 self.hotkeys_tab._load_group_members("Default")
                 self.hotkeys_tab.cycling_groups = groups
             self.logger.info(f"Added {char_name} to Default cycling group")
+
+    def _begin_bulk_import(self):
+        """Batch persistence during startup import bursts."""
+        self._bulk_import_active = True
+        self._bulk_import_dirty_characters = False
+        self._bulk_import_dirty_groups = False
+
+    def _finish_bulk_import(self):
+        """Flush any deferred saves from a bulk import session."""
+        if self._bulk_import_dirty_characters:
+            self.character_manager.save_data()
+        if self._bulk_import_dirty_groups:
+            self.settings_manager.save_settings()
+        self._bulk_import_active = False
+        self._bulk_import_dirty_characters = False
+        self._bulk_import_dirty_groups = False
+
+    def _queue_discovery_notification(self, char_name: str):
+        """Batch rapid auto-discovery notifications into one tray update."""
+        if char_name not in self._pending_discovery_names:
+            self._pending_discovery_names.append(char_name)
+        self._discovery_notification_timer.start()
+
+    def _flush_discovery_notifications(self):
+        """Show a single notification for any queued discoveries."""
+        if not self._pending_discovery_names:
+            return
+
+        names = self._pending_discovery_names[:]
+        self._pending_discovery_names.clear()
+
+        if len(names) == 1:
+            title = "New Character Detected"
+            message = f"Added: {names[0]}"
+        else:
+            title = "New Characters Detected"
+            preview = ", ".join(names[:3])
+            if len(names) > 3:
+                preview = f"{preview}, +{len(names) - 3} more"
+            message = preview
+
+        self.system_tray.show_notification(title, message)
+
+    def _queue_main_tab_status_refresh(self):
+        """Debounce expensive overview status refreshes during burst discovery."""
+        if hasattr(self, "_status_refresh_timer"):
+            self._status_refresh_timer.start()
+        else:
+            self._flush_main_tab_status_refresh()
+
+    def _flush_main_tab_status_refresh(self):
+        """Refresh overview status if the main tab is available."""
+        if hasattr(self, "main_tab"):
+            self.main_tab._update_status()
 
     def _get_window_id_for_character(self, char_name: str) -> str | None:
         """Get window ID for a character name"""
@@ -310,26 +425,12 @@ class MainWindowV21(QMainWindow):
             direction: 1 for next, -1 for previous
         """
         members = self._get_cycling_group_members()
-        if not members:
-            self.logger.warning("No members in cycling group")
-            return
-
-        # Try each member at most once to avoid infinite loop
-        for _ in range(len(members)):
-            self.cycling_index = (self.cycling_index + direction) % len(members)
-            char_name = members[self.cycling_index]
-
-            window_id = self._get_window_id_for_character(char_name)
-            if window_id:
-                self._activate_window(window_id)
-                self.logger.info(
-                    f"Cycled to: {char_name} ({self.cycling_index + 1}/{len(members)})"
-                )
-                return
-
-            self.logger.warning(f"Character '{char_name}' not found in active windows, skipping")
-
-        self.logger.warning("No active windows found in cycling group")
+        self.cycling_index, _ = self.cycle_controller.cycle(
+            members=members,
+            current_index=self.cycling_index,
+            direction=direction,
+            window_lookup=self._get_window_id_for_character,
+        )
 
     @Slot()
     def _cycle_next(self):
@@ -350,37 +451,8 @@ class MainWindowV21(QMainWindow):
             self._pending_cycle_direction = None
 
     def _activate_window(self, window_id: str):
-        """Activate a window by ID, optionally minimizing previous EVE window.
-
-        Uses the platform abstraction layer instead of raw subprocess calls.
-        """
-        if not self.capture_system._window_mgr.is_valid_window_id(window_id):
-            self.logger.warning(f"Invalid window ID format: {window_id}")
-            return
-
-        try:
-            # Check if auto-minimize is enabled
-            auto_minimize = self.settings_manager.get("performance.auto_minimize_inactive", False)
-
-            if auto_minimize:
-                # Get the last activated EVE window
-                last_eve_window = self.settings_manager.get_last_activated_window()
-
-                if (
-                    last_eve_window
-                    and last_eve_window != window_id
-                    and self.capture_system._window_mgr.is_valid_window_id(last_eve_window)
-                ):
-                    self.capture_system.minimize_window(last_eve_window)
-                    self.logger.info(f"Auto-minimized previous EVE window: {last_eve_window}")
-
-            # Track this as the last activated EVE window
-            self.settings_manager.set_last_activated_window(window_id)
-
-            # Activate the new window
-            self.capture_system.activate_window(window_id)
-        except (OSError, RuntimeError) as e:
-            self.logger.error(f"Failed to activate window {window_id}: {e}")
+        """Activate a window by ID."""
+        self.cycle_controller.activate_window(window_id)
 
     @Slot(str)
     def _on_profile_selected(self, profile_name: str):
@@ -396,9 +468,27 @@ class MainWindowV21(QMainWindow):
         """Show settings tab"""
         self.show()
         self.raise_()
-        self.tabs.setCurrentIndex(
-            4
-        )  # Settings tab (Overview=0, Cycle Control=1, Roster=2, Sync=3, Settings=4)
+        settings_index = self._tab_indexes.get("Settings")
+        if settings_index is not None:
+            self.tabs.setCurrentIndex(settings_index)
+
+    @Slot()
+    def _show_roster(self):
+        """Show roster tab."""
+        self.show()
+        self.raise_()
+        roster_index = self._tab_indexes.get("Roster")
+        if roster_index is not None:
+            self.tabs.setCurrentIndex(roster_index)
+
+    @Slot()
+    def _show_cycle_control(self):
+        """Show cycle control tab."""
+        self.show()
+        self.raise_()
+        cycle_index = self._tab_indexes.get("Cycle Control")
+        if cycle_index is not None:
+            self.tabs.setCurrentIndex(cycle_index)
 
     @Slot()
     def _reload_config(self):
@@ -411,15 +501,7 @@ class MainWindowV21(QMainWindow):
         theme = self.settings_manager.get("appearance.theme", "dark")
         self.theme_manager.apply_theme(theme)
 
-        # Update auto-discovery
-        if self.settings_manager.get("general.auto_discovery", True):
-            self.auto_discovery.set_interval(
-                self.settings_manager.get("general.auto_discovery_interval", 5)
-            )
-            if not self.auto_discovery.scan_timer.isActive():
-                self.auto_discovery.start()
-        else:
-            self.auto_discovery.stop()
+        self._ensure_auto_discovery_state()
 
         self.system_tray.show_notification("Config Reloaded", "Settings have been reloaded")
         self.logger.info("Configuration reloaded successfully")
@@ -428,7 +510,42 @@ class MainWindowV21(QMainWindow):
     def _quit_application(self):
         """Quit the application"""
         self.logger.info("Quit requested from tray")
-        QApplication.quit()
+        self._is_quitting = True
+        self.close()
+
+    def _run_startup_assistant(self):
+        """Improve first-use UX without interrupting startup."""
+        if not hasattr(self, "main_tab") or not hasattr(self.main_tab, "window_manager"):
+            return
+
+        if self.main_tab.window_manager.get_active_window_count() > 0:
+            return
+
+        if self.settings_manager.get("general.auto_import_on_startup", True):
+            self._begin_bulk_import()
+            try:
+                added_count, _skipped_count, _detected_count = self.main_tab.one_click_import(
+                    show_dialogs=False
+                )
+            finally:
+                self._finish_bulk_import()
+            if added_count > 0:
+                self.statusBar().showMessage(
+                    f"Imported {added_count} EVE window(s) automatically",
+                    6000,
+                )
+                if self.settings_manager.get("general.show_notifications", True):
+                    self.system_tray.show_notification(
+                        "Setup Complete",
+                        f"Imported {added_count} running EVE client(s)",
+                    )
+                return
+
+        if self.settings_manager.get("general.show_setup_guidance", True):
+            self.statusBar().showMessage(
+                "Quick start: click Import Windows to detect running EVE clients automatically",
+                8000,
+            )
 
     def _apply_to_all_windows(self, action: str):
         """Apply action to all EVE windows
@@ -462,14 +579,7 @@ class MainWindowV21(QMainWindow):
 
     def _activate_character(self, char_name: str):
         """Activate window for a specific character (v2.2 per-character hotkeys)"""
-        if hasattr(self, "main_tab"):
-            for window_id, frame in self.main_tab.window_manager.preview_frames.items():
-                if frame.character_name == char_name:
-                    # Use _activate_window which has auto-minimize logic
-                    self._activate_window(window_id)
-                    self.logger.info(f"Activated character: {char_name}")
-                    return
-        self.logger.warning(f"Character not found: {char_name}")
+        self.cycle_controller.activate_character(char_name, self._get_window_id_for_character)
 
     @Slot(str, str, str)
     def _on_new_character_discovered(self, char_name: str, window_id: str, window_title: str):
@@ -479,27 +589,12 @@ class MainWindowV21(QMainWindow):
         # Add to main tab if not already there
         if hasattr(self, "main_tab"):
             if window_id not in self.main_tab.window_manager.preview_frames:
-                frame = self.main_tab.window_manager.add_window(window_id, char_name)
-                if frame:
-                    frame.window_activated.connect(
-                        self.main_tab._on_window_activated,
-                        Qt.ConnectionType.UniqueConnection,
-                    )
-                    frame.window_removed.connect(
-                        self.main_tab._on_window_removed,
-                        Qt.ConnectionType.UniqueConnection,
-                    )
-                    self.main_tab.preview_layout.addWidget(frame)
-                    self.main_tab._update_status()
-
-                    # Auto-add to Default cycling group
-                    self._add_to_default_cycling_group(char_name)
+                if self.main_tab.import_detected_window(window_id, char_name):
+                    self._queue_main_tab_status_refresh()
 
                     # Show notification
                     if self.settings_manager.get("general.show_notifications", True):
-                        self.system_tray.show_notification(
-                            "New Character Detected", f"Added: {char_name}"
-                        )
+                        self._queue_discovery_notification(char_name)
 
     def _create_menu_bar(self):
         """Create menu bar with Help menu (v2.4 - uses ActionRegistry)"""
@@ -584,11 +679,23 @@ class MainWindowV21(QMainWindow):
             self.character_manager,
             settings_manager=self.settings_manager,
         )
-        self.tabs.addTab(self.main_tab, "Overview")
+        self._tab_indexes["Overview"] = self.tabs.addTab(self.main_tab, "Overview")
 
         # Connect signals
         self.main_tab.character_detected.connect(self._on_character_detected)
         self.main_tab.layout_applied.connect(self._on_layout_applied)
+        self.main_tab.window_focus_requested.connect(
+            self._activate_window,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        self.main_tab.roster_navigation_requested.connect(
+            self._show_roster,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        self.main_tab.cycle_control_navigation_requested.connect(
+            self._show_cycle_control,
+            Qt.ConnectionType.UniqueConnection,
+        )
 
     def _create_characters_tab(self):
         """Create Roster tab (character & team management) - formerly 'Characters & Teams'"""
@@ -599,7 +706,7 @@ class MainWindowV21(QMainWindow):
             self.layout_manager,
             settings_sync=self.settings_sync,  # v2.2: Enable EVE folder scanning
         )
-        self.tabs.addTab(self.characters_tab, "Roster")
+        self._tab_indexes["Roster"] = self.tabs.addTab(self.characters_tab, "Roster")
 
         # Connect signals
         self.characters_tab.team_selected.connect(self._on_team_selected)
@@ -611,7 +718,7 @@ class MainWindowV21(QMainWindow):
         self.hotkeys_tab = HotkeysTab(
             self.character_manager, self.settings_manager, main_tab=self.main_tab
         )
-        self.tabs.addTab(self.hotkeys_tab, "Cycle Control")
+        self._tab_indexes["Cycle Control"] = self.tabs.addTab(self.hotkeys_tab, "Cycle Control")
 
         # Connect group changes to refresh layout sources in overview tab
         self.hotkeys_tab.group_changed.connect(self.main_tab.refresh_layout_groups)
@@ -630,7 +737,7 @@ class MainWindowV21(QMainWindow):
         from argus_overview.ui.intel_tab import IntelTab
 
         self.intel_tab = IntelTab(self.settings_manager)
-        self.tabs.addTab(self.intel_tab, "Intel")
+        self._tab_indexes["Intel"] = self.tabs.addTab(self.intel_tab, "Intel")
 
         # Connect alert signals to main window for visual feedback
         self.intel_tab.alert_triggered.connect(self._on_intel_alert)
@@ -677,14 +784,14 @@ class MainWindowV21(QMainWindow):
         from argus_overview.ui.settings_sync_tab import SettingsSyncTab
 
         self.settings_sync_tab = SettingsSyncTab(self.settings_sync, self.character_manager)
-        self.tabs.addTab(self.settings_sync_tab, "Sync")
+        self._tab_indexes["Sync"] = self.tabs.addTab(self.settings_sync_tab, "Sync")
 
     def _create_settings_tab(self):
         """Create Settings tab (application settings)"""
         from argus_overview.ui.settings_tab import SettingsTab
 
         self.settings_tab = SettingsTab(self.settings_manager, self.hotkey_manager)
-        self.tabs.addTab(self.settings_tab, "Settings")
+        self._tab_indexes["Settings"] = self.tabs.addTab(self.settings_tab, "Settings")
 
         # Connect signals
         self.settings_tab.settings_changed.connect(self._apply_setting)
@@ -704,6 +811,9 @@ class MainWindowV21(QMainWindow):
                 [
                     ("character_detected", self._on_character_detected),
                     ("layout_applied", self._on_layout_applied),
+                    ("window_focus_requested", self._activate_window),
+                    ("roster_navigation_requested", self._show_roster),
+                    ("cycle_control_navigation_requested", self._show_cycle_control),
                 ],
             ),
             # characters_tab signals
@@ -744,15 +854,6 @@ class MainWindowV21(QMainWindow):
                     ("settings_requested", self._show_settings),
                     ("reload_config_requested", self._reload_config),
                     ("quit_requested", self._quit_application),
-                ],
-            ),
-            # auto_discovery signals
-            (
-                self,
-                "auto_discovery",
-                [
-                    ("new_character_found", self._on_new_character_discovered),
-                    ("character_gone", self._on_character_gone),
                 ],
             ),
             # intel_tab signals
@@ -906,8 +1007,15 @@ class MainWindowV21(QMainWindow):
         """
         self.logger.info(f"Character detected: {char_name} (window: {window_id})")
 
+        auto_save = not self._bulk_import_active
+        self.character_manager.ensure_character(char_name, auto_save=auto_save)
         # Assign window in character manager
-        self.character_manager.assign_window(char_name, window_id)
+        self.character_manager.assign_window(char_name, window_id, auto_save=auto_save)
+        self._add_to_default_cycling_group(char_name, auto_save=auto_save)
+
+        if self._bulk_import_active:
+            self._bulk_import_dirty_characters = True
+            self._bulk_import_dirty_groups = True
 
         # Update characters tab if it exists and has the method
         if hasattr(self, "characters_tab") and hasattr(
@@ -932,6 +1040,7 @@ class MainWindowV21(QMainWindow):
         # Remove preview frame so capture loop stops hitting dead window
         if hasattr(self, "main_tab") and hasattr(self.main_tab, "window_manager"):
             self.main_tab.window_manager.remove_window(window_id)
+            self._queue_main_tab_status_refresh()
 
         # Update characters tab if it exists and has the method
         if hasattr(self, "characters_tab") and hasattr(
@@ -975,7 +1084,7 @@ class MainWindowV21(QMainWindow):
     def closeEvent(self, event: QCloseEvent):
         """Handle application close - v2.2 minimize to tray support"""
         # Check if we should minimize to tray instead of closing
-        if self.settings_manager.get("general.minimize_to_tray", True):
+        if not self._is_quitting and self.settings_manager.get("general.minimize_to_tray", True):
             if hasattr(self, "system_tray") and self.system_tray.is_visible():
                 self.logger.info("Minimizing to system tray")
                 self.hide()
@@ -988,6 +1097,12 @@ class MainWindowV21(QMainWindow):
 
         # Actually closing the application
         self.logger.info(f"Shutting down Argus Overview v{__version__}...")
+        if hasattr(self, "_discovery_notification_timer"):
+            self._discovery_notification_timer.stop()
+        if hasattr(self, "_status_refresh_timer"):
+            self._status_refresh_timer.stop()
+        self._pending_discovery_names.clear()
+        self._disconnect_auto_discovery()
 
         # Disconnect signals to break reference cycles
         self._disconnect_signals()
