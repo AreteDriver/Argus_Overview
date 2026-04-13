@@ -480,34 +480,30 @@ class TestGridApplier:
         assert applier.logger is not None
 
     def test_get_screen_geometry_with_xrandr(self):
-        """Test get_screen_geometry parses xrandr output"""
-        from argus_overview.ui.main_tab import GridApplier
+        """Test get_screen_geometry delegates to the shared screen helper."""
+        from argus_overview.ui.main_tab import GridApplier, ScreenGeometry
 
         applier = GridApplier()
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                stdout="DP-1 connected primary 1920x1080+0+0 (normal left inverted right x axis y axis) 527mm x 296mm",
-                returncode=0,
-            )
+        expected = ScreenGeometry(0, 0, 1920, 1080, True)
 
-            applier.get_screen_geometry(0)
+        with patch("argus_overview.ui.main_tab.get_screen_geometry", return_value=expected) as mock_get:
+            result = applier.get_screen_geometry(0)
 
-            # Returns None or ScreenGeometry based on parsing
-            # Just verify no exception
+        assert result == expected
+        mock_get.assert_called_once_with(0)
 
     def test_get_screen_geometry_no_display(self):
-        """Test get_screen_geometry with no connected display"""
+        """Test get_screen_geometry tolerates no detected display."""
         from argus_overview.ui.main_tab import GridApplier
 
         applier = GridApplier()
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="", returncode=0)
+        with patch("argus_overview.ui.main_tab.get_screen_geometry", return_value=None) as mock_get:
+            result = applier.get_screen_geometry(0)
 
-            applier.get_screen_geometry(0)
-
-            # Result depends on fallback logic, just verify no exception
+        assert result is None
+        mock_get.assert_called_once_with(0)
 
     def test_apply_arrangement_empty(self):
         """Test apply_arrangement with empty arrangement"""

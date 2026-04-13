@@ -2,8 +2,11 @@
 
 import os
 import sys
+from pathlib import Path
 
 import pytest
+
+from PySide6 import __file__ as pyside6_file
 
 # Set Qt platform plugin before importing PySide6
 # Use offscreen platform for CI environments (GitHub Actions sets CI=true)
@@ -11,10 +14,18 @@ import pytest
 if "QT_QPA_PLATFORM" not in os.environ:
     os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
+_pyside6_root = Path(pyside6_file).resolve().parent
+_qt_plugins_dir = _pyside6_root / "Qt" / "plugins"
+_qt_platforms_dir = _qt_plugins_dir / "platforms"
+os.environ.setdefault("QT_PLUGIN_PATH", str(_qt_plugins_dir))
+os.environ.setdefault("QT_QPA_PLATFORM_PLUGIN_PATH", str(_qt_platforms_dir))
+
 from PySide6.QtWidgets import QApplication
+from PySide6.QtCore import QCoreApplication
 
 # Create QApplication at module load time to ensure it exists
 # before any Qt widgets are imported by test files
+QCoreApplication.setLibraryPaths([str(_qt_plugins_dir)])
 _qapp_instance = QApplication.instance()
 if _qapp_instance is None:
     _qapp_instance = QApplication(sys.argv[:1])

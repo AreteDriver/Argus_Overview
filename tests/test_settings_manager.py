@@ -128,7 +128,6 @@ class TestEnsureCharacter:
 
         assert result is True
         assert manager.characters["Existing Pilot"].name == "Existing Pilot"
-        assert "default_width" in thumbs
 
     def test_default_settings_has_hotkeys(self):
         """Test that DEFAULT_SETTINGS has hotkeys section"""

@@ -1702,7 +1702,9 @@ class MainTab(QWidget):
     def _set_status_message(self, message: str, timeout_ms: int = 5000):
         """Show a transient status message without losing live status updates."""
         self._status_override_text = message
-        self.status_label.setText(message)
+        status_label = getattr(self, "status_label", None)
+        if status_label is not None:
+            status_label.setText(message)
         timer = getattr(self, "_status_override_timer", None)
         if timer is not None:
             timer.start(timeout_ms)
@@ -1714,8 +1716,9 @@ class MainTab(QWidget):
 
     def _get_empty_state_message(self) -> str:
         """Return the most helpful empty-state guidance for the overview tab."""
-        if self.settings_manager and self.settings_manager.get("general.show_setup_guidance", True):
-            if self.settings_manager.get("general.auto_discovery", True):
+        settings_manager = getattr(self, "settings_manager", None)
+        if settings_manager and settings_manager.get("general.show_setup_guidance", True):
+            if settings_manager.get("general.auto_discovery", True):
                 return (
                     "No windows in preview. Click 'Import Windows' to start, or launch EVE and "
                     "let auto-discovery add clients for you."

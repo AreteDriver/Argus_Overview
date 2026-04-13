@@ -114,6 +114,7 @@ def create_mock_window():
     window.capture_system = MagicMock()
     window.capture_system._window_mgr = mock_window_mgr
     window.cycle_controller = MagicMock()
+    window.cycle_controller.cycle.return_value = (0, None)
     window.statusBar = MagicMock(return_value=MagicMock())
     window.settings_manager = MagicMock()
     window.character_manager = MagicMock()
@@ -252,6 +253,7 @@ class TestCycling:
         """Test cycle_next advances cycling index"""
         window = create_mock_window()
         window.cycling_index = 0
+        window.cycle_controller.cycle.return_value = (1, "Char2")
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = {"Default": ["Char1", "Char2", "Char3"]}
         window.current_cycling_group = "Default"
@@ -273,6 +275,7 @@ class TestCycling:
         """Test cycle_next wraps to beginning"""
         window = create_mock_window()
         window.cycling_index = 2  # Last position
+        window.cycle_controller.cycle.return_value = (0, "Char1")
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = {"Default": ["Char1", "Char2", "Char3"]}
         window.current_cycling_group = "Default"
@@ -294,6 +297,7 @@ class TestCycling:
         """Test cycle_prev decrements cycling index"""
         window = create_mock_window()
         window.cycling_index = 2
+        window.cycle_controller.cycle.return_value = (1, "Char2")
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = {"Default": ["Char1", "Char2", "Char3"]}
         window.current_cycling_group = "Default"
@@ -543,9 +547,16 @@ class TestOnCharacterDetected:
 
         window._on_character_detected("0x12345", "TestPilot")
 
-        window.character_manager.ensure_character.assert_called_with("TestPilot")
-        window.character_manager.assign_window.assert_called_with("TestPilot", "0x12345")
-        window._add_to_default_cycling_group.assert_called_with("TestPilot")
+        window.character_manager.ensure_character.assert_called_with(
+            "TestPilot",
+            auto_save=True,
+        )
+        window.character_manager.assign_window.assert_called_with(
+            "TestPilot",
+            "0x12345",
+            auto_save=True,
+        )
+        window._add_to_default_cycling_group.assert_called_with("TestPilot", auto_save=True)
 
 
 # Test team selected
@@ -702,6 +713,7 @@ class TestNewCharacterDiscovered:
         window.main_tab.window_manager.preview_frames = {}  # Not already there
         window.main_tab.import_detected_window.return_value = True
         window._queue_main_tab_status_refresh = MagicMock()
+        window._queue_discovery_notification = MagicMock()
 
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = True  # show_notifications
@@ -712,7 +724,7 @@ class TestNewCharacterDiscovered:
 
         window.main_tab.import_detected_window.assert_called_with("0x99999", "NewPilot")
         window._queue_main_tab_status_refresh.assert_called_once()
-        window.system_tray.show_notification.assert_called()
+        window._queue_discovery_notification.assert_called_once_with("NewPilot")
 
 
 # Test toggle lock
