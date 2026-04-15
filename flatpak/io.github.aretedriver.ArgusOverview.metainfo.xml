@@ -54,6 +54,14 @@
   </branding>
 
   <releases>
+    <release version="3.1.2" date="2026-04-15">
+      <description>
+        <p>Security patch</p>
+        <ul>
+          <li>Bump Pillow to 12.2.0 to patch FITS GZIP decompression bomb</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.1" date="2026-04-15">
       <description>
         <p>Stability and performance fixes</p>
