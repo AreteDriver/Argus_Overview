@@ -54,6 +54,18 @@
   </branding>
 
   <releases>
+    <release version="3.1.1" date="2026-04-15">
+      <description>
+        <p>Stability and performance fixes</p>
+        <ul>
+          <li>Signal lifecycle leak fixes in preview frame cleanup</li>
+          <li>Capture pipeline stability: snapshot iteration, orphan image cleanup</li>
+          <li>Crop-based frame dedup (~22x cheaper on unchanged frames)</li>
+          <li>Wayland-only pynput import guard</li>
+          <li>Security: scrub filesystem paths from recording script</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.0" date="2026-03-13">
       <description>
         <p>Wayland POC, Intel SDE, Windows parity, coverage 99%</p>

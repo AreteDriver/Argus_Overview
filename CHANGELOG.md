@@ -5,6 +5,24 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2026-04-15
+
+### Fixed
+- **Signal lifecycle leaks** - Disconnect dynamic `frame.signal` connections in `closeEvent()` across all preview frames and cross-tab signals to prevent leaks after widget deletion
+- **Capture pipeline stability** - Snapshot `preview_frames.items()` via `list()` to prevent crashes from concurrent window removal; timestamped `pending_requests`; orphan image cleanup
+- **Frame dedup performance** - Crop-based fingerprinting (top 32 rows) is ~22× cheaper than full `tobytes()` on unchanged frames; only compute full hash after dedup confirms change
+- **Preview frame hang on client close** - Remove preview frame on client disconnect to prevent capture loop hang
+- **Wayland import guard** - Guard `pynput` import for Wayland-only environments (#55)
+
+### Security
+- Scrub local filesystem paths from recording script
+
+### Other
+- Bump `codecov/codecov-action` from 5 to 6
+- Format codebase with CI-matching black version (#58)
+- Docs: add CI/CD and testing sections to CLAUDE.md
+- 100% coverage milestone, Flatpak PyPI URL, Wayland hardware test report
+
 ## [3.1.0] - 2026-03-13
 
 ### Added
