@@ -1,0 +1,31 @@
+name: AI Task
+about: Track implementation tasks that use AI-assisted coding workflows.
+title: "[AI] "
+labels: ["ai", "automation"]
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: Clear success criteria for the AI-assisted task.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: In-scope files/modules and explicit out-of-scope boundaries.
+    validations:
+      required: true
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Product, security, and architectural constraints.
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation Plan
+      description: Tests/lint/manual checks required before merge.
+    validations:
+      required: true

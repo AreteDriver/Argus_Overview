@@ -12,7 +12,8 @@ ENV/
 env/
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/extensions.json
 .idea/
 *.swp
 *.swo
