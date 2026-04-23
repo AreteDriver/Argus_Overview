@@ -24,3 +24,13 @@ def test_launch_docs_do_not_claim_legacy_python_floor() -> None:
     for doc in (reddit, forum):
         assert "Python 3.8+" not in doc
         assert "Python 3.9+" not in doc
+
+
+def test_runtime_guards_exist_for_python_floor() -> None:
+    main_py = (REPO_ROOT / "src" / "main.py").read_text()
+    conftest = (REPO_ROOT / "tests" / "conftest.py").read_text()
+
+    assert "sys.version_info < (3, 10)" in main_py
+    assert "Python 3.10+" in main_py
+    assert "sys.version_info < (3, 10)" in conftest
+    assert "tests require Python 3.10+" in conftest
