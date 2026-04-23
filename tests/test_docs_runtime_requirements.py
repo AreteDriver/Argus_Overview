@@ -1,0 +1,26 @@
+"""Docs/runtime consistency tests."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_launch_docs_match_pyproject_python_floor() -> None:
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text()
+    reddit = (REPO_ROOT / "docs" / "REDDIT_LAUNCH.md").read_text()
+    forum = (REPO_ROOT / "docs" / "FORUM_POST.md").read_text()
+
+    assert 'requires-python = ">=3.10"' in pyproject
+    assert "Python 3.10+" in reddit
+    assert "Python 3.10+" in forum
+
+
+def test_launch_docs_do_not_claim_legacy_python_floor() -> None:
+    reddit = (REPO_ROOT / "docs" / "REDDIT_LAUNCH.md").read_text()
+    forum = (REPO_ROOT / "docs" / "FORUM_POST.md").read_text()
+
+    for doc in (reddit, forum):
+        assert "Python 3.8+" not in doc
+        assert "Python 3.9+" not in doc

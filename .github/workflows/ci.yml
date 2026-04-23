@@ -76,7 +76,6 @@ jobs:
 
       - name: Run mypy
         run: mypy . --ignore-missing-imports --no-error-summary --exclude 'src/argus_overview/platform/windows.py'
-        continue-on-error: true  # Type checking is advisory, not blocking
 
   test:
     name: Test (Python ${{ matrix.python-version }})

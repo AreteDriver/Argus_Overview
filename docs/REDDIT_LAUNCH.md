@@ -64,7 +64,7 @@ cd Argus_Overview && ./install.sh
 
 **Requirements:**
 - Linux with X11 (Wayland works via XWayland)
-- Python 3.8+
+- Python 3.10+
 - wmctrl, xdotool, ImageMagick
 
 **Windows users:** Check the releases page for the Windows .exe build.

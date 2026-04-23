@@ -100,7 +100,7 @@ Argus is MIT-licensed open source. No account linking, no third-party servers, n
 ### Technical Details
 
 Built with:
-- Python 3.8+ / PySide6 (Qt)
+- Python 3.10+ / PySide6 (Qt)
 - Native X11 window management (python-xlib, wmctrl, xdotool)
 - 1,500+ automated tests, 96% code coverage
 
