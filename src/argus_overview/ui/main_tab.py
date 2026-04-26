@@ -1284,12 +1284,15 @@ class WindowPreviewWidget(QWidget):
         # Build context menu from ActionRegistry
         context_builder = ContextMenuBuilder()
 
-        # Handler map for context actions
+        # Handler map for context actions. toggle_replay_strip was added
+        # to the registry as a tier-3 WINDOW_CONTEXT action; it joins the
+        # other handlers here.
         handlers = {
             "focus_window": lambda: self.window_activated.emit(self.window_id),
             "minimize_window": self._minimize_window,
             "close_window": self._close_window,
             "set_label": self._show_label_dialog,
+            "toggle_replay_strip": self._toggle_replay_strip,
             "remove_from_preview": lambda: self.window_removed.emit(self.window_id),
         }
 
@@ -1299,17 +1302,6 @@ class WindowPreviewWidget(QWidget):
             current_zoom=self.zoom_factor,
             parent=self,
         )
-
-        # PR10: replay-strip toggle. Added directly here rather than via
-        # ActionRegistry because the action is per-widget state, not a
-        # global tier-1 / tier-2 action — registering it as a tier-3
-        # CONTEXT action would force a registry refactor for one toggle.
-        menu.addSeparator()
-        replay_label = (
-            "Hide replay strip" if self.is_replay_strip_enabled() else "Show replay strip"
-        )
-        replay_action = menu.addAction(replay_label)
-        replay_action.triggered.connect(self._toggle_replay_strip)
 
         menu.exec(event.globalPos())
 
