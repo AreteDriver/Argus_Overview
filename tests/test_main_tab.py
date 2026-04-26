@@ -10471,3 +10471,242 @@ class TestWindowManagerPassesDistanceToFrame:
         alice.set_threat_state.assert_called_once_with(
             ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5, distance=None
         )
+
+
+# =============================================================================
+# Replay strip integration on WindowPreviewWidget (PR10)
+# =============================================================================
+
+
+def _replay_widget(qapp, settings_manager=None):
+    from argus_overview.ui.main_tab import WindowPreviewWidget
+
+    return WindowPreviewWidget(
+        window_id="0xABC",
+        character_name="ReplayPilot",
+        capture_system=MagicMock(),
+        settings_manager=settings_manager,
+    )
+
+
+def _fake_pixmap(color=Qt.GlobalColor.red):
+    from PySide6.QtGui import QPixmap
+
+    pm = QPixmap(200, 150)
+    pm.fill(color)
+    return pm
+
+
+class TestWindowPreviewReplayBuffer:
+    def test_buffer_starts_empty(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            assert len(widget._replay_buffer) == 0
+        finally:
+            widget.deleteLater()
+
+    def test_sample_appends_one_frame(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget._sample_replay_buffer(_fake_pixmap())
+            assert len(widget._replay_buffer) == 1
+        finally:
+            widget.deleteLater()
+
+    def test_sample_throttled(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            widget._sample_replay_buffer(_fake_pixmap())
+            # Pretend no time has passed by leaving _replay_last_sample_ms as set
+            widget._sample_replay_buffer(_fake_pixmap())
+            # Throttled — still one
+            assert len(widget._replay_buffer) == 1
+
+            # Advance past the throttle window
+            widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+            widget._sample_replay_buffer(_fake_pixmap())
+            assert len(widget._replay_buffer) == 2
+        finally:
+            widget.deleteLater()
+
+    def test_buffer_respects_maxlen(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_BUFFER_SIZE, REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            for _ in range(REPLAY_BUFFER_SIZE * 2):
+                widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+                widget._sample_replay_buffer(_fake_pixmap())
+            assert len(widget._replay_buffer) == REPLAY_BUFFER_SIZE
+        finally:
+            widget.deleteLater()
+
+    def test_null_pixmap_skipped(self, qapp):
+        from PySide6.QtGui import QPixmap
+
+        widget = _replay_widget(qapp)
+        try:
+            widget._sample_replay_buffer(QPixmap())  # null
+            assert len(widget._replay_buffer) == 0
+        finally:
+            widget.deleteLater()
+
+
+class TestWindowPreviewReplayStripToggle:
+    def test_disabled_by_default(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            assert widget.is_replay_strip_enabled() is False
+            assert widget._replay_strip is None
+        finally:
+            widget.deleteLater()
+
+    def test_enable_creates_strip(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            assert widget.is_replay_strip_enabled() is True
+            assert widget._replay_strip is not None
+        finally:
+            widget.deleteLater()
+
+    def test_disable_destroys_strip(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            widget.enable_replay_strip(False)
+            assert widget.is_replay_strip_enabled() is False
+            assert widget._replay_strip is None
+        finally:
+            widget.deleteLater()
+
+    def test_enable_idempotent(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            strip_obj = widget._replay_strip
+            widget.enable_replay_strip(True)
+            # Same instance — second call is a no-op.
+            assert widget._replay_strip is strip_obj
+        finally:
+            widget.deleteLater()
+
+    def test_disable_clears_held_view_index(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            widget._replay_view_index = 2
+            widget.enable_replay_strip(False)
+            assert widget._replay_view_index is None
+        finally:
+            widget.deleteLater()
+
+    def test_enable_pushes_existing_buffer_to_strip(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            for _ in range(3):
+                widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+                widget._sample_replay_buffer(_fake_pixmap())
+
+            widget.enable_replay_strip(True)
+            assert widget._replay_strip.frame_count() == 3
+        finally:
+            widget.deleteLater()
+
+
+class TestWindowPreviewReplayHoverSwap:
+    def test_hover_index_swaps_image_label(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            for _ in range(3):
+                widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+                widget._sample_replay_buffer(_fake_pixmap())
+
+            widget.enable_replay_strip(True)
+            widget._on_replay_frame_hovered(1)
+
+            assert widget._replay_view_index == 1
+            assert widget.image_label.pixmap() is not None
+        finally:
+            widget.deleteLater()
+
+    def test_minus_one_restores_live(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            for _ in range(2):
+                widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+                widget._sample_replay_buffer(_fake_pixmap())
+
+            widget.current_pixmap = _fake_pixmap(color=Qt.GlobalColor.green)
+            widget.enable_replay_strip(True)
+            widget._on_replay_frame_hovered(0)
+            widget._on_replay_frame_hovered(-1)
+
+            assert widget._replay_view_index is None
+        finally:
+            widget.deleteLater()
+
+    def test_out_of_range_index_treated_as_minus_one(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            widget._replay_view_index = 0
+            widget._on_replay_frame_hovered(99)
+            assert widget._replay_view_index is None
+        finally:
+            widget.deleteLater()
+
+
+class TestWindowPreviewReplayPersistence:
+    def _settings_mock(self, replay_store):
+        """SettingsManager mock that returns differentiated values per key."""
+        sm = MagicMock()
+        sm.get.side_effect = lambda key, default=None: (
+            replay_store if key == "replay_strip_enabled" else default
+        )
+        return sm
+
+    def test_toggle_persists_to_settings(self, qapp):
+        sm = self._settings_mock({})
+
+        widget = _replay_widget(qapp, settings_manager=sm)
+        try:
+            widget._toggle_replay_strip()  # off → on
+            # set was called with the toggled-on dict
+            calls = sm.set.call_args_list
+            last = calls[-1]
+            assert last.args[0] == "replay_strip_enabled"
+            assert last.args[1] == {"ReplayPilot": True}
+        finally:
+            widget.deleteLater()
+
+    def test_toggle_off_removes_entry(self, qapp):
+        sm = self._settings_mock({"ReplayPilot": True})
+
+        widget = _replay_widget(qapp, settings_manager=sm)
+        try:
+            # Init turned strip on from settings; toggle should turn it off
+            assert widget.is_replay_strip_enabled() is True
+            widget._toggle_replay_strip()
+            calls = sm.set.call_args_list
+            last = calls[-1]
+            assert last.args[1] == {}  # entry removed
+        finally:
+            widget.deleteLater()
+
+    def test_init_restores_strip_from_settings(self, qapp):
+        sm = self._settings_mock({"ReplayPilot": True})
+
+        widget = _replay_widget(qapp, settings_manager=sm)
+        try:
+            assert widget.is_replay_strip_enabled() is True
+        finally:
+            widget.deleteLater()
