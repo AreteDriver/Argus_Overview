@@ -73,6 +73,11 @@ THREAT_DECAY_DURATION_MS = 30_000  # full fade time after last alert
 THREAT_PULSE_TICK_MS = 33  # ~30 fps pulse
 THREAT_PULSE_DURATION_MS = 600  # one pulse cycle
 
+# Replay strip (PR10) — small ring buffer of recent capture pixmaps.
+# 6 cells × 800ms throttle = ~5s of recent history.
+REPLAY_BUFFER_SIZE = 6
+REPLAY_THROTTLE_MS = 800
+
 # Per-character accent palette (PR8). Shared by both frames + chips so
 # the same character renders in the same color across the preview grid
 # and the status dock. Palette is fixed-length; deterministic hash maps
@@ -687,6 +692,16 @@ class WindowPreviewWidget(QWidget):
         self._flash_timer.setSingleShot(True)
         self._flash_timer.timeout.connect(self._clear_flash)
 
+        # PR10: replay strip — bounded ring buffer of recent frame pixmaps,
+        # sampled at most once per REPLAY_THROTTLE_MS so the buffer covers
+        # ~5 seconds of capture even at high refresh rates.
+        from collections import deque
+
+        self._replay_buffer: deque = deque(maxlen=REPLAY_BUFFER_SIZE)
+        self._replay_last_sample_ms: int = 0
+        self._replay_strip = None  # type: ignore[var-annotated]
+        self._replay_view_index: int | None = None  # None = live; int = buffered
+
         # Setup UI
         self.setMinimumSize(200, 150)
         self.setMaximumSize(600, 450)
@@ -737,6 +752,16 @@ class WindowPreviewWidget(QWidget):
         # Cached size constraints so we can restore them when leaving focus.
         self._normal_min_size: QSize = self.minimumSize()
         self._normal_max_size: QSize = self.maximumSize()
+
+        # PR10: restore the replay-strip toggle from settings if it was
+        # previously enabled for this character.
+        if self.settings_manager is not None:
+            try:
+                store = self.settings_manager.get("replay_strip_enabled", {}) or {}
+                if isinstance(store, dict) and store.get(self.character_name):
+                    self.enable_replay_strip(True)
+            except (AttributeError, TypeError):
+                pass
 
     def _load_settings(self):
         """Load settings from settings_manager"""
@@ -799,6 +824,17 @@ class WindowPreviewWidget(QWidget):
             # Convert to pixmap — release the previous one first
             self.current_pixmap = QPixmap.fromImage(qimage)
             del qimage  # Release intermediate QImage memory
+
+            # PR10: sample into the replay ring buffer at most once per
+            # REPLAY_THROTTLE_MS so the buffer covers ~5s regardless of
+            # capture rate. Only sample the unscaled pixmap; the strip
+            # rescales itself for display.
+            self._sample_replay_buffer(self.current_pixmap)
+
+            # If the user is currently scrubbing through the strip, hold
+            # the buffered view — don't overwrite it with the live frame.
+            if getattr(self, "_replay_view_index", None) is not None:
+                return
 
             # Scale to fit widget while maintaining aspect ratio
             scaled_pixmap = self.current_pixmap.scaled(
@@ -1022,6 +1058,81 @@ class WindowPreviewWidget(QWidget):
         self._flash_color = None
         self.update()
 
+    # ----- PR10 replay strip ------------------------------------------------
+    def _sample_replay_buffer(self, pixmap: QPixmap) -> None:
+        """Throttle-sample a captured pixmap into the ring buffer."""
+        if pixmap is None or pixmap.isNull():
+            return
+        # Defensive: bypassed-init test helpers may not set these.
+        if not hasattr(self, "_replay_buffer"):
+            return
+        now_ms = int(time.monotonic() * 1000)
+        if now_ms - getattr(self, "_replay_last_sample_ms", 0) < REPLAY_THROTTLE_MS:
+            return
+        # Store an immutable copy at modest size; full-res pixmaps would
+        # blow up memory across many widgets. 240×180 keeps it ~170KB max.
+        thumb = pixmap.scaled(
+            240,
+            180,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
+        self._replay_buffer.append(thumb)
+        self._replay_last_sample_ms = now_ms
+        if self._replay_strip is not None:
+            try:
+                self._replay_strip.set_frames(list(self._replay_buffer))
+            except RuntimeError:
+                self._replay_strip = None
+
+    def is_replay_strip_enabled(self) -> bool:
+        return getattr(self, "_replay_strip", None) is not None
+
+    def enable_replay_strip(self, enabled: bool) -> None:
+        """Show or hide the replay strip below the main image."""
+        if enabled and self._replay_strip is None:
+            from argus_overview.ui.replay_strip import ReplayStrip
+
+            self._replay_strip = ReplayStrip(parent=self)
+            self._replay_strip.frame_hovered.connect(self._on_replay_frame_hovered)
+            # Append below the existing image_label / info_label / timer.
+            self.layout().addWidget(self._replay_strip)
+            self._replay_strip.set_frames(list(self._replay_buffer))
+        elif not enabled and self._replay_strip is not None:
+            try:
+                self._replay_strip.frame_hovered.disconnect(self._on_replay_frame_hovered)
+            except (RuntimeError, TypeError):
+                pass
+            self.layout().removeWidget(self._replay_strip)
+            self._replay_strip.deleteLater()
+            self._replay_strip = None
+            # Drop any held buffered view.
+            self._replay_view_index = None
+
+    def _on_replay_frame_hovered(self, idx: int) -> None:
+        """Swap the main image label between live capture and a buffered frame."""
+        if idx < 0 or idx >= len(self._replay_buffer):
+            self._replay_view_index = None
+            # Restore the live capture if we have one cached.
+            if self.current_pixmap is not None and not self.current_pixmap.isNull():
+                scaled = self.current_pixmap.scaled(
+                    self.image_label.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.FastTransformation,
+                )
+                self.image_label.setPixmap(scaled)
+            return
+        self._replay_view_index = idx
+        buffered = self._replay_buffer[idx]
+        if buffered is None or buffered.isNull():
+            return
+        scaled = buffered.scaled(
+            self.image_label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
+        self.image_label.setPixmap(scaled)
+
     def paintEvent(self, event):
         """Custom paint: accent, threat border, focus dot, lock icon, flash."""
         super().paintEvent(event)
@@ -1189,7 +1300,35 @@ class WindowPreviewWidget(QWidget):
             parent=self,
         )
 
+        # PR10: replay-strip toggle. Added directly here rather than via
+        # ActionRegistry because the action is per-widget state, not a
+        # global tier-1 / tier-2 action — registering it as a tier-3
+        # CONTEXT action would force a registry refactor for one toggle.
+        menu.addSeparator()
+        replay_label = (
+            "Hide replay strip" if self.is_replay_strip_enabled() else "Show replay strip"
+        )
+        replay_action = menu.addAction(replay_label)
+        replay_action.triggered.connect(self._toggle_replay_strip)
+
         menu.exec(event.globalPos())
+
+    def _toggle_replay_strip(self) -> None:
+        """Flip the replay strip on/off and persist the choice per character."""
+        new_state = not self.is_replay_strip_enabled()
+        self.enable_replay_strip(new_state)
+        if self.settings_manager is not None:
+            try:
+                store = self.settings_manager.get("replay_strip_enabled", {}) or {}
+                if not isinstance(store, dict):
+                    store = {}
+                if new_state:
+                    store[self.character_name] = True
+                else:
+                    store.pop(self.character_name, None)
+                self.settings_manager.set("replay_strip_enabled", store)
+            except (AttributeError, TypeError) as e:
+                self.logger.debug(f"Failed to persist replay-strip toggle: {e}")
 
     def _show_label_dialog(self):
         """Show dialog to set custom label"""
