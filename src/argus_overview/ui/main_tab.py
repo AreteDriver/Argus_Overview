@@ -48,9 +48,30 @@ from PySide6.QtWidgets import (
 )
 
 from argus_overview.core.discovery import scan_eve_windows
+from argus_overview.intel.parser import ThreatLevel
 from argus_overview.ui.action_registry import PrimaryHome
 from argus_overview.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
 from argus_overview.utils.screen import ScreenGeometry, get_screen_geometry
+
+# Threat-tint config — tuned for a glanceable but non-distracting frame
+THREAT_BORDER_COLORS: dict[ThreatLevel, tuple[int, int, int]] = {
+    ThreatLevel.CLEAR: (0, 200, 100),
+    ThreatLevel.INFO: (0, 180, 230),
+    ThreatLevel.WARNING: (255, 170, 0),
+    ThreatLevel.DANGER: (255, 90, 30),
+    ThreatLevel.CRITICAL: (255, 40, 40),
+}
+THREAT_LEVEL_RANK: dict[ThreatLevel, int] = {
+    ThreatLevel.CLEAR: 0,
+    ThreatLevel.INFO: 1,
+    ThreatLevel.WARNING: 2,
+    ThreatLevel.DANGER: 3,
+    ThreatLevel.CRITICAL: 4,
+}
+THREAT_DECAY_TICK_MS = 100  # decay tick rate
+THREAT_DECAY_DURATION_MS = 30_000  # full fade time after last alert
+THREAT_PULSE_TICK_MS = 33  # ~30 fps pulse
+THREAT_PULSE_DURATION_MS = 600  # one pulse cycle
 
 # Module-level constant: avoids re-creating the dict on every pil_to_qimage call
 _FORMAT_MAP = {
@@ -606,6 +627,27 @@ class WindowPreviewWidget(QWidget):
         self._show_session_timer = False
         self._load_settings()
 
+        # Intel threat state (PR1: intel-aware preview borders)
+        self._threat_level: ThreatLevel | None = None
+        self._threat_system: str | None = None
+        # Decay alpha drives the inset border; ranges 0.0 (off) to 1.0 (full)
+        self._threat_alpha: float = 0.0
+        self._threat_decay_steps: int = max(1, THREAT_DECAY_DURATION_MS // THREAT_DECAY_TICK_MS)
+        self._threat_decay_timer = QTimer(self)
+        self._threat_decay_timer.timeout.connect(self._tick_threat_decay)
+
+        # Pulse animation (oneshot on transition into danger/critical)
+        self._pulse_phase: float = 0.0  # 1.0 -> 0.0 over PULSE_DURATION
+        self._pulse_steps: int = max(1, THREAT_PULSE_DURATION_MS // THREAT_PULSE_TICK_MS)
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.timeout.connect(self._tick_pulse)
+
+        # Legacy flash_border state (retains existing border_flash_requested wiring)
+        self._flash_color: QColor | None = None
+        self._flash_timer = QTimer(self)
+        self._flash_timer.setSingleShot(True)
+        self._flash_timer.timeout.connect(self._clear_flash)
+
         # Setup UI
         self.setMinimumSize(200, 150)
         self.setMaximumSize(600, 450)
@@ -803,14 +845,117 @@ class WindowPreviewWidget(QWidget):
 
         super().leaveEvent(event)
 
+    def set_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> None:
+        """
+        Update the intel threat state for this preview frame.
+
+        Args:
+            level: Threat level. None or CLEAR clears the border.
+            system: System name the threat refers to (kept for tooltip + dock).
+        """
+        prev_level = self._threat_level
+
+        if level is None or level == ThreatLevel.CLEAR:
+            self._threat_level = None
+            self._threat_system = None
+            self._threat_alpha = 0.0
+            self._threat_decay_timer.stop()
+            self.update()
+            return
+
+        self._threat_level = level
+        self._threat_system = system
+        self._threat_alpha = 1.0
+
+        # Pulse on upgrade into danger/critical
+        upgraded = prev_level is None or THREAT_LEVEL_RANK.get(
+            prev_level, 0
+        ) < THREAT_LEVEL_RANK.get(level, 0)
+        if upgraded and level in (ThreatLevel.DANGER, ThreatLevel.CRITICAL):
+            self._start_pulse()
+
+        # Restart decay timer
+        self._threat_decay_timer.start(THREAT_DECAY_TICK_MS)
+        self.update()
+
+    def _tick_threat_decay(self) -> None:
+        """Linear decay of the threat-border alpha."""
+        if self._threat_alpha <= 0.0:
+            self._threat_decay_timer.stop()
+            return
+        self._threat_alpha = max(0.0, self._threat_alpha - 1.0 / self._threat_decay_steps)
+        if self._threat_alpha <= 0.0:
+            self._threat_level = None
+            self._threat_system = None
+            self._threat_decay_timer.stop()
+        self.update()
+
+    def _start_pulse(self) -> None:
+        """Trigger a single pulse cycle on upgrade to danger/critical."""
+        self._pulse_phase = 1.0
+        self._pulse_timer.start(THREAT_PULSE_TICK_MS)
+
+    def _tick_pulse(self) -> None:
+        """Decrement pulse phase toward 0; stop when done."""
+        self._pulse_phase = max(0.0, self._pulse_phase - 1.0 / self._pulse_steps)
+        if self._pulse_phase <= 0.0:
+            self._pulse_timer.stop()
+        self.update()
+
+    def flash_border(self, color: str, duration_ms: int) -> None:
+        """
+        Legacy color/duration border flash hook used by border_flash_requested.
+
+        Kept independent of set_threat_state so callers without IntelReport
+        context still get visual feedback.
+        """
+        self._flash_color = QColor(color)
+        self._flash_timer.start(max(0, int(duration_ms)))
+        self.update()
+
+    def _clear_flash(self) -> None:
+        self._flash_color = None
+        self.update()
+
     def paintEvent(self, event):
-        """Custom paint for activity indicator"""
+        """Custom paint: threat border, focus dot, lock icon, legacy flash."""
         super().paintEvent(event)
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Draw activity indicator (v2.2)
+        # 1. Threat-tint border (PR1) — drawn first so dot/lock paint over it
+        if self._threat_level is not None and self._threat_alpha > 0.0:
+            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            base_alpha = int(220 * self._threat_alpha)
+            # Pulse adds an extra alpha kick for the first ~600ms after upgrade
+            pulse_boost = int(35 * self._pulse_phase)
+            alpha = max(0, min(255, base_alpha + pulse_boost))
+            border_color = QColor(r, g, b, alpha)
+            pen_width = 3 + int(2 * self._pulse_phase)  # 3px → 5px during pulse
+            pen = QPen(border_color)
+            pen.setWidth(pen_width)
+            painter.setPen(pen)
+            painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            inset = pen_width // 2 + 1
+            painter.drawRoundedRect(
+                inset,
+                inset,
+                self.width() - 2 * inset,
+                self.height() - 2 * inset,
+                4,
+                4,
+            )
+
+        # 2. Legacy flash overlay (compat with border_flash_requested)
+        if self._flash_color is not None:
+            pen = QPen(self._flash_color)
+            pen.setWidth(3)
+            painter.setPen(pen)
+            painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
+
+        # 3. Activity indicator (v2.2)
         if self._show_activity_indicator:
             activity = self.get_activity_state()
             if activity == "focused":
@@ -825,7 +970,7 @@ class WindowPreviewWidget(QWidget):
             painter.setPen(QPen(Qt.PenStyle.NoPen))
             painter.drawEllipse(self.width() - 14, 6, 8, 8)
 
-        # Draw lock icon if positions are locked
+        # 4. Lock icon if positions are locked
         if self._positions_locked:
             painter.setPen(QPen(QColor(200, 200, 200, 180)))
             painter.drawText(6, 14, "🔒")
@@ -1035,6 +1180,23 @@ class WindowManager:
             frame.deleteLater()
 
             self.logger.info(f"Removed window {window_id} from preview")
+
+    def apply_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> int:
+        """
+        Fan out an intel threat state to every preview frame.
+
+        Until per-character system tracking lands, every frame shares the
+        same state. Returns the count of frames updated for tests + logs.
+        """
+        count = 0
+        for frame in list(self.preview_frames.values()):
+            try:
+                frame.set_threat_state(level, system)
+                count += 1
+            except RuntimeError:
+                # Widget already deleted by Qt — skip
+                continue
+        return count
 
     def _capture_cycle(self):
         """

@@ -9040,3 +9040,367 @@ class TestOnWindowActivatedException:
             tab._on_window_activated("0x123")
 
             tab.logger.error.assert_called_once()
+
+
+# =============================================================================
+# Threat-Tint Border Tests (PR1: intel-aware preview borders)
+# =============================================================================
+
+
+def _make_widget_for_threat_tests():
+    """Bypass __init__ and seed only the threat-related state."""
+    from argus_overview.ui.main_tab import (
+        THREAT_DECAY_DURATION_MS,
+        THREAT_DECAY_TICK_MS,
+        THREAT_PULSE_DURATION_MS,
+        THREAT_PULSE_TICK_MS,
+        WindowPreviewWidget,
+    )
+
+    widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+    widget._threat_level = None
+    widget._threat_system = None
+    widget._threat_alpha = 0.0
+    widget._threat_decay_steps = max(1, THREAT_DECAY_DURATION_MS // THREAT_DECAY_TICK_MS)
+    widget._threat_decay_timer = MagicMock()
+    widget._pulse_phase = 0.0
+    widget._pulse_steps = max(1, THREAT_PULSE_DURATION_MS // THREAT_PULSE_TICK_MS)
+    widget._pulse_timer = MagicMock()
+    widget._flash_color = None
+    widget._flash_timer = MagicMock()
+    widget.update = MagicMock()
+    return widget
+
+
+class TestWindowPreviewWidgetThreatState:
+    """Tests for set_threat_state, decay, pulse, and flash_border."""
+
+    def test_set_threat_state_stores_level_and_system(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.WARNING, "HED-GP")
+
+        assert widget._threat_level == ThreatLevel.WARNING
+        assert widget._threat_system == "HED-GP"
+        assert widget._threat_alpha == 1.0
+        widget._threat_decay_timer.start.assert_called_once()
+        widget.update.assert_called()
+
+    def test_set_threat_state_clear_resets(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget._threat_level = ThreatLevel.DANGER
+        widget._threat_system = "HED-GP"
+        widget._threat_alpha = 0.7
+
+        widget.set_threat_state(ThreatLevel.CLEAR)
+
+        assert widget._threat_level is None
+        assert widget._threat_system is None
+        assert widget._threat_alpha == 0.0
+        widget._threat_decay_timer.stop.assert_called_once()
+
+    def test_set_threat_state_none_resets(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget._threat_level = ThreatLevel.DANGER
+        widget._threat_alpha = 0.5
+
+        widget.set_threat_state(None)
+
+        assert widget._threat_level is None
+        assert widget._threat_alpha == 0.0
+
+    def test_pulse_triggers_on_upgrade_to_danger(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.WARNING, "HED-GP")
+        widget._pulse_timer.start.reset_mock()
+
+        widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert widget._pulse_phase == 1.0
+        widget._pulse_timer.start.assert_called_once()
+
+    def test_pulse_triggers_on_first_critical(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.CRITICAL, "Jita")
+
+        assert widget._pulse_phase == 1.0
+        widget._pulse_timer.start.assert_called_once()
+
+    def test_pulse_does_not_trigger_on_warning(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.WARNING, "Jita")
+
+        assert widget._pulse_phase == 0.0
+        widget._pulse_timer.start.assert_not_called()
+
+    def test_pulse_does_not_re_trigger_on_same_level(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+        widget._pulse_timer.start.reset_mock()
+        widget._pulse_phase = 0.0  # pulse already finished
+
+        widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        widget._pulse_timer.start.assert_not_called()
+
+    def test_decay_tick_reduces_alpha(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget._threat_level = ThreatLevel.WARNING
+        widget._threat_alpha = 1.0
+
+        widget._tick_threat_decay()
+
+        assert widget._threat_alpha < 1.0
+        assert widget._threat_alpha > 0.0
+        widget.update.assert_called()
+
+    def test_decay_clears_state_at_zero(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget._threat_level = ThreatLevel.WARNING
+        widget._threat_system = "HED-GP"
+        widget._threat_decay_steps = 2  # tighten so 2 ticks fully drains
+        widget._threat_alpha = 1.0 / widget._threat_decay_steps  # near zero
+
+        widget._tick_threat_decay()
+
+        assert widget._threat_alpha == 0.0
+        assert widget._threat_level is None
+        assert widget._threat_system is None
+        widget._threat_decay_timer.stop.assert_called()
+
+    def test_decay_tick_at_zero_stops_timer(self):
+        widget = _make_widget_for_threat_tests()
+        widget._threat_alpha = 0.0
+
+        widget._tick_threat_decay()
+
+        widget._threat_decay_timer.stop.assert_called_once()
+
+    def test_pulse_tick_decrements_phase(self):
+        widget = _make_widget_for_threat_tests()
+        widget._pulse_phase = 1.0
+
+        widget._tick_pulse()
+
+        assert widget._pulse_phase < 1.0
+        widget.update.assert_called()
+
+    def test_pulse_tick_at_zero_stops_timer(self):
+        widget = _make_widget_for_threat_tests()
+        widget._pulse_steps = 2
+        widget._pulse_phase = 1.0 / widget._pulse_steps  # near zero
+
+        widget._tick_pulse()
+
+        assert widget._pulse_phase == 0.0
+        widget._pulse_timer.stop.assert_called_once()
+
+    def test_flash_border_sets_color_and_starts_timer(self):
+        from PySide6.QtGui import QColor
+
+        widget = _make_widget_for_threat_tests()
+        widget.flash_border("#FF0000", 2000)
+
+        assert isinstance(widget._flash_color, QColor)
+        widget._flash_timer.start.assert_called_once_with(2000)
+        widget.update.assert_called()
+
+    def test_flash_border_with_negative_duration_clamped_to_zero(self):
+        widget = _make_widget_for_threat_tests()
+        widget.flash_border("#FF0000", -100)
+
+        widget._flash_timer.start.assert_called_once_with(0)
+
+    def test_clear_flash_resets_color(self):
+        from PySide6.QtGui import QColor
+
+        widget = _make_widget_for_threat_tests()
+        widget._flash_color = QColor("#FF0000")
+
+        widget._clear_flash()
+
+        assert widget._flash_color is None
+        widget.update.assert_called()
+
+
+class TestWindowManagerApplyThreatState:
+    """Tests for WindowManager.apply_threat_state fan-out."""
+
+    def test_apply_threat_state_fans_out_to_all_frames(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            f1, f2, f3 = MagicMock(), MagicMock(), MagicMock()
+            manager.preview_frames = {"w1": f1, "w2": f2, "w3": f3}
+
+            count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 3
+            f1.set_threat_state.assert_called_once_with(ThreatLevel.DANGER, "HED-GP")
+            f2.set_threat_state.assert_called_once_with(ThreatLevel.DANGER, "HED-GP")
+            f3.set_threat_state.assert_called_once_with(ThreatLevel.DANGER, "HED-GP")
+
+    def test_apply_threat_state_empty_frames(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            manager.preview_frames = {}
+
+            count = manager.apply_threat_state(ThreatLevel.WARNING, "Jita")
+
+            assert count == 0
+
+    def test_apply_threat_state_skips_deleted_widgets(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            ok = MagicMock()
+            dead = MagicMock()
+            dead.set_threat_state.side_effect = RuntimeError("widget deleted")
+            manager.preview_frames = {"alive": ok, "dead": dead}
+
+            count = manager.apply_threat_state(ThreatLevel.WARNING, "Jita")
+
+            assert count == 1
+            ok.set_threat_state.assert_called_once()
+
+    def test_apply_threat_state_clear_propagates(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            f1 = MagicMock()
+            manager.preview_frames = {"w1": f1}
+
+            manager.apply_threat_state(ThreatLevel.CLEAR, None)
+
+            f1.set_threat_state.assert_called_once_with(ThreatLevel.CLEAR, None)
+
+
+class TestWindowPreviewWidgetPaintWithThreat:
+    """Smoke tests that paintEvent runs without crashing across threat states."""
+
+    def _build_real_widget(self):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        capture_system = MagicMock()
+        widget = WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=capture_system,
+        )
+        widget.resize(200, 150)
+        return widget
+
+    def test_paint_event_no_threat_does_not_crash(self):
+        widget = self._build_real_widget()
+        try:
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+    def test_paint_event_with_threat_does_not_crash(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._build_real_widget()
+        try:
+            widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+    def test_paint_event_with_flash_does_not_crash(self):
+        widget = self._build_real_widget()
+        try:
+            widget.flash_border("#FF0000", 1000)
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+
+class TestMainWindowV21IntelAlertThreatFanout:
+    """Wiring test: _on_intel_alert routes VISUAL_BORDER alerts to fan-out."""
+
+    def test_visual_border_alert_calls_apply_threat_state(self):
+        from argus_overview.intel.alerts import AlertType
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.system_tray = MagicMock()  # avoid critical-tray branch firing extra calls
+
+        report = IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.DANGER,
+            hostile_count=3,
+            ship_types=["sabre"],
+            player_names=[],
+            raw_message="hostiles HED-GP +3",
+        )
+
+        window._on_intel_alert(report, AlertType.VISUAL_BORDER)
+
+        window.main_tab.window_manager.apply_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP"
+        )
+
+    def test_non_border_alert_does_not_fan_out(self):
+        from argus_overview.intel.alerts import AlertType
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.system_tray = MagicMock()
+
+        report = IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.WARNING,
+            hostile_count=1,
+            ship_types=[],
+            player_names=[],
+            raw_message="neut HED-GP",
+        )
+
+        window._on_intel_alert(report, AlertType.AUDIO)
+
+        window.main_tab.window_manager.apply_threat_state.assert_not_called()
+
+    def test_non_intel_report_ignored(self):
+        from argus_overview.intel.alerts import AlertType
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+
+        window._on_intel_alert("not a report", AlertType.VISUAL_BORDER)
+
+        window.main_tab.window_manager.apply_threat_state.assert_not_called()

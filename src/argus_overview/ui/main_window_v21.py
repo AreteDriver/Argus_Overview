@@ -653,10 +653,19 @@ class MainWindowV21(QMainWindow):
     @Slot(object, object)
     def _on_intel_alert(self, report, alert_type):
         """Handle intel alert from intel tab."""
+        from argus_overview.intel.alerts import AlertType
         from argus_overview.intel.parser import IntelReport
 
         if not isinstance(report, IntelReport):
             return
+
+        # Fan out threat state to preview frames once per report
+        # (filter on VISUAL_BORDER so we only trigger on a single AlertType
+        # emission per report, not on every type the dispatcher fires).
+        if alert_type == AlertType.VISUAL_BORDER and hasattr(self, "main_tab"):
+            window_manager = getattr(self.main_tab, "window_manager", None)
+            if window_manager is not None and hasattr(window_manager, "apply_threat_state"):
+                window_manager.apply_threat_state(report.threat_level, report.system)
 
         # Show tray notification for critical alerts
         if report.threat_level.value == "critical":
