@@ -195,6 +195,95 @@ class TestAppearancePanel:
         assert hasattr(AppearancePanel, "setting_changed")
 
 
+class TestIntelPanel:
+    """Tests for IntelPanel (v3.2.0 chrome controls)."""
+
+    def _settings_mock(self, overrides=None):
+        """Per-key settings mock so unrelated lookups return their defaults."""
+        store = {
+            "intel.track_character_locations": True,
+            "intel.threat_jumps_threshold": 1,
+            "replay_strip_enabled": {},
+        }
+        if overrides:
+            store.update(overrides)
+        sm = MagicMock()
+        sm.get.side_effect = lambda key, default=None: store.get(key, default)
+        return sm
+
+    def test_signal_exists(self):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        assert hasattr(IntelPanel, "setting_changed")
+
+    def test_init_reads_defaults(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        try:
+            assert panel.track_locations_check.isChecked() is True
+            assert panel.jumps_threshold_spin.value() == 1
+        finally:
+            panel.deleteLater()
+
+    def test_init_reads_overridden_values(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock(
+            {
+                "intel.track_character_locations": False,
+                "intel.threat_jumps_threshold": 3,
+            }
+        )
+        panel = IntelPanel(sm)
+        try:
+            assert panel.track_locations_check.isChecked() is False
+            assert panel.jumps_threshold_spin.value() == 3
+        finally:
+            panel.deleteLater()
+
+    def test_track_locations_emits_signal(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        received: list[tuple[str, object]] = []
+        panel.setting_changed.connect(lambda k, v: received.append((k, v)))
+        try:
+            panel.track_locations_check.setChecked(False)
+            assert (
+                "intel.track_character_locations",
+                False,
+            ) in received
+        finally:
+            panel.deleteLater()
+
+    def test_jumps_threshold_emits_signal(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        received: list[tuple[str, object]] = []
+        panel.setting_changed.connect(lambda k, v: received.append((k, v)))
+        try:
+            panel.jumps_threshold_spin.setValue(2)
+            assert ("intel.threat_jumps_threshold", 2) in received
+        finally:
+            panel.deleteLater()
+
+    def test_jumps_threshold_clamped_to_range(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock({"intel.threat_jumps_threshold": 99})
+        panel = IntelPanel(sm)
+        try:
+            # Spinbox max is 5 — value should clamp on init.
+            assert panel.jumps_threshold_spin.value() == 5
+        finally:
+            panel.deleteLater()
+
+
 # Test AdvancedPanel
 class TestAdvancedPanel:
     """Tests for AdvancedPanel"""
@@ -994,12 +1083,14 @@ class TestSettingsTabSetupUI:
     @patch("argus_overview.ui.settings_tab.GeneralPanel")
     @patch("argus_overview.ui.settings_tab.PerformancePanel")
     @patch("argus_overview.ui.settings_tab.HotkeysPanel")
+    @patch("argus_overview.ui.settings_tab.IntelPanel")
     @patch("argus_overview.ui.settings_tab.AppearancePanel")
     @patch("argus_overview.ui.settings_tab.AdvancedPanel")
     def test_setup_ui_creates_all_panels(
         self,
         mock_adv,
         mock_app,
+        mock_intel,
         mock_hk,
         mock_perf,
         mock_gen,
@@ -1025,6 +1116,7 @@ class TestSettingsTabSetupUI:
                     assert mock_gen.called
                     assert mock_perf.called
                     assert mock_hk.called
+                    assert mock_intel.called
                     assert mock_app.called
                     assert mock_adv.called
 
