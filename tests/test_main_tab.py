@@ -10199,3 +10199,110 @@ class TestStatusDockJumpsFromFanout:
             assert dock._chips["0x1"]._threat_level is None
         finally:
             dock.deleteLater()
+
+
+# =============================================================================
+# Per-character accent border (PR8)
+# =============================================================================
+
+
+class TestCharacterAccentColor:
+    """Shared accent palette helper used by frames + chips."""
+
+    def test_deterministic(self):
+        from argus_overview.ui.main_tab import character_accent_color
+
+        assert character_accent_color("Pilot1").rgb() == character_accent_color("Pilot1").rgb()
+
+    def test_returns_qcolor(self):
+        from PySide6.QtGui import QColor
+
+        from argus_overview.ui.main_tab import character_accent_color
+
+        assert isinstance(character_accent_color("X"), QColor)
+
+    def test_palette_has_eight_entries(self):
+        from argus_overview.ui.main_tab import CHARACTER_ACCENT_COLORS
+
+        assert len(CHARACTER_ACCENT_COLORS) == 8
+
+
+class TestCharacterAccentChipFrameMatch:
+    """Same character → same color across the frame and the chip."""
+
+    def test_frame_and_chip_share_accent(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+        from argus_overview.ui.status_dock import CharacterChip
+
+        widget = WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            assert widget._accent_color.rgb() == chip._accent.rgb()
+        finally:
+            widget.deleteLater()
+            chip.deleteLater()
+
+    def test_legacy_chip_aliases_resolve_to_main_tab_helpers(self):
+        from argus_overview.ui.main_tab import (
+            CHARACTER_ACCENT_COLORS,
+            character_accent_color,
+        )
+        from argus_overview.ui.status_dock import CHIP_ACCENT_COLORS, accent_for
+
+        assert CHIP_ACCENT_COLORS is CHARACTER_ACCENT_COLORS
+        assert accent_for is character_accent_color
+
+
+class TestWindowPreviewAccentBorder:
+    """Frame paints the accent border only when no threat is active."""
+
+    def _make_widget(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        return WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+
+    def test_accent_color_set_on_init(self, qapp):
+        from PySide6.QtGui import QColor
+
+        widget = self._make_widget(qapp)
+        try:
+            assert isinstance(widget._accent_color, QColor)
+        finally:
+            widget.deleteLater()
+
+    def test_paint_clear_state_does_not_crash(self, qapp):
+        widget = self._make_widget(qapp)
+        try:
+            widget.resize(200, 150)
+            # No threat, no flash → accent border should paint
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+    def test_paint_with_threat_does_not_crash(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.resize(200, 150)
+            widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+    def test_paint_with_flash_does_not_crash(self, qapp):
+        widget = self._make_widget(qapp)
+        try:
+            widget.resize(200, 150)
+            widget.flash_border("#FF0000", 1000)
+            widget.repaint()
+        finally:
+            widget.deleteLater()

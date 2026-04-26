@@ -28,25 +28,16 @@ from PySide6.QtWidgets import (
 )
 
 from argus_overview.intel.parser import ThreatLevel
-from argus_overview.ui.main_tab import THREAT_BORDER_COLORS
+from argus_overview.ui.main_tab import (
+    CHARACTER_ACCENT_COLORS,
+    THREAT_BORDER_COLORS,
+    character_accent_color,
+)
 
-# Stable accent palette — same hue per character across sessions
-CHIP_ACCENT_COLORS: list[tuple[int, int, int]] = [
-    (255, 100, 100),
-    (100, 255, 100),
-    (100, 150, 255),
-    (255, 200, 80),
-    (220, 120, 220),
-    (100, 220, 220),
-    (255, 165, 60),
-    (170, 130, 255),
-]
-
-
-def accent_for(name: str) -> QColor:
-    """Deterministic accent color for a character name."""
-    r, g, b = CHIP_ACCENT_COLORS[abs(hash(name)) % len(CHIP_ACCENT_COLORS)]
-    return QColor(r, g, b)
+# Backward-compatible aliases — PR8 promoted these to main_tab.py so
+# frames + chips share one palette + helper. Public names preserved.
+CHIP_ACCENT_COLORS = CHARACTER_ACCENT_COLORS
+accent_for = character_accent_color
 
 
 def _initials(name: str) -> str:
