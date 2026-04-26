@@ -22,4 +22,8 @@ jobs:
           pip install -e ".[dev]"
           pip install pip-audit
       - name: Run pip-audit
-        run: pip-audit
+        # Ignore CVE-2026-3219 (pip itself) — no fix version available as
+        # of 2026-04-26. pip is the package manager, not a runtime dep, and
+        # the advisory has no upstream patch yet. Re-evaluate when a fix
+        # ships.
+        run: pip-audit --ignore-vuln CVE-2026-3219
