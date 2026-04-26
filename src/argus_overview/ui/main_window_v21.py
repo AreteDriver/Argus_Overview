@@ -659,13 +659,16 @@ class MainWindowV21(QMainWindow):
         if not isinstance(report, IntelReport):
             return
 
-        # Fan out threat state to preview frames once per report
+        # Fan out threat state to preview frames + status dock once per report
         # (filter on VISUAL_BORDER so we only trigger on a single AlertType
         # emission per report, not on every type the dispatcher fires).
         if alert_type == AlertType.VISUAL_BORDER and hasattr(self, "main_tab"):
             window_manager = getattr(self.main_tab, "window_manager", None)
             if window_manager is not None and hasattr(window_manager, "apply_threat_state"):
                 window_manager.apply_threat_state(report.threat_level, report.system)
+            status_dock = getattr(self.main_tab, "status_dock", None)
+            if status_dock is not None and hasattr(status_dock, "set_threat_state"):
+                status_dock.set_threat_state(report.threat_level, report.system)
 
         # Show tray notification for critical alerts
         if report.threat_level.value == "critical":

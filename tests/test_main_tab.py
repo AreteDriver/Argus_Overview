@@ -8446,6 +8446,7 @@ class TestMainTabSetupUi:
             mock_container = MagicMock()
             mock_flow_layout = MagicMock()
 
+            mock_status_dock = MagicMock()
             with patch("argus_overview.ui.main_tab.QVBoxLayout") as mock_vbox:
                 with patch("argus_overview.ui.main_tab.QScrollArea", return_value=mock_scroll):
                     with patch("argus_overview.ui.main_tab.QWidget", return_value=mock_container):
@@ -8453,29 +8454,33 @@ class TestMainTabSetupUi:
                             "argus_overview.ui.main_tab.FlowLayout",
                             return_value=mock_flow_layout,
                         ):
-                            mock_layout = MagicMock()
-                            mock_vbox.return_value = mock_layout
+                            with patch(
+                                "argus_overview.ui.status_dock.StatusDock",
+                                return_value=mock_status_dock,
+                            ):
+                                mock_layout = MagicMock()
+                                mock_vbox.return_value = mock_layout
 
-                            tab._setup_ui()
+                                tab._setup_ui()
 
-                            # Layout created and set
-                            tab.setLayout.assert_called_once_with(mock_layout)
+                                # Layout created and set
+                                tab.setLayout.assert_called_once_with(mock_layout)
 
-                            # Toolbar, layout controls, status bar created
-                            tab._create_toolbar.assert_called_once()
-                            tab._create_layout_controls.assert_called_once()
-                            tab._create_status_bar.assert_called_once()
+                                # Toolbar, layout controls, status bar created
+                                tab._create_toolbar.assert_called_once()
+                                tab._create_layout_controls.assert_called_once()
+                                tab._create_status_bar.assert_called_once()
 
-                            # Scroll area configured
-                            mock_scroll.setWidgetResizable.assert_called_once_with(True)
-                            mock_scroll.setWidget.assert_called_once_with(mock_container)
+                                # Scroll area configured
+                                mock_scroll.setWidgetResizable.assert_called_once_with(True)
+                                mock_scroll.setWidget.assert_called_once_with(mock_container)
 
-                            # Preview container and layout stored
-                            assert tab.preview_container is mock_container
-                            assert tab.preview_layout is mock_flow_layout
+                                # Preview container and layout stored
+                                assert tab.preview_container is mock_container
+                                assert tab.preview_layout is mock_flow_layout
 
-                            # All widgets added to layout
-                            assert mock_layout.addWidget.call_count == 4
+                                # 5 widgets added to layout (PR2 added status dock)
+                                assert mock_layout.addWidget.call_count == 5
 
 
 # =============================================================================

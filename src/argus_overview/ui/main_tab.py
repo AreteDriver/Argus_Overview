@@ -1351,6 +1351,18 @@ class MainTab(QWidget):
         layout_controls = self._create_layout_controls()
         layout.addWidget(layout_controls)
 
+        # PR2: Character status dock — chip strip with per-character system
+        # + threat dot. Clicking a chip focuses the matching window.
+        # Parent is set when the dock is added to the layout below.
+        from argus_overview.ui.status_dock import StatusDock
+
+        self.status_dock = StatusDock()
+        self.status_dock.chip_clicked.connect(self._on_window_activated)
+        sm = getattr(self, "settings_manager", None)
+        show_dock = sm.get("thumbnails.show_status_dock", True) if sm else True
+        self.status_dock.setVisible(show_dock)
+        layout.addWidget(self.status_dock)
+
         # Scroll area for preview frames
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -1368,6 +1380,16 @@ class MainTab(QWidget):
         # Status bar
         status_bar = self._create_status_bar()
         layout.addWidget(status_bar)
+
+    def _sync_status_dock(self) -> None:
+        """Mirror window_manager.preview_frames into the status dock."""
+        if not hasattr(self, "status_dock") or self.status_dock is None:
+            return
+        desired: dict[str, str] = {
+            wid: getattr(frame, "character_name", wid)
+            for wid, frame in self.window_manager.preview_frames.items()
+        }
+        self.status_dock.sync_from_window_ids(desired)
 
     def _create_toolbar(self) -> QWidget:
         """Create toolbar using ActionRegistry (v2.3)"""
@@ -1754,6 +1776,7 @@ class MainTab(QWidget):
             self.status_label.setText("No new EVE windows found")
 
         self._update_status()
+        self._sync_status_dock()
 
     def _toggle_lock(self):
         """Toggle thumbnail position lock"""
@@ -1849,6 +1872,7 @@ class MainTab(QWidget):
                 self._on_window_removed, Qt.ConnectionType.UniqueConnection
             )
             self.preview_layout.addWidget(frame)
+            self._sync_status_dock()
             return True
         return False
 
@@ -1957,6 +1981,7 @@ class MainTab(QWidget):
             frame.session_timer.stop()
         self.window_manager.remove_window(window_id)
         self._update_status()
+        self._sync_status_dock()
 
     def _remove_all_windows(self):
         """Remove all windows from preview"""
@@ -1977,6 +2002,7 @@ class MainTab(QWidget):
                 self.window_manager.remove_window(window_id)
 
             self._update_status()
+            self._sync_status_dock()
 
     def minimize_inactive_windows(self):
         """Toggle auto-minimize mode - when enabled, cycling minimizes previous window"""
