@@ -349,6 +349,8 @@ class ContextMenuBuilder:
             None,
             "zoom",
             None,
+            "toggle_replay_strip",
+            None,
             "remove_from_preview",
         ]
 

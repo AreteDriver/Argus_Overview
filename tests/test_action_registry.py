@@ -584,6 +584,15 @@ class TestRegistryActionCoverage:
         assert action.scope == ActionScope.OBJECT
         assert action.primary_home == PrimaryHome.WINDOW_CONTEXT
 
+    def test_toggle_replay_strip_action_exists(self):
+        """toggle_replay_strip context action should exist (PR10 follow-up)"""
+        registry = ActionRegistry.get_instance()
+        action = registry.get("toggle_replay_strip")
+        assert action is not None
+        assert action.scope == ActionScope.OBJECT
+        assert action.primary_home == PrimaryHome.WINDOW_CONTEXT
+        assert action.handler_name == "_toggle_replay_strip"
+
     def test_lock_positions_is_checkable(self):
         """lock_positions should be checkable"""
         registry = ActionRegistry.get_instance()
