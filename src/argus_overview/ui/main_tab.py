@@ -1152,6 +1152,10 @@ class WindowManager:
 
         # State
         self.preview_frames: dict[str, WindowPreviewWidget] = {}
+        # PR4: per-character current system, fed by CharacterLocationTracker.
+        # Survives window add/remove cycles. Used for chip system labels and
+        # (in a follow-up PR) smart per-character threat fan-out.
+        self._character_systems: dict[str, str] = {}
         self.pending_requests: dict[
             str, tuple[str, float]
         ] = {}  # request_id -> (window_id, timestamp)
@@ -1231,6 +1235,23 @@ class WindowManager:
             frame.deleteLater()
 
             self.logger.info(f"Removed window {window_id} from preview")
+
+    def set_character_system(self, character_name: str, system: str | None) -> None:
+        """
+        Record the current system for a character.
+
+        Stored on a per-character map (separate from preview_frames) so the
+        information survives across window add/remove cycles. PR4 uses this
+        only for storage + future smart fan-out; existing fan-out semantics
+        (one shared threat state) are unchanged.
+        """
+        if system is None:
+            self._character_systems.pop(character_name, None)
+        else:
+            self._character_systems[character_name] = system
+
+    def get_character_system(self, character_name: str) -> str | None:
+        return self._character_systems.get(character_name)
 
     def apply_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> int:
         """
@@ -1444,6 +1465,13 @@ class MainTab(QWidget):
             for wid, frame in self.window_manager.preview_frames.items()
         }
         self.status_dock.sync_from_window_ids(desired)
+
+        # PR4: seed chip system labels from cached per-character state so
+        # newly-added chips populate without waiting for the next location
+        # change event.
+        char_systems = getattr(self.window_manager, "_character_systems", {})
+        for char_name, system in char_systems.items():
+            self.status_dock.set_character_system(char_name, system)
 
     def _create_toolbar(self) -> QWidget:
         """Create toolbar using ActionRegistry (v2.3)"""
