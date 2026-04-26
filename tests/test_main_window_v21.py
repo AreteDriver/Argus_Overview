@@ -2335,6 +2335,7 @@ class TestMainWindowV21InitPartial:
             stack.enter_context(patch.object(MainWindowV21, "_connect_signals"))
             stack.enter_context(patch.object(MainWindowV21, "_create_system_tray"))
             stack.enter_context(patch.object(MainWindowV21, "_register_hotkeys"))
+            stack.enter_context(patch.object(MainWindowV21, "_init_location_tracker"))
             stack.enter_context(patch(f"{mod}.QTabWidget"))
             stack.enter_context(patch(f"{mod}.QVBoxLayout"))
             stack.enter_context(patch(f"{mod}.QWidget"))

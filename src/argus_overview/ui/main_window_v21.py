@@ -161,7 +161,57 @@ class MainWindowV21(QMainWindow):
             self.auto_discovery.character_gone.connect(self._on_character_gone)
             self.auto_discovery.start()
 
+        # PR4: per-character location tracker (Local channel logs)
+        self._init_location_tracker()
+
         self.logger.info("Main window v2.2 initialized successfully")
+
+    def _init_location_tracker(self) -> None:
+        """Start the per-character location tracker if enabled."""
+        from argus_overview.intel.character_location import CharacterLocationTracker
+
+        enabled = self.settings_manager.get("intel.track_character_locations", True)
+        if not enabled:
+            self.location_tracker = None
+            return
+        self.location_tracker = CharacterLocationTracker(parent=self)
+        self.location_tracker.character_system_changed.connect(self._on_character_system_changed)
+        self.location_tracker.start()
+
+        # PR6: wire one shared JumpCalculator into both threat fan-out paths
+        # so adjacent-system alerts also tint at reduced intensity. max_jumps
+        # is gated on intel.threat_jumps_threshold (default 1).
+        self._init_threat_jump_filter()
+
+    def _init_threat_jump_filter(self) -> None:
+        """Wire a shared JumpCalculator into the manager + dock fan-out."""
+        from argus_overview.intel.jumps import JumpCalculator
+
+        max_jumps = int(self.settings_manager.get("intel.threat_jumps_threshold", 1))
+        if max_jumps <= 0:
+            self.jump_calculator = None
+            return
+        self.jump_calculator = JumpCalculator()
+        if not hasattr(self, "main_tab"):
+            return
+        wm = getattr(self.main_tab, "window_manager", None)
+        if wm is not None and hasattr(wm, "set_jump_calculator"):
+            wm.set_jump_calculator(self.jump_calculator, max_jumps=max_jumps)
+        dock = getattr(self.main_tab, "status_dock", None)
+        if dock is not None and hasattr(dock, "set_jump_calculator"):
+            dock.set_jump_calculator(self.jump_calculator, max_jumps=max_jumps)
+
+    @Slot(str, str)
+    def _on_character_system_changed(self, character_name: str, system: str) -> None:
+        """Forward per-character system updates to the dock + window manager."""
+        if not hasattr(self, "main_tab"):
+            return
+        wm = getattr(self.main_tab, "window_manager", None)
+        if wm is not None and hasattr(wm, "set_character_system"):
+            wm.set_character_system(character_name, system)
+        dock = getattr(self.main_tab, "status_dock", None)
+        if dock is not None and hasattr(dock, "set_character_system"):
+            dock.set_character_system(character_name, system)
 
     def _create_system_tray(self):
         """Create system tray icon (v2.4 - uses ActionRegistry)"""
@@ -653,10 +703,22 @@ class MainWindowV21(QMainWindow):
     @Slot(object, object)
     def _on_intel_alert(self, report, alert_type):
         """Handle intel alert from intel tab."""
+        from argus_overview.intel.alerts import AlertType
         from argus_overview.intel.parser import IntelReport
 
         if not isinstance(report, IntelReport):
             return
+
+        # Fan out threat state to preview frames + status dock once per report
+        # (filter on VISUAL_BORDER so we only trigger on a single AlertType
+        # emission per report, not on every type the dispatcher fires).
+        if alert_type == AlertType.VISUAL_BORDER and hasattr(self, "main_tab"):
+            window_manager = getattr(self.main_tab, "window_manager", None)
+            if window_manager is not None and hasattr(window_manager, "apply_threat_state"):
+                window_manager.apply_threat_state(report.threat_level, report.system)
+            status_dock = getattr(self.main_tab, "status_dock", None)
+            if status_dock is not None and hasattr(status_dock, "set_threat_state"):
+                status_dock.set_threat_state(report.threat_level, report.system)
 
         # Show tray notification for critical alerts
         if report.threat_level.value == "critical":
@@ -1003,6 +1065,15 @@ class MainWindowV21(QMainWindow):
         # Stop systems
         if hasattr(self, "auto_discovery"):
             self.auto_discovery.stop()
+
+        if getattr(self, "location_tracker", None) is not None:
+            try:
+                self.location_tracker.character_system_changed.disconnect(
+                    self._on_character_system_changed
+                )
+            except (RuntimeError, TypeError):
+                pass
+            self.location_tracker.stop()
 
         if hasattr(self, "capture_system"):
             self.capture_system.stop()

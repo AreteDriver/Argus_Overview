@@ -8446,6 +8446,7 @@ class TestMainTabSetupUi:
             mock_container = MagicMock()
             mock_flow_layout = MagicMock()
 
+            mock_status_dock = MagicMock()
             with patch("argus_overview.ui.main_tab.QVBoxLayout") as mock_vbox:
                 with patch("argus_overview.ui.main_tab.QScrollArea", return_value=mock_scroll):
                     with patch("argus_overview.ui.main_tab.QWidget", return_value=mock_container):
@@ -8453,29 +8454,33 @@ class TestMainTabSetupUi:
                             "argus_overview.ui.main_tab.FlowLayout",
                             return_value=mock_flow_layout,
                         ):
-                            mock_layout = MagicMock()
-                            mock_vbox.return_value = mock_layout
+                            with patch(
+                                "argus_overview.ui.status_dock.StatusDock",
+                                return_value=mock_status_dock,
+                            ):
+                                mock_layout = MagicMock()
+                                mock_vbox.return_value = mock_layout
 
-                            tab._setup_ui()
+                                tab._setup_ui()
 
-                            # Layout created and set
-                            tab.setLayout.assert_called_once_with(mock_layout)
+                                # Layout created and set
+                                tab.setLayout.assert_called_once_with(mock_layout)
 
-                            # Toolbar, layout controls, status bar created
-                            tab._create_toolbar.assert_called_once()
-                            tab._create_layout_controls.assert_called_once()
-                            tab._create_status_bar.assert_called_once()
+                                # Toolbar, layout controls, status bar created
+                                tab._create_toolbar.assert_called_once()
+                                tab._create_layout_controls.assert_called_once()
+                                tab._create_status_bar.assert_called_once()
 
-                            # Scroll area configured
-                            mock_scroll.setWidgetResizable.assert_called_once_with(True)
-                            mock_scroll.setWidget.assert_called_once_with(mock_container)
+                                # Scroll area configured
+                                mock_scroll.setWidgetResizable.assert_called_once_with(True)
+                                mock_scroll.setWidget.assert_called_once_with(mock_container)
 
-                            # Preview container and layout stored
-                            assert tab.preview_container is mock_container
-                            assert tab.preview_layout is mock_flow_layout
+                                # Preview container and layout stored
+                                assert tab.preview_container is mock_container
+                                assert tab.preview_layout is mock_flow_layout
 
-                            # All widgets added to layout
-                            assert mock_layout.addWidget.call_count == 4
+                                # 5 widgets added to layout (PR2 added status dock)
+                                assert mock_layout.addWidget.call_count == 5
 
 
 # =============================================================================
@@ -9040,3 +9045,1668 @@ class TestOnWindowActivatedException:
             tab._on_window_activated("0x123")
 
             tab.logger.error.assert_called_once()
+
+
+# =============================================================================
+# Threat-Tint Border Tests (PR1: intel-aware preview borders)
+# =============================================================================
+
+
+def _make_widget_for_threat_tests():
+    """Bypass __init__ and seed only the threat-related state."""
+    from argus_overview.ui.main_tab import (
+        THREAT_DECAY_DURATION_MS,
+        THREAT_DECAY_TICK_MS,
+        THREAT_PULSE_DURATION_MS,
+        THREAT_PULSE_TICK_MS,
+        WindowPreviewWidget,
+    )
+
+    widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+    widget._threat_level = None
+    widget._threat_system = None
+    widget._threat_alpha = 0.0
+    widget._threat_decay_steps = max(1, THREAT_DECAY_DURATION_MS // THREAT_DECAY_TICK_MS)
+    widget._threat_decay_timer = MagicMock()
+    widget._pulse_phase = 0.0
+    widget._pulse_steps = max(1, THREAT_PULSE_DURATION_MS // THREAT_PULSE_TICK_MS)
+    widget._pulse_timer = MagicMock()
+    widget._flash_color = None
+    widget._flash_timer = MagicMock()
+    widget.update = MagicMock()
+    return widget
+
+
+class TestWindowPreviewWidgetThreatState:
+    """Tests for set_threat_state, decay, pulse, and flash_border."""
+
+    def test_set_threat_state_stores_level_and_system(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.WARNING, "HED-GP")
+
+        assert widget._threat_level == ThreatLevel.WARNING
+        assert widget._threat_system == "HED-GP"
+        assert widget._threat_alpha == 1.0
+        widget._threat_decay_timer.start.assert_called_once()
+        widget.update.assert_called()
+
+    def test_set_threat_state_clear_resets(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget._threat_level = ThreatLevel.DANGER
+        widget._threat_system = "HED-GP"
+        widget._threat_alpha = 0.7
+
+        widget.set_threat_state(ThreatLevel.CLEAR)
+
+        assert widget._threat_level is None
+        assert widget._threat_system is None
+        assert widget._threat_alpha == 0.0
+        widget._threat_decay_timer.stop.assert_called_once()
+
+    def test_set_threat_state_none_resets(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget._threat_level = ThreatLevel.DANGER
+        widget._threat_alpha = 0.5
+
+        widget.set_threat_state(None)
+
+        assert widget._threat_level is None
+        assert widget._threat_alpha == 0.0
+
+    def test_pulse_triggers_on_upgrade_to_danger(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.WARNING, "HED-GP")
+        widget._pulse_timer.start.reset_mock()
+
+        widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert widget._pulse_phase == 1.0
+        widget._pulse_timer.start.assert_called_once()
+
+    def test_pulse_triggers_on_first_critical(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.CRITICAL, "Jita")
+
+        assert widget._pulse_phase == 1.0
+        widget._pulse_timer.start.assert_called_once()
+
+    def test_pulse_does_not_trigger_on_warning(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.WARNING, "Jita")
+
+        assert widget._pulse_phase == 0.0
+        widget._pulse_timer.start.assert_not_called()
+
+    def test_pulse_does_not_re_trigger_on_same_level(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+        widget._pulse_timer.start.reset_mock()
+        widget._pulse_phase = 0.0  # pulse already finished
+
+        widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        widget._pulse_timer.start.assert_not_called()
+
+    def test_decay_tick_reduces_alpha(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget._threat_level = ThreatLevel.WARNING
+        widget._threat_alpha = 1.0
+
+        widget._tick_threat_decay()
+
+        assert widget._threat_alpha < 1.0
+        assert widget._threat_alpha > 0.0
+        widget.update.assert_called()
+
+    def test_decay_clears_state_at_zero(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = _make_widget_for_threat_tests()
+        widget._threat_level = ThreatLevel.WARNING
+        widget._threat_system = "HED-GP"
+        widget._threat_decay_steps = 2  # tighten so 2 ticks fully drains
+        widget._threat_alpha = 1.0 / widget._threat_decay_steps  # near zero
+
+        widget._tick_threat_decay()
+
+        assert widget._threat_alpha == 0.0
+        assert widget._threat_level is None
+        assert widget._threat_system is None
+        widget._threat_decay_timer.stop.assert_called()
+
+    def test_decay_tick_at_zero_stops_timer(self):
+        widget = _make_widget_for_threat_tests()
+        widget._threat_alpha = 0.0
+
+        widget._tick_threat_decay()
+
+        widget._threat_decay_timer.stop.assert_called_once()
+
+    def test_pulse_tick_decrements_phase(self):
+        widget = _make_widget_for_threat_tests()
+        widget._pulse_phase = 1.0
+
+        widget._tick_pulse()
+
+        assert widget._pulse_phase < 1.0
+        widget.update.assert_called()
+
+    def test_pulse_tick_at_zero_stops_timer(self):
+        widget = _make_widget_for_threat_tests()
+        widget._pulse_steps = 2
+        widget._pulse_phase = 1.0 / widget._pulse_steps  # near zero
+
+        widget._tick_pulse()
+
+        assert widget._pulse_phase == 0.0
+        widget._pulse_timer.stop.assert_called_once()
+
+    def test_flash_border_sets_color_and_starts_timer(self):
+        from PySide6.QtGui import QColor
+
+        widget = _make_widget_for_threat_tests()
+        widget.flash_border("#FF0000", 2000)
+
+        assert isinstance(widget._flash_color, QColor)
+        widget._flash_timer.start.assert_called_once_with(2000)
+        widget.update.assert_called()
+
+    def test_flash_border_with_negative_duration_clamped_to_zero(self):
+        widget = _make_widget_for_threat_tests()
+        widget.flash_border("#FF0000", -100)
+
+        widget._flash_timer.start.assert_called_once_with(0)
+
+    def test_clear_flash_resets_color(self):
+        from PySide6.QtGui import QColor
+
+        widget = _make_widget_for_threat_tests()
+        widget._flash_color = QColor("#FF0000")
+
+        widget._clear_flash()
+
+        assert widget._flash_color is None
+        widget.update.assert_called()
+
+
+class TestWindowManagerApplyThreatState:
+    """Tests for WindowManager.apply_threat_state fan-out."""
+
+    def test_apply_threat_state_fans_out_to_all_frames(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            f1, f2, f3 = MagicMock(), MagicMock(), MagicMock()
+            manager.preview_frames = {"w1": f1, "w2": f2, "w3": f3}
+
+            count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 3
+            # PR6: smart-filter branch passes initial_alpha=1.0 explicitly when
+            # the per-character system is unknown (graceful fallback).
+            # PR9: also passes distance=None for the +Nj badge surface.
+            f1.set_threat_state.assert_called_once_with(
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+            )
+            f2.set_threat_state.assert_called_once_with(
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+            )
+            f3.set_threat_state.assert_called_once_with(
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+            )
+
+    def test_apply_threat_state_empty_frames(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            manager.preview_frames = {}
+
+            count = manager.apply_threat_state(ThreatLevel.WARNING, "Jita")
+
+            assert count == 0
+
+    def test_apply_threat_state_skips_deleted_widgets(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            ok = MagicMock()
+            dead = MagicMock()
+            dead.set_threat_state.side_effect = RuntimeError("widget deleted")
+            manager.preview_frames = {"alive": ok, "dead": dead}
+
+            count = manager.apply_threat_state(ThreatLevel.WARNING, "Jita")
+
+            assert count == 1
+            ok.set_threat_state.assert_called_once()
+
+    def test_apply_threat_state_clear_propagates(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_tab import WindowManager
+
+        with patch.object(WindowManager, "__init__", return_value=None):
+            manager = WindowManager.__new__(WindowManager)
+            f1 = MagicMock()
+            manager.preview_frames = {"w1": f1}
+
+            manager.apply_threat_state(ThreatLevel.CLEAR, None)
+
+            f1.set_threat_state.assert_called_once_with(ThreatLevel.CLEAR, None)
+
+
+class TestWindowPreviewWidgetPaintWithThreat:
+    """Smoke tests that paintEvent runs without crashing across threat states."""
+
+    def _build_real_widget(self):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        capture_system = MagicMock()
+        widget = WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=capture_system,
+        )
+        widget.resize(200, 150)
+        return widget
+
+    def test_paint_event_no_threat_does_not_crash(self):
+        widget = self._build_real_widget()
+        try:
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+    def test_paint_event_with_threat_does_not_crash(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._build_real_widget()
+        try:
+            widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+    def test_paint_event_with_flash_does_not_crash(self):
+        widget = self._build_real_widget()
+        try:
+            widget.flash_border("#FF0000", 1000)
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+
+class TestMainWindowV21IntelAlertThreatFanout:
+    """Wiring test: _on_intel_alert routes VISUAL_BORDER alerts to fan-out."""
+
+    def test_visual_border_alert_calls_apply_threat_state(self):
+        from argus_overview.intel.alerts import AlertType
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.system_tray = MagicMock()  # avoid critical-tray branch firing extra calls
+
+        report = IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.DANGER,
+            hostile_count=3,
+            ship_types=["sabre"],
+            player_names=[],
+            raw_message="hostiles HED-GP +3",
+        )
+
+        window._on_intel_alert(report, AlertType.VISUAL_BORDER)
+
+        window.main_tab.window_manager.apply_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP"
+        )
+
+    def test_non_border_alert_does_not_fan_out(self):
+        from argus_overview.intel.alerts import AlertType
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.system_tray = MagicMock()
+
+        report = IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.WARNING,
+            hostile_count=1,
+            ship_types=[],
+            player_names=[],
+            raw_message="neut HED-GP",
+        )
+
+        window._on_intel_alert(report, AlertType.AUDIO)
+
+        window.main_tab.window_manager.apply_threat_state.assert_not_called()
+
+    def test_non_intel_report_ignored(self):
+        from argus_overview.intel.alerts import AlertType
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+
+        window._on_intel_alert("not a report", AlertType.VISUAL_BORDER)
+
+        window.main_tab.window_manager.apply_threat_state.assert_not_called()
+
+
+# =============================================================================
+# Spotlight / Focus Mode Tests (PR3)
+# =============================================================================
+
+
+class TestWindowPreviewWidgetSpotlight:
+    """Tests for set_spotlight() state transitions."""
+
+    def _make(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        widget = WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+        return widget
+
+    def test_set_spotlight_focused_grows(self, qapp):
+        widget = self._make(qapp)
+        try:
+            widget.set_spotlight("focused")
+            assert widget._spotlight_mode == "focused"
+            # Focused widget gets a larger min size than the default 200x150
+            assert widget.minimumWidth() >= 360
+            assert widget.opacity_effect.opacity() == 1.0
+        finally:
+            widget.deleteLater()
+
+    def test_set_spotlight_dimmed_drops_opacity(self, qapp):
+        widget = self._make(qapp)
+        try:
+            widget.set_spotlight("dimmed")
+            assert widget._spotlight_mode == "dimmed"
+            assert widget.opacity_effect.opacity() == 0.25
+        finally:
+            widget.deleteLater()
+
+    def test_set_spotlight_none_restores(self, qapp):
+        widget = self._make(qapp)
+        try:
+            normal_min = widget._normal_min_size
+            widget.set_spotlight("focused")
+            widget.set_spotlight(None)
+            assert widget._spotlight_mode is None
+            assert widget.minimumSize() == normal_min
+            assert widget.opacity_effect.opacity() == 1.0
+        finally:
+            widget.deleteLater()
+
+    def test_set_spotlight_invalid_raises(self, qapp):
+        import pytest
+
+        widget = self._make(qapp)
+        try:
+            with pytest.raises(ValueError):
+                widget.set_spotlight("bogus")
+        finally:
+            widget.deleteLater()
+
+    def test_double_click_emits_focus_requested(self, qapp):
+        from PySide6.QtCore import QPoint, Qt
+        from PySide6.QtGui import QMouseEvent
+
+        widget = self._make(qapp)
+        try:
+            received: list[str] = []
+            widget.focus_requested.connect(received.append)
+            event = QMouseEvent(
+                QMouseEvent.Type.MouseButtonDblClick,
+                QPoint(50, 50),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            widget.mouseDoubleClickEvent(event)
+            assert received == ["0xABC"]
+        finally:
+            widget.deleteLater()
+
+
+class TestMainTabFocusMode:
+    """Tests for MainTab focus mode controller."""
+
+    def _make_tab(self):
+        from argus_overview.ui.main_tab import MainTab
+
+        tab = MainTab.__new__(MainTab)
+        tab.logger = MagicMock()
+        tab._focus_window_id = None
+        tab.window_manager = MagicMock()
+        tab.window_manager.preview_frames = {}
+        return tab
+
+    def test_enter_focus_mode_unknown_window_noop(self):
+        tab = self._make_tab()
+        tab.enter_focus_mode("missing")
+        assert tab._focus_window_id is None
+
+    def test_enter_focus_mode_sets_state_and_fans_out(self):
+        tab = self._make_tab()
+        f1, f2 = MagicMock(), MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1, "w2": f2}
+
+        tab.enter_focus_mode("w1")
+
+        assert tab._focus_window_id == "w1"
+        f1.set_spotlight.assert_called_once_with("focused")
+        f2.set_spotlight.assert_called_once_with("dimmed")
+
+    def test_exit_focus_mode_clears_all(self):
+        tab = self._make_tab()
+        f1, f2 = MagicMock(), MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1, "w2": f2}
+        tab._focus_window_id = "w1"
+
+        tab.exit_focus_mode()
+
+        assert tab._focus_window_id is None
+        f1.set_spotlight.assert_called_once_with(None)
+        f2.set_spotlight.assert_called_once_with(None)
+
+    def test_exit_focus_mode_when_inactive_noop(self):
+        tab = self._make_tab()
+        f1 = MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1}
+
+        tab.exit_focus_mode()
+
+        f1.set_spotlight.assert_not_called()
+
+    def test_on_focus_requested_toggles_on(self):
+        tab = self._make_tab()
+        f1 = MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1}
+
+        tab._on_focus_requested("w1")
+
+        assert tab._focus_window_id == "w1"
+
+    def test_on_focus_requested_toggles_off_when_same_window(self):
+        tab = self._make_tab()
+        f1 = MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1}
+        tab._focus_window_id = "w1"
+
+        tab._on_focus_requested("w1")
+
+        assert tab._focus_window_id is None
+
+    def test_on_focus_requested_swaps_to_different_window(self):
+        tab = self._make_tab()
+        f1, f2 = MagicMock(), MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1, "w2": f2}
+        tab._focus_window_id = "w1"
+
+        tab._on_focus_requested("w2")
+
+        assert tab._focus_window_id == "w2"
+        # f1 should be dimmed now (used to be focused), f2 focused
+        f1.set_spotlight.assert_called_with("dimmed")
+        f2.set_spotlight.assert_called_with("focused")
+
+    def test_apply_focus_state_skips_deleted_widgets(self):
+        tab = self._make_tab()
+        ok = MagicMock()
+        dead = MagicMock()
+        dead.set_spotlight.side_effect = RuntimeError("widget deleted")
+        tab.window_manager.preview_frames = {"alive": ok, "dead": dead}
+        tab._focus_window_id = "alive"
+
+        tab._apply_focus_state()
+
+        ok.set_spotlight.assert_called_with("focused")
+
+    def test_is_focus_mode_active(self):
+        tab = self._make_tab()
+        assert tab.is_focus_mode_active() is False
+        tab._focus_window_id = "w1"
+        assert tab.is_focus_mode_active() is True
+
+    def test_remove_focused_window_clears_focus(self):
+        from argus_overview.ui.main_tab import MainTab
+
+        tab = MainTab.__new__(MainTab)
+        tab.logger = MagicMock()
+        tab._focus_window_id = "w1"
+        tab.status_dock = MagicMock()
+        tab._update_status = MagicMock()
+
+        # Build a frame mock with the disconnect surface and session_timer
+        frame = MagicMock()
+        wm = MagicMock()
+        wm.preview_frames = {"w1": frame}
+        tab.window_manager = wm
+
+        tab._on_window_removed("w1")
+
+        assert tab._focus_window_id is None
+        wm.remove_window.assert_called_once_with("w1")
+        # Disconnect calls happened
+        frame.window_activated.disconnect.assert_called()
+        frame.focus_requested.disconnect.assert_called()
+
+
+class TestMainTabFocusEscapeKey:
+    """Tests that Escape exits focus mode without swallowing other keys."""
+
+    def test_escape_when_focused_exits(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QKeyEvent
+
+        from argus_overview.ui.main_tab import MainTab
+
+        tab = MainTab.__new__(MainTab)
+        tab.logger = MagicMock()
+        tab._focus_window_id = "w1"
+        tab.window_manager = MagicMock()
+        tab.window_manager.preview_frames = {"w1": MagicMock()}
+
+        event = QKeyEvent(
+            QKeyEvent.Type.KeyPress,
+            Qt.Key.Key_Escape,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        tab.keyPressEvent(event)
+
+        assert tab._focus_window_id is None
+
+    def test_escape_when_not_focused_passes_through(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QKeyEvent
+
+        from argus_overview.ui.main_tab import MainTab
+
+        tab = MainTab.__new__(MainTab)
+        tab.logger = MagicMock()
+        tab._focus_window_id = None
+        tab.window_manager = MagicMock()
+        tab.window_manager.preview_frames = {}
+
+        event = QKeyEvent(
+            QKeyEvent.Type.KeyPress,
+            Qt.Key.Key_Escape,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        # Should not raise even though super().keyPressEvent reaches QWidget
+        # bypassed init — bypass keyPressEvent dispatch by mocking out super
+        # via a real QWidget call would crash, so we just assert the focus
+        # path didn't fire.
+        try:
+            tab.keyPressEvent(event)
+        except RuntimeError:
+            pass  # Expected: super().keyPressEvent hits bypassed-init widget
+        assert tab._focus_window_id is None
+
+
+# =============================================================================
+# Smart per-character threat fan-out (PR5)
+# =============================================================================
+
+
+def _frame_mock(character_name: str):
+    """Mock preview frame exposing the character_name + set_threat_state surface."""
+    f = MagicMock()
+    f.character_name = character_name
+    return f
+
+
+class TestWindowPreviewWidgetCharacterSystem:
+    """Tests for the per-frame _character_system setter."""
+
+    def test_set_and_get(self):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget._character_system = None
+
+            widget.set_character_system("Jita")
+            assert widget.get_character_system() == "Jita"
+
+            widget.set_character_system(None)
+            assert widget.get_character_system() is None
+
+
+class TestWindowManagerSetCharacterSystemPushesToFrames:
+    """set_character_system updates the map AND pushes to matching frames."""
+
+    def _make_manager(self):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.preview_frames = {}
+        manager._character_systems = {}
+        return manager
+
+    def test_pushes_to_matching_frame_only(self):
+        manager = self._make_manager()
+        alice_frame = _frame_mock("Alice")
+        bob_frame = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice_frame, "w2": bob_frame}
+
+        manager.set_character_system("Alice", "Jita")
+
+        alice_frame.set_character_system.assert_called_once_with("Jita")
+        bob_frame.set_character_system.assert_not_called()
+
+    def test_pushes_to_multiple_frames_for_same_character(self):
+        manager = self._make_manager()
+        f1 = _frame_mock("Alice")
+        f2 = _frame_mock("Alice")
+        manager.preview_frames = {"w1": f1, "w2": f2}
+
+        manager.set_character_system("Alice", "Jita")
+
+        f1.set_character_system.assert_called_once_with("Jita")
+        f2.set_character_system.assert_called_once_with("Jita")
+
+    def test_clearing_character_pushes_none_to_frames(self):
+        manager = self._make_manager()
+        alice = _frame_mock("Alice")
+        manager.preview_frames = {"w1": alice}
+        manager._character_systems = {"Alice": "Jita"}
+
+        manager.set_character_system("Alice", None)
+
+        alice.set_character_system.assert_called_once_with(None)
+        assert "Alice" not in manager._character_systems
+
+    def test_skips_deleted_widgets(self):
+        manager = self._make_manager()
+        alive = _frame_mock("Alice")
+        dead = _frame_mock("Alice")
+        dead.set_character_system.side_effect = RuntimeError("widget deleted")
+        manager.preview_frames = {"alive": alive, "dead": dead}
+
+        # Should not raise even though one frame is gone.
+        manager.set_character_system("Alice", "Jita")
+
+        alive.set_character_system.assert_called_once_with("Jita")
+
+
+class TestWindowManagerApplyThreatStateSmartFanout:
+    """PR5 smart fan-out filter rules."""
+
+    def _make_manager(self, char_systems: dict[str, str] | None = None):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.preview_frames = {}
+        manager._character_systems = dict(char_systems or {})
+        return manager
+
+    def test_clear_flushes_all_regardless_of_system(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "Jita", "Bob": "Amarr"})
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.CLEAR, "HED-GP")
+
+        assert count == 2
+        alice.set_threat_state.assert_called_once_with(ThreatLevel.CLEAR, "HED-GP")
+        bob.set_threat_state.assert_called_once_with(ThreatLevel.CLEAR, "HED-GP")
+
+    def test_none_level_flushes_all(self):
+        manager = self._make_manager(char_systems={"Alice": "Jita"})
+        alice = _frame_mock("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        count = manager.apply_threat_state(None, "HED-GP")
+
+        assert count == 1
+        alice.set_threat_state.assert_called_once()
+
+    def test_no_alert_system_falls_through_to_all(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "Jita"})
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.WARNING, None)
+
+        assert count == 2
+
+    def test_empty_alert_system_falls_through_to_all(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "Jita"})
+        alice = _frame_mock("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        count = manager.apply_threat_state(ThreatLevel.WARNING, "")
+
+        assert count == 1
+
+    def test_only_matching_character_tints(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "HED-GP", "Bob": "Amarr"})
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 1
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+        )
+        bob.set_threat_state.assert_not_called()
+
+    def test_unknown_character_falls_through_to_apply(self):
+        """Graceful upgrade: untracked characters still tint."""
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "HED-GP"})
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")  # Bob has no known system
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 2
+        alice.set_threat_state.assert_called_once()
+        bob.set_threat_state.assert_called_once()
+
+    def test_no_per_char_data_fans_to_all_legacy_behavior(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={})
+        f1 = _frame_mock("Alice")
+        f2 = _frame_mock("Bob")
+        manager.preview_frames = {"w1": f1, "w2": f2}
+
+        count = manager.apply_threat_state(ThreatLevel.WARNING, "HED-GP")
+
+        assert count == 2
+
+    def test_skips_deleted_widgets(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "HED-GP"})
+        alive = _frame_mock("Alice")
+        dead = _frame_mock("Alice")
+        dead.set_threat_state.side_effect = RuntimeError("widget deleted")
+        manager.preview_frames = {"alive": alive, "dead": dead}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 1
+
+
+class TestStatusDockSmartFanout:
+    """PR5 smart fan-out applied to chips via their _system attribute."""
+
+    def test_only_matching_chips_tint(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "HED-GP")
+            dock.set_character_system("Bob", "Amarr")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 1
+            assert dock._chips["0x1"]._threat_level == ThreatLevel.DANGER
+            assert dock._chips["0x2"]._threat_level is None
+        finally:
+            dock.deleteLater()
+
+    def test_unknown_chip_falls_through(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")  # Bob has no system
+            dock.set_character_system("Alice", "HED-GP")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            # Both tint: Alice matches, Bob unknown → graceful fallback.
+            assert count == 2
+        finally:
+            dock.deleteLater()
+
+    def test_clear_bypasses_filter(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "HED-GP")
+            dock.set_character_system("Bob", "Amarr")
+            # Tint both first
+            dock._chips["0x1"].set_threat_state(ThreatLevel.DANGER, "HED-GP")
+            dock._chips["0x2"].set_threat_state(ThreatLevel.WARNING, "Amarr")
+
+            count = dock.set_threat_state(ThreatLevel.CLEAR, "HED-GP")
+
+            assert count == 2
+            for chip in dock._chips.values():
+                assert chip._threat_level is None
+        finally:
+            dock.deleteLater()
+
+    def test_no_system_fans_to_all(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "Jita")
+            dock.set_character_system("Bob", "Amarr")
+
+            count = dock.set_threat_state(ThreatLevel.WARNING, None)
+            assert count == 2
+        finally:
+            dock.deleteLater()
+
+
+# =============================================================================
+# Jumps-from threat fan-out (PR6)
+# =============================================================================
+
+
+class TestWindowPreviewWidgetInitialAlpha:
+    """set_threat_state honors the initial_alpha param."""
+
+    def _make_widget(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        return WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+
+    def test_default_alpha_is_one(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "Jita")
+            assert widget._threat_alpha == 1.0
+        finally:
+            widget.deleteLater()
+
+    def test_explicit_alpha_applied(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "Jita", initial_alpha=0.5)
+            assert widget._threat_alpha == 0.5
+        finally:
+            widget.deleteLater()
+
+    def test_alpha_clamped_to_unit_range(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "Jita", initial_alpha=2.5)
+            assert widget._threat_alpha == 1.0
+            widget.set_threat_state(ThreatLevel.WARNING, "Jita", initial_alpha=-0.5)
+            assert widget._threat_alpha == 0.0
+        finally:
+            widget.deleteLater()
+
+    def test_pulse_skipped_for_low_alpha_alerts(self, qapp):
+        """Adjacent-system alerts (low alpha) should NOT pulse."""
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.DANGER, "Jita", initial_alpha=0.5)
+            assert widget._pulse_phase == 0.0
+        finally:
+            widget.deleteLater()
+
+    def test_pulse_fires_for_full_alpha_danger(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.DANGER, "Jita", initial_alpha=1.0)
+            assert widget._pulse_phase == 1.0
+        finally:
+            widget.deleteLater()
+
+
+def _calc_mock(distances: dict[tuple[str, str], int | None]):
+    """Build a MagicMock JumpCalculator from a (from, to) -> distance map."""
+    calc = MagicMock()
+
+    def _distance(a, b):
+        return distances.get((a, b)) or distances.get((b, a))
+
+    calc.distance.side_effect = _distance
+    return calc
+
+
+class TestWindowManagerJumpsFromFanout:
+    """WindowManager.apply_threat_state with jumps-from filter."""
+
+    def _make_manager(
+        self,
+        char_systems: dict[str, str],
+        max_jumps: int = 0,
+        distances: dict[tuple[str, str], int | None] | None = None,
+    ):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.preview_frames = {}
+        manager._character_systems = dict(char_systems)
+        manager._jump_calculator = _calc_mock(distances or {}) if distances else None
+        manager._jump_max = max_jumps
+        return manager
+
+    def test_set_jump_calculator_stores_calculator_and_max(self):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        calc = MagicMock()
+
+        manager.set_jump_calculator(calc, max_jumps=3)
+
+        assert manager._jump_calculator is calc
+        assert manager._jump_max == 3
+
+    def test_set_jump_calculator_clamps_negative_max(self):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.set_jump_calculator(MagicMock(), max_jumps=-5)
+
+        assert manager._jump_max == 0
+
+    def test_adjacent_character_tinted_with_falloff_alpha(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(
+            char_systems={"Alice": "Jita", "Bob": "HED-GP"},
+            max_jumps=2,
+            distances={("Jita", "HED-GP"): 1, ("HED-GP", "HED-GP"): 0},
+        )
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 2
+        bob.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+        )
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5, distance=1
+        )
+
+    def test_beyond_threshold_skipped(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(
+            char_systems={"Alice": "Jita"},
+            max_jumps=1,
+            distances={("Jita", "HED-GP"): 4},
+        )
+        alice = _frame_mock("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 0
+        alice.set_threat_state.assert_not_called()
+
+    def test_no_calculator_keeps_pr5_exact_match_only(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "Jita", "Bob": "HED-GP"}, max_jumps=0)
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 1
+        bob.set_threat_state.assert_called_once()
+        alice.set_threat_state.assert_not_called()
+
+
+class TestStatusDockJumpsFromFanout:
+    """StatusDock.set_threat_state with jumps-from filter."""
+
+    def test_set_jump_calculator_stores_calculator_and_max(self, qapp):
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            calc = MagicMock()
+            dock.set_jump_calculator(calc, max_jumps=2)
+            assert dock._jump_calculator is calc
+            assert dock._jump_max == 2
+        finally:
+            dock.deleteLater()
+
+    def test_adjacent_chip_tinted_with_falloff_alpha(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            calc = _calc_mock({("Jita", "HED-GP"): 1})
+            dock.set_jump_calculator(calc, max_jumps=2)
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "Jita")
+            dock.set_character_system("Bob", "HED-GP")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 2
+            assert dock._chips["0x2"]._threat_alpha == 1.0
+            assert dock._chips["0x1"]._threat_alpha == 0.5
+        finally:
+            dock.deleteLater()
+
+    def test_beyond_threshold_chip_skipped(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            calc = _calc_mock({("Jita", "HED-GP"): 5})
+            dock.set_jump_calculator(calc, max_jumps=1)
+            dock.add_chip("0x1", "Alice")
+            dock.set_character_system("Alice", "Jita")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 0
+            assert dock._chips["0x1"]._threat_level is None
+        finally:
+            dock.deleteLater()
+
+    def test_no_calculator_keeps_pr5_behavior(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "Jita")
+            dock.set_character_system("Bob", "HED-GP")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 1
+            assert dock._chips["0x2"]._threat_level is not None
+            assert dock._chips["0x1"]._threat_level is None
+        finally:
+            dock.deleteLater()
+
+
+# =============================================================================
+# Per-character accent border (PR8)
+# =============================================================================
+
+
+class TestCharacterAccentColor:
+    """Shared accent palette helper used by frames + chips."""
+
+    def test_deterministic(self):
+        from argus_overview.ui.main_tab import character_accent_color
+
+        assert character_accent_color("Pilot1").rgb() == character_accent_color("Pilot1").rgb()
+
+    def test_returns_qcolor(self):
+        from PySide6.QtGui import QColor
+
+        from argus_overview.ui.main_tab import character_accent_color
+
+        assert isinstance(character_accent_color("X"), QColor)
+
+    def test_palette_has_eight_entries(self):
+        from argus_overview.ui.main_tab import CHARACTER_ACCENT_COLORS
+
+        assert len(CHARACTER_ACCENT_COLORS) == 8
+
+
+class TestCharacterAccentChipFrameMatch:
+    """Same character → same color across the frame and the chip."""
+
+    def test_frame_and_chip_share_accent(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+        from argus_overview.ui.status_dock import CharacterChip
+
+        widget = WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            assert widget._accent_color.rgb() == chip._accent.rgb()
+        finally:
+            widget.deleteLater()
+            chip.deleteLater()
+
+    def test_legacy_chip_aliases_resolve_to_main_tab_helpers(self):
+        from argus_overview.ui.main_tab import (
+            CHARACTER_ACCENT_COLORS,
+            character_accent_color,
+        )
+        from argus_overview.ui.status_dock import CHIP_ACCENT_COLORS, accent_for
+
+        assert CHIP_ACCENT_COLORS is CHARACTER_ACCENT_COLORS
+        assert accent_for is character_accent_color
+
+
+class TestWindowPreviewAccentBorder:
+    """Frame paints the accent border only when no threat is active."""
+
+    def _make_widget(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        return WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+
+    def test_accent_color_set_on_init(self, qapp):
+        from PySide6.QtGui import QColor
+
+        widget = self._make_widget(qapp)
+        try:
+            assert isinstance(widget._accent_color, QColor)
+        finally:
+            widget.deleteLater()
+
+    def test_paint_clear_state_does_not_crash(self, qapp):
+        widget = self._make_widget(qapp)
+        try:
+            widget.resize(200, 150)
+            # No threat, no flash → accent border should paint
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+    def test_paint_with_threat_does_not_crash(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.resize(200, 150)
+            widget.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+    def test_paint_with_flash_does_not_crash(self, qapp):
+        widget = self._make_widget(qapp)
+        try:
+            widget.resize(200, 150)
+            widget.flash_border("#FF0000", 1000)
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+
+# =============================================================================
+# Frame distance badge (PR9 — symmetrize PR7 across grid + dock)
+# =============================================================================
+
+
+class TestWindowPreviewWidgetDistanceBadge:
+    def _make_widget(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        return WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+
+    def test_default_distance_is_none(self, qapp):
+        widget = self._make_widget(qapp)
+        try:
+            assert widget._threat_distance is None
+        finally:
+            widget.deleteLater()
+
+    def test_distance_stored_when_positive(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "HED-GP", initial_alpha=0.5, distance=2)
+            assert widget._threat_distance == 2
+        finally:
+            widget.deleteLater()
+
+    def test_zero_distance_treated_as_none(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=0)
+            assert widget._threat_distance is None
+        finally:
+            widget.deleteLater()
+
+    def test_clear_resets_distance(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "HED-GP", initial_alpha=0.5, distance=2)
+            widget.set_threat_state(ThreatLevel.CLEAR)
+            assert widget._threat_distance is None
+        finally:
+            widget.deleteLater()
+
+    def test_decay_to_zero_clears_distance(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "HED-GP", initial_alpha=0.5, distance=2)
+            # Tighten decay so a single tick fully drains.
+            widget._threat_decay_steps = 1
+            widget._threat_alpha = 0.5  # ensure > 0 so first branch runs
+            widget._tick_threat_decay()
+            assert widget._threat_distance is None
+            assert widget._threat_level is None
+        finally:
+            widget.deleteLater()
+
+    def test_paint_with_distance_does_not_crash(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.resize(200, 150)
+            widget.set_threat_state(ThreatLevel.WARNING, "HED-GP", initial_alpha=0.5, distance=1)
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+
+def _frame_mock_v2(character_name: str):
+    """Mock frame for WindowManager tests — preserves character_name."""
+    f = MagicMock()
+    f.character_name = character_name
+    return f
+
+
+class TestWindowManagerPassesDistanceToFrame:
+    def _make_calc(self, distance: int | None):
+        calc = MagicMock()
+        calc.distance.return_value = distance
+        return calc
+
+    def _make_manager(self, char_systems=None, max_jumps=0, calc=None):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.preview_frames = {}
+        manager._character_systems = dict(char_systems or {})
+        manager._jump_calculator = calc
+        manager._jump_max = max_jumps
+        return manager
+
+    def test_adjacent_frame_receives_distance(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        calc = self._make_calc(distance=1)
+        manager = self._make_manager(char_systems={"Alice": "Jita"}, max_jumps=2, calc=calc)
+        alice = _frame_mock_v2("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5, distance=1
+        )
+
+    def test_same_system_frame_distance_is_none(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        calc = self._make_calc(distance=0)
+        manager = self._make_manager(char_systems={"Alice": "HED-GP"}, max_jumps=2, calc=calc)
+        alice = _frame_mock_v2("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+        )
+        calc.distance.assert_not_called()
+
+    def test_unknown_character_distance_is_none(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        calc = self._make_calc(distance=99)
+        manager = self._make_manager(char_systems={}, max_jumps=2, calc=calc)
+        anon = _frame_mock_v2("Bob")
+        manager.preview_frames = {"w1": anon}
+
+        manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        anon.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+        )
+
+    def test_calculator_error_swallowed(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        calc = MagicMock()
+        # First call (inside resolve_tint) returns a usable distance, second
+        # call (PR9 explicit query for the badge) raises.
+        calc.distance.side_effect = [1, ValueError("graph corrupt")]
+        manager = self._make_manager(char_systems={"Alice": "Jita"}, max_jumps=2, calc=calc)
+        alice = _frame_mock_v2("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5, distance=None
+        )
+
+
+# =============================================================================
+# Replay strip integration on WindowPreviewWidget (PR10)
+# =============================================================================
+
+
+def _replay_widget(qapp, settings_manager=None):
+    from argus_overview.ui.main_tab import WindowPreviewWidget
+
+    return WindowPreviewWidget(
+        window_id="0xABC",
+        character_name="ReplayPilot",
+        capture_system=MagicMock(),
+        settings_manager=settings_manager,
+    )
+
+
+def _fake_pixmap(color=Qt.GlobalColor.red):
+    from PySide6.QtGui import QPixmap
+
+    pm = QPixmap(200, 150)
+    pm.fill(color)
+    return pm
+
+
+class TestWindowPreviewReplayBuffer:
+    def test_buffer_starts_empty(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            assert len(widget._replay_buffer) == 0
+        finally:
+            widget.deleteLater()
+
+    def test_sample_appends_one_frame(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget._sample_replay_buffer(_fake_pixmap())
+            assert len(widget._replay_buffer) == 1
+        finally:
+            widget.deleteLater()
+
+    def test_sample_throttled(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            widget._sample_replay_buffer(_fake_pixmap())
+            # Pretend no time has passed by leaving _replay_last_sample_ms as set
+            widget._sample_replay_buffer(_fake_pixmap())
+            # Throttled — still one
+            assert len(widget._replay_buffer) == 1
+
+            # Advance past the throttle window
+            widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+            widget._sample_replay_buffer(_fake_pixmap())
+            assert len(widget._replay_buffer) == 2
+        finally:
+            widget.deleteLater()
+
+    def test_buffer_respects_maxlen(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_BUFFER_SIZE, REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            for _ in range(REPLAY_BUFFER_SIZE * 2):
+                widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+                widget._sample_replay_buffer(_fake_pixmap())
+            assert len(widget._replay_buffer) == REPLAY_BUFFER_SIZE
+        finally:
+            widget.deleteLater()
+
+    def test_null_pixmap_skipped(self, qapp):
+        from PySide6.QtGui import QPixmap
+
+        widget = _replay_widget(qapp)
+        try:
+            widget._sample_replay_buffer(QPixmap())  # null
+            assert len(widget._replay_buffer) == 0
+        finally:
+            widget.deleteLater()
+
+
+class TestWindowPreviewReplayStripToggle:
+    def test_disabled_by_default(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            assert widget.is_replay_strip_enabled() is False
+            assert widget._replay_strip is None
+        finally:
+            widget.deleteLater()
+
+    def test_enable_creates_strip(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            assert widget.is_replay_strip_enabled() is True
+            assert widget._replay_strip is not None
+        finally:
+            widget.deleteLater()
+
+    def test_disable_destroys_strip(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            widget.enable_replay_strip(False)
+            assert widget.is_replay_strip_enabled() is False
+            assert widget._replay_strip is None
+        finally:
+            widget.deleteLater()
+
+    def test_enable_idempotent(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            strip_obj = widget._replay_strip
+            widget.enable_replay_strip(True)
+            # Same instance — second call is a no-op.
+            assert widget._replay_strip is strip_obj
+        finally:
+            widget.deleteLater()
+
+    def test_disable_clears_held_view_index(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            widget._replay_view_index = 2
+            widget.enable_replay_strip(False)
+            assert widget._replay_view_index is None
+        finally:
+            widget.deleteLater()
+
+    def test_enable_pushes_existing_buffer_to_strip(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            for _ in range(3):
+                widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+                widget._sample_replay_buffer(_fake_pixmap())
+
+            widget.enable_replay_strip(True)
+            assert widget._replay_strip.frame_count() == 3
+        finally:
+            widget.deleteLater()
+
+
+class TestWindowPreviewReplayHoverSwap:
+    def test_hover_index_swaps_image_label(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            for _ in range(3):
+                widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+                widget._sample_replay_buffer(_fake_pixmap())
+
+            widget.enable_replay_strip(True)
+            widget._on_replay_frame_hovered(1)
+
+            assert widget._replay_view_index == 1
+            assert widget.image_label.pixmap() is not None
+        finally:
+            widget.deleteLater()
+
+    def test_minus_one_restores_live(self, qapp):
+        from argus_overview.ui.main_tab import REPLAY_THROTTLE_MS
+
+        widget = _replay_widget(qapp)
+        try:
+            for _ in range(2):
+                widget._replay_last_sample_ms -= REPLAY_THROTTLE_MS + 1
+                widget._sample_replay_buffer(_fake_pixmap())
+
+            widget.current_pixmap = _fake_pixmap(color=Qt.GlobalColor.green)
+            widget.enable_replay_strip(True)
+            widget._on_replay_frame_hovered(0)
+            widget._on_replay_frame_hovered(-1)
+
+            assert widget._replay_view_index is None
+        finally:
+            widget.deleteLater()
+
+    def test_out_of_range_index_treated_as_minus_one(self, qapp):
+        widget = _replay_widget(qapp)
+        try:
+            widget.enable_replay_strip(True)
+            widget._replay_view_index = 0
+            widget._on_replay_frame_hovered(99)
+            assert widget._replay_view_index is None
+        finally:
+            widget.deleteLater()
+
+
+class TestWindowPreviewReplayPersistence:
+    def _settings_mock(self, replay_store):
+        """SettingsManager mock that returns differentiated values per key."""
+        sm = MagicMock()
+        sm.get.side_effect = lambda key, default=None: (
+            replay_store if key == "replay_strip_enabled" else default
+        )
+        return sm
+
+    def test_toggle_persists_to_settings(self, qapp):
+        sm = self._settings_mock({})
+
+        widget = _replay_widget(qapp, settings_manager=sm)
+        try:
+            widget._toggle_replay_strip()  # off → on
+            # set was called with the toggled-on dict
+            calls = sm.set.call_args_list
+            last = calls[-1]
+            assert last.args[0] == "replay_strip_enabled"
+            assert last.args[1] == {"ReplayPilot": True}
+        finally:
+            widget.deleteLater()
+
+    def test_toggle_off_removes_entry(self, qapp):
+        sm = self._settings_mock({"ReplayPilot": True})
+
+        widget = _replay_widget(qapp, settings_manager=sm)
+        try:
+            # Init turned strip on from settings; toggle should turn it off
+            assert widget.is_replay_strip_enabled() is True
+            widget._toggle_replay_strip()
+            calls = sm.set.call_args_list
+            last = calls[-1]
+            assert last.args[1] == {}  # entry removed
+        finally:
+            widget.deleteLater()
+
+    def test_init_restores_strip_from_settings(self, qapp):
+        sm = self._settings_mock({"ReplayPilot": True})
+
+        widget = _replay_widget(qapp, settings_manager=sm)
+        try:
+            assert widget.is_replay_strip_enabled() is True
+        finally:
+            widget.deleteLater()
