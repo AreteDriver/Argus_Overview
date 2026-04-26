@@ -405,3 +405,161 @@ class TestMainWindowV21StatusDockFanout:
         # Should not raise even though main_tab has no status_dock attr
         window._on_intel_alert(report, AlertType.VISUAL_BORDER)
         window.main_tab.window_manager.apply_threat_state.assert_called_once()
+
+
+# =============================================================================
+# Distance badge (PR7)
+# =============================================================================
+
+
+class TestCharacterChipDistanceBadge:
+    """+Nj badge state on the chip."""
+
+    def test_default_distance_is_none(self, qapp):
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            assert chip._threat_distance is None
+        finally:
+            chip.deleteLater()
+
+    def test_distance_stored_when_positive(self, qapp):
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            chip.set_threat_state(ThreatLevel.WARNING, "HED-GP", alpha=0.5, distance=2)
+            assert chip._threat_distance == 2
+        finally:
+            chip.deleteLater()
+
+    def test_zero_distance_treated_as_none(self, qapp):
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            # Same-system case: caller passes distance=0; chip stores None
+            chip.set_threat_state(ThreatLevel.DANGER, "HED-GP", alpha=1.0, distance=0)
+            assert chip._threat_distance is None
+        finally:
+            chip.deleteLater()
+
+    def test_clear_resets_distance(self, qapp):
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            chip.set_threat_state(ThreatLevel.WARNING, "HED-GP", alpha=0.5, distance=2)
+            chip.set_threat_state(ThreatLevel.CLEAR)
+            assert chip._threat_distance is None
+        finally:
+            chip.deleteLater()
+
+    def test_paint_with_distance_does_not_crash(self, qapp):
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            chip.resize(200, 40)
+            chip.set_threat_state(ThreatLevel.WARNING, "HED-GP", alpha=0.5, distance=1)
+            chip.repaint()
+        finally:
+            chip.deleteLater()
+
+    def test_paint_with_no_distance_does_not_crash(self, qapp):
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            chip.resize(200, 40)
+            chip.set_threat_state(ThreatLevel.DANGER, "HED-GP", alpha=1.0)
+            chip.repaint()
+        finally:
+            chip.deleteLater()
+
+    def test_tooltip_includes_distance(self, qapp):
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            chip.set_system("Jita")
+            chip.set_threat_state(ThreatLevel.WARNING, "HED-GP", alpha=0.5, distance=2)
+            tip = chip.toolTip()
+            assert "2j away" in tip
+        finally:
+            chip.deleteLater()
+
+    def test_tooltip_omits_distance_for_same_system(self, qapp):
+        chip = CharacterChip("0xABC", "TestPilot")
+        try:
+            chip.set_system("HED-GP")
+            chip.set_threat_state(ThreatLevel.DANGER, "HED-GP", alpha=1.0)
+            tip = chip.toolTip()
+            assert "j away" not in tip
+        finally:
+            chip.deleteLater()
+
+
+class TestStatusDockPassesDistanceToChip:
+    """Dock fan-out queries calculator.distance and passes it to chips."""
+
+    def _make_calc(self, distance: int | None):
+        calc = MagicMock()
+        calc.distance.return_value = distance
+        return calc
+
+    def test_adjacent_chip_receives_distance(self, qapp):
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.set_jump_calculator(self._make_calc(distance=1), max_jumps=2)
+            dock.add_chip("0x1", "Alice")
+            dock.set_character_system("Alice", "Jita")
+
+            dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert dock._chips["0x1"]._threat_distance == 1
+        finally:
+            dock.deleteLater()
+
+    def test_same_system_chip_has_no_distance(self, qapp):
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.set_jump_calculator(self._make_calc(distance=0), max_jumps=2)
+            dock.add_chip("0x1", "Alice")
+            dock.set_character_system("Alice", "HED-GP")
+
+            dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert dock._chips["0x1"]._threat_distance is None
+        finally:
+            dock.deleteLater()
+
+    def test_unknown_chip_system_has_no_distance(self, qapp):
+        """Graceful fallback: unknown chip tints at full alpha, no badge."""
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.set_jump_calculator(self._make_calc(distance=99), max_jumps=2)
+            dock.add_chip("0x1", "Alice")
+            # No set_character_system → chip._system stays None
+
+            dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert dock._chips["0x1"]._threat_distance is None
+            # Calculator should not have been queried at all (alpha=1.0 path)
+        finally:
+            dock.deleteLater()
+
+    def test_calculator_error_swallowed(self, qapp):
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            calc = MagicMock()
+            calc.distance.side_effect = ValueError("graph corrupt")
+            dock.set_jump_calculator(calc, max_jumps=2)
+            dock.add_chip("0x1", "Alice")
+            dock.set_character_system("Alice", "Jita")
+
+            # Force smart-filter branch by stubbing resolve_tint? No — just
+            # rely on real resolve_tint: it would call calculator.distance
+            # too. Either way, the dock should not raise.
+            dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            # Chip threat state may or may not be set depending on which
+            # call raised, but the dock must not have crashed.
+            assert "0x1" in dock._chips
+        finally:
+            dock.deleteLater()

@@ -84,6 +84,9 @@ class CharacterChip(QFrame):
         self._system: str | None = None
         self._threat_level: ThreatLevel | None = None
         self._threat_alpha: float = 0.0
+        # PR7: jumps from this chip's character to the alert system. None when
+        # same-system or unknown; positive int for adjacent. Renders as +Nj.
+        self._threat_distance: int | None = None
 
         self.setFixedHeight(40)
         self.setMinimumWidth(160)
@@ -157,7 +160,10 @@ class CharacterChip(QFrame):
         if self._system:
             parts.append(f"System: {self._system}")
         if self._threat_level is not None:
-            parts.append(f"Threat: {self._threat_level.value}")
+            line = f"Threat: {self._threat_level.value}"
+            if self._threat_distance and self._threat_distance > 0:
+                line += f" ({self._threat_distance}j away)"
+            parts.append(line)
         parts.append("Click to focus window")
         return "\n".join(parts)
 
@@ -168,14 +174,32 @@ class CharacterChip(QFrame):
         self.setToolTip(self._tooltip_text())
 
     def set_threat_state(
-        self, level: ThreatLevel | None, system: str | None = None, alpha: float = 1.0
+        self,
+        level: ThreatLevel | None,
+        system: str | None = None,
+        alpha: float = 1.0,
+        distance: int | None = None,
     ) -> None:
+        """
+        Update threat state for this chip.
+
+        Args:
+            level: Threat level. None or CLEAR clears state.
+            system: System the alert refers to.
+            alpha: Initial alpha [0, 1] for the threat dot. PR6 falloff for
+                adjacent-system alerts uses < 1.0.
+            distance: Jumps from this chip's character to the alert system.
+                None for same-system or unknown. Positive ints render as
+                "+Nj" badge next to the threat dot (PR7).
+        """
         if level is None or level == ThreatLevel.CLEAR:
             self._threat_level = None
             self._threat_alpha = 0.0
+            self._threat_distance = None
         else:
             self._threat_level = level
             self._threat_alpha = max(0.0, min(1.0, alpha))
+            self._threat_distance = distance if distance and distance > 0 else None
         if system is not None:
             self.set_system(system)
         else:
@@ -204,9 +228,31 @@ class CharacterChip(QFrame):
             painter.setPen(QPen(color.darker(140), 1))
             painter.setBrush(QBrush(color))
             # Draw threat dot vertically centered, left of the right edge
-            x = self.width() - self.DOT_SIZE - 8
-            y = (self.height() - self.DOT_SIZE) // 2
-            painter.drawEllipse(x, y, self.DOT_SIZE, self.DOT_SIZE)
+            dot_x = self.width() - self.DOT_SIZE - 8
+            dot_y = (self.height() - self.DOT_SIZE) // 2
+            painter.drawEllipse(dot_x, dot_y, self.DOT_SIZE, self.DOT_SIZE)
+
+            # PR7: distance badge for adjacent-system alerts.
+            # Renders as "+Nj" just left of the threat dot in the same color.
+            if self._threat_distance and self._threat_distance > 0:
+                from PySide6.QtGui import QFont
+
+                badge_text = f"+{self._threat_distance}j"
+                font = painter.font()
+                badge_font = QFont(font)
+                badge_font.setPointSize(7)
+                badge_font.setBold(True)
+                painter.setFont(badge_font)
+                # Foreground stays in the threat color but bumped opaque so
+                # it stays legible even when the dot itself is dim.
+                text_color = QColor(r, g, b, max(180, alpha))
+                painter.setPen(QPen(text_color))
+                metrics = painter.fontMetrics()
+                text_w = metrics.horizontalAdvance(badge_text)
+                # Place to the left of the dot, vertically centered.
+                text_x = dot_x - text_w - 3
+                text_y = (self.height() + metrics.ascent() - metrics.descent()) // 2
+                painter.drawText(text_x, text_y, badge_text)
         finally:
             painter.end()
 
@@ -328,7 +374,19 @@ class StatusDock(QWidget):
                 )
                 if not should_apply:
                     continue
-                chip.set_threat_state(level, system, alpha=alpha)
+                # PR7: surface the jump distance for the +Nj badge.
+                distance: int | None = None
+                if (
+                    alpha < 1.0
+                    and chip_system
+                    and calculator is not None
+                    and chip_system.lower() != system.lower()
+                ):
+                    try:
+                        distance = calculator.distance(chip_system, system)
+                    except (AttributeError, TypeError, ValueError):
+                        distance = None
+                chip.set_threat_state(level, system, alpha=alpha, distance=distance)
                 count += 1
             except RuntimeError:
                 continue

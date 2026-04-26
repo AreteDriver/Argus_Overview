@@ -66,7 +66,11 @@ def resolve_tint(
     if jump_calculator is None or max_jumps <= 0:
         return False, 0.0
 
-    distance = jump_calculator.distance(known_system, alert_system)
+    try:
+        distance = jump_calculator.distance(known_system, alert_system)
+    except (AttributeError, TypeError, ValueError):
+        # Calculator misconfigured / corrupt — treat as unknown distance.
+        return False, 0.0
     if distance is None or distance > max_jumps:
         return False, 0.0
 
