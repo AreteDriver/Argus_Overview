@@ -430,6 +430,35 @@ class IntelPanel(QWidget):
     def _setup_ui(self):
         layout = QVBoxLayout()
 
+        # ---- Master toggle — chrome on/off ---------------------------
+        master_group = QGroupBox("Intel-Aware Preview Chrome")
+        master_form = QFormLayout()
+
+        self.chrome_enabled_check = QCheckBox()
+        self.chrome_enabled_check.setChecked(
+            self.settings_manager.get("intel.preview_chrome_enabled", True)
+        )
+        self.chrome_enabled_check.stateChanged.connect(
+            lambda: self.setting_changed.emit(
+                "intel.preview_chrome_enabled",
+                self.chrome_enabled_check.isChecked(),
+            )
+        )
+        self.chrome_enabled_check.setToolTip(
+            "Master toggle for the v3.2.0 intel-aware preview chrome.\n\n"
+            "When OFF, threat tints / pulses / dots / +Nj badges are\n"
+            "suppressed on previews and chips. The intel parser, audio\n"
+            "alerts, tray notifications, system labels on chips, and the\n"
+            "replay strip all keep working.\n\n"
+            "Use this if you find threat tints distracting or you don't\n"
+            "use chat-log intel — the rest of Argus is unaffected."
+        )
+        self.chrome_enabled_check.setStyleSheet("QCheckBox { font-weight: bold; }")
+        master_form.addRow("Show threat chrome on previews:", self.chrome_enabled_check)
+
+        master_group.setLayout(master_form)
+        layout.addWidget(master_group)
+
         # ---- Per-character location tracker ---------------------------
         loc_group = QGroupBox("Per-Character Location Tracking")
         loc_form = QFormLayout()

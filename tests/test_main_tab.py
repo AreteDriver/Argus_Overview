@@ -10710,3 +10710,170 @@ class TestWindowPreviewReplayPersistence:
             assert widget.is_replay_strip_enabled() is True
         finally:
             widget.deleteLater()
+
+
+# =============================================================================
+# Master toggle: intel.preview_chrome_enabled (v3.2.0 follow-up)
+# =============================================================================
+
+
+def _make_window_with_settings(chrome_enabled: bool):
+    """Build a bypassed-init MainWindowV21 with a settings_manager mock."""
+    from argus_overview.ui.main_window_v21 import MainWindowV21
+
+    window = MainWindowV21.__new__(MainWindowV21)
+    sm = MagicMock()
+    sm.get.side_effect = lambda key, default=None: (
+        chrome_enabled if key == "intel.preview_chrome_enabled" else default
+    )
+    window.settings_manager = sm
+    window.main_tab = MagicMock()
+    window.main_tab.window_manager = MagicMock()
+    window.main_tab.status_dock = MagicMock()
+    window.system_tray = MagicMock()
+    return window
+
+
+class TestMainWindowV21ChromeMasterToggle:
+    """When intel.preview_chrome_enabled is False, fan-out is suppressed."""
+
+    def _make_report(self):
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+
+        return IntelReport(
+            system="HED-GP",
+            threat_level=ThreatLevel.DANGER,
+            hostile_count=2,
+            ship_types=[],
+            player_names=[],
+            raw_message="hostiles",
+        )
+
+    def test_chrome_on_calls_fan_out(self):
+        from argus_overview.intel.alerts import AlertType
+
+        window = _make_window_with_settings(chrome_enabled=True)
+        window._on_intel_alert(self._make_report(), AlertType.VISUAL_BORDER)
+        window.main_tab.window_manager.apply_threat_state.assert_called_once()
+        window.main_tab.status_dock.set_threat_state.assert_called_once()
+
+    def test_chrome_off_suppresses_fan_out(self):
+        from argus_overview.intel.alerts import AlertType
+
+        window = _make_window_with_settings(chrome_enabled=False)
+        window._on_intel_alert(self._make_report(), AlertType.VISUAL_BORDER)
+        window.main_tab.window_manager.apply_threat_state.assert_not_called()
+        window.main_tab.status_dock.set_threat_state.assert_not_called()
+
+    def test_chrome_off_still_fires_critical_tray_notification(self):
+        from argus_overview.intel.alerts import AlertType
+        from argus_overview.intel.parser import IntelReport, ThreatLevel
+
+        window = _make_window_with_settings(chrome_enabled=False)
+        critical = IntelReport(
+            system="Jita",
+            threat_level=ThreatLevel.CRITICAL,
+            hostile_count=10,
+            ship_types=["titan"],
+            player_names=[],
+            raw_message="hot drop",
+        )
+        window._on_intel_alert(critical, AlertType.VISUAL_BORDER)
+        # Tray notification independent of the chrome toggle
+        window.system_tray.show_notification.assert_called_once()
+
+    def test_no_settings_manager_defaults_to_on(self):
+        """Bypassed-init sites without settings_manager should still fan out."""
+        from argus_overview.intel.alerts import AlertType
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        # No settings_manager set
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.status_dock = MagicMock()
+        window.system_tray = MagicMock()
+
+        window._on_intel_alert(self._make_report(), AlertType.VISUAL_BORDER)
+
+        window.main_tab.window_manager.apply_threat_state.assert_called_once()
+
+
+class TestMainWindowV21ClearThreatChrome:
+    """_clear_threat_chrome flushes both surfaces with CLEAR."""
+
+    def test_clear_calls_both_surfaces(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.status_dock = MagicMock()
+
+        window._clear_threat_chrome()
+
+        window.main_tab.window_manager.apply_threat_state.assert_called_once_with(
+            ThreatLevel.CLEAR, None
+        )
+        window.main_tab.status_dock.set_threat_state.assert_called_once_with(
+            ThreatLevel.CLEAR, None
+        )
+
+    def test_clear_no_main_tab_safe(self):
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        # No main_tab — should not raise
+        window._clear_threat_chrome()
+
+    def test_clear_dock_optional(self):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.main_tab = MagicMock(spec=["window_manager"])
+        window.main_tab.window_manager = MagicMock()
+
+        window._clear_threat_chrome()
+
+        window.main_tab.window_manager.apply_threat_state.assert_called_once_with(
+            ThreatLevel.CLEAR, None
+        )
+
+
+class TestMainWindowV21ApplySettingChromeToggle:
+    """_apply_setting routes the toggle-off case to _clear_threat_chrome."""
+
+    def test_toggle_off_clears_chrome(self):
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.logger = MagicMock()
+        window._clear_threat_chrome = MagicMock()
+
+        window._apply_setting("intel.preview_chrome_enabled", False)
+
+        window._clear_threat_chrome.assert_called_once()
+
+    def test_toggle_on_does_not_clear(self):
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.logger = MagicMock()
+        window._clear_threat_chrome = MagicMock()
+
+        window._apply_setting("intel.preview_chrome_enabled", True)
+
+        window._clear_threat_chrome.assert_not_called()
+
+    def test_unrelated_key_does_not_clear(self):
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MainWindowV21.__new__(MainWindowV21)
+        window.logger = MagicMock()
+        window._clear_threat_chrome = MagicMock()
+
+        window._apply_setting("performance.default_refresh_rate", 30)
+
+        window._clear_threat_chrome.assert_not_called()

@@ -201,6 +201,7 @@ class TestIntelPanel:
     def _settings_mock(self, overrides=None):
         """Per-key settings mock so unrelated lookups return their defaults."""
         store = {
+            "intel.preview_chrome_enabled": True,
             "intel.track_character_locations": True,
             "intel.threat_jumps_threshold": 1,
             "replay_strip_enabled": {},
@@ -280,6 +281,39 @@ class TestIntelPanel:
         try:
             # Spinbox max is 5 — value should clamp on init.
             assert panel.jumps_threshold_spin.value() == 5
+        finally:
+            panel.deleteLater()
+
+    def test_chrome_toggle_default_on(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        try:
+            assert panel.chrome_enabled_check.isChecked() is True
+        finally:
+            panel.deleteLater()
+
+    def test_chrome_toggle_init_off(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock({"intel.preview_chrome_enabled": False})
+        panel = IntelPanel(sm)
+        try:
+            assert panel.chrome_enabled_check.isChecked() is False
+        finally:
+            panel.deleteLater()
+
+    def test_chrome_toggle_emits_setting_changed(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        received: list[tuple[str, object]] = []
+        panel.setting_changed.connect(lambda k, v: received.append((k, v)))
+        try:
+            panel.chrome_enabled_check.setChecked(False)
+            assert ("intel.preview_chrome_enabled", False) in received
         finally:
             panel.deleteLater()
 
