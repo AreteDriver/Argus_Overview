@@ -178,6 +178,29 @@ class MainWindowV21(QMainWindow):
         self.location_tracker.character_system_changed.connect(self._on_character_system_changed)
         self.location_tracker.start()
 
+        # PR6: wire one shared JumpCalculator into both threat fan-out paths
+        # so adjacent-system alerts also tint at reduced intensity. max_jumps
+        # is gated on intel.threat_jumps_threshold (default 1).
+        self._init_threat_jump_filter()
+
+    def _init_threat_jump_filter(self) -> None:
+        """Wire a shared JumpCalculator into the manager + dock fan-out."""
+        from argus_overview.intel.jumps import JumpCalculator
+
+        max_jumps = int(self.settings_manager.get("intel.threat_jumps_threshold", 1))
+        if max_jumps <= 0:
+            self.jump_calculator = None
+            return
+        self.jump_calculator = JumpCalculator()
+        if not hasattr(self, "main_tab"):
+            return
+        wm = getattr(self.main_tab, "window_manager", None)
+        if wm is not None and hasattr(wm, "set_jump_calculator"):
+            wm.set_jump_calculator(self.jump_calculator, max_jumps=max_jumps)
+        dock = getattr(self.main_tab, "status_dock", None)
+        if dock is not None and hasattr(dock, "set_jump_calculator"):
+            dock.set_jump_calculator(self.jump_calculator, max_jumps=max_jumps)
+
     @Slot(str, str)
     def _on_character_system_changed(self, character_name: str, system: str) -> None:
         """Forward per-character system updates to the dock + window manager."""

@@ -9260,9 +9260,17 @@ class TestWindowManagerApplyThreatState:
             count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
 
             assert count == 3
-            f1.set_threat_state.assert_called_once_with(ThreatLevel.DANGER, "HED-GP")
-            f2.set_threat_state.assert_called_once_with(ThreatLevel.DANGER, "HED-GP")
-            f3.set_threat_state.assert_called_once_with(ThreatLevel.DANGER, "HED-GP")
+            # PR6: smart-filter branch passes initial_alpha=1.0 explicitly when
+            # the per-character system is unknown (graceful fallback).
+            f1.set_threat_state.assert_called_once_with(
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+            )
+            f2.set_threat_state.assert_called_once_with(
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+            )
+            f3.set_threat_state.assert_called_once_with(
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+            )
 
     def test_apply_threat_state_empty_frames(self):
         from argus_overview.intel.parser import ThreatLevel
@@ -9823,7 +9831,9 @@ class TestWindowManagerApplyThreatStateSmartFanout:
         count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
 
         assert count == 1
-        alice.set_threat_state.assert_called_once_with(ThreatLevel.DANGER, "HED-GP")
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+        )
         bob.set_threat_state.assert_not_called()
 
     def test_unknown_character_falls_through_to_apply(self):
@@ -9941,5 +9951,251 @@ class TestStatusDockSmartFanout:
 
             count = dock.set_threat_state(ThreatLevel.WARNING, None)
             assert count == 2
+        finally:
+            dock.deleteLater()
+
+
+# =============================================================================
+# Jumps-from threat fan-out (PR6)
+# =============================================================================
+
+
+class TestWindowPreviewWidgetInitialAlpha:
+    """set_threat_state honors the initial_alpha param."""
+
+    def _make_widget(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        return WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+
+    def test_default_alpha_is_one(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "Jita")
+            assert widget._threat_alpha == 1.0
+        finally:
+            widget.deleteLater()
+
+    def test_explicit_alpha_applied(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "Jita", initial_alpha=0.5)
+            assert widget._threat_alpha == 0.5
+        finally:
+            widget.deleteLater()
+
+    def test_alpha_clamped_to_unit_range(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "Jita", initial_alpha=2.5)
+            assert widget._threat_alpha == 1.0
+            widget.set_threat_state(ThreatLevel.WARNING, "Jita", initial_alpha=-0.5)
+            assert widget._threat_alpha == 0.0
+        finally:
+            widget.deleteLater()
+
+    def test_pulse_skipped_for_low_alpha_alerts(self, qapp):
+        """Adjacent-system alerts (low alpha) should NOT pulse."""
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.DANGER, "Jita", initial_alpha=0.5)
+            assert widget._pulse_phase == 0.0
+        finally:
+            widget.deleteLater()
+
+    def test_pulse_fires_for_full_alpha_danger(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.DANGER, "Jita", initial_alpha=1.0)
+            assert widget._pulse_phase == 1.0
+        finally:
+            widget.deleteLater()
+
+
+def _calc_mock(distances: dict[tuple[str, str], int | None]):
+    """Build a MagicMock JumpCalculator from a (from, to) -> distance map."""
+    calc = MagicMock()
+
+    def _distance(a, b):
+        return distances.get((a, b)) or distances.get((b, a))
+
+    calc.distance.side_effect = _distance
+    return calc
+
+
+class TestWindowManagerJumpsFromFanout:
+    """WindowManager.apply_threat_state with jumps-from filter."""
+
+    def _make_manager(
+        self,
+        char_systems: dict[str, str],
+        max_jumps: int = 0,
+        distances: dict[tuple[str, str], int | None] | None = None,
+    ):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.preview_frames = {}
+        manager._character_systems = dict(char_systems)
+        manager._jump_calculator = _calc_mock(distances or {}) if distances else None
+        manager._jump_max = max_jumps
+        return manager
+
+    def test_set_jump_calculator_stores_calculator_and_max(self):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        calc = MagicMock()
+
+        manager.set_jump_calculator(calc, max_jumps=3)
+
+        assert manager._jump_calculator is calc
+        assert manager._jump_max == 3
+
+    def test_set_jump_calculator_clamps_negative_max(self):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.set_jump_calculator(MagicMock(), max_jumps=-5)
+
+        assert manager._jump_max == 0
+
+    def test_adjacent_character_tinted_with_falloff_alpha(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(
+            char_systems={"Alice": "Jita", "Bob": "HED-GP"},
+            max_jumps=2,
+            distances={("Jita", "HED-GP"): 1, ("HED-GP", "HED-GP"): 0},
+        )
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 2
+        bob.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+        )
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5
+        )
+
+    def test_beyond_threshold_skipped(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(
+            char_systems={"Alice": "Jita"},
+            max_jumps=1,
+            distances={("Jita", "HED-GP"): 4},
+        )
+        alice = _frame_mock("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 0
+        alice.set_threat_state.assert_not_called()
+
+    def test_no_calculator_keeps_pr5_exact_match_only(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "Jita", "Bob": "HED-GP"}, max_jumps=0)
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 1
+        bob.set_threat_state.assert_called_once()
+        alice.set_threat_state.assert_not_called()
+
+
+class TestStatusDockJumpsFromFanout:
+    """StatusDock.set_threat_state with jumps-from filter."""
+
+    def test_set_jump_calculator_stores_calculator_and_max(self, qapp):
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            calc = MagicMock()
+            dock.set_jump_calculator(calc, max_jumps=2)
+            assert dock._jump_calculator is calc
+            assert dock._jump_max == 2
+        finally:
+            dock.deleteLater()
+
+    def test_adjacent_chip_tinted_with_falloff_alpha(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            calc = _calc_mock({("Jita", "HED-GP"): 1})
+            dock.set_jump_calculator(calc, max_jumps=2)
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "Jita")
+            dock.set_character_system("Bob", "HED-GP")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 2
+            assert dock._chips["0x2"]._threat_alpha == 1.0
+            assert dock._chips["0x1"]._threat_alpha == 0.5
+        finally:
+            dock.deleteLater()
+
+    def test_beyond_threshold_chip_skipped(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            calc = _calc_mock({("Jita", "HED-GP"): 5})
+            dock.set_jump_calculator(calc, max_jumps=1)
+            dock.add_chip("0x1", "Alice")
+            dock.set_character_system("Alice", "Jita")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 0
+            assert dock._chips["0x1"]._threat_level is None
+        finally:
+            dock.deleteLater()
+
+    def test_no_calculator_keeps_pr5_behavior(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "Jita")
+            dock.set_character_system("Bob", "HED-GP")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 1
+            assert dock._chips["0x2"]._threat_level is not None
+            assert dock._chips["0x1"]._threat_level is None
         finally:
             dock.deleteLater()
