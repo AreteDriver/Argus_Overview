@@ -410,6 +410,102 @@ class HotkeysPanel(QWidget):
         )
 
 
+class IntelPanel(QWidget):
+    """
+    Intel settings — exposes the v3.2.0 chrome controls so users don't
+    have to edit settings.json directly.
+
+    Surfaces:
+        - intel.track_character_locations (bool, default true)
+        - intel.threat_jumps_threshold (int, default 1, range 0-5)
+    """
+
+    setting_changed = Signal(str, object)
+
+    def __init__(self, settings_manager):
+        super().__init__()
+        self.settings_manager = settings_manager
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout()
+
+        # ---- Per-character location tracker ---------------------------
+        loc_group = QGroupBox("Per-Character Location Tracking")
+        loc_form = QFormLayout()
+
+        self.track_locations_check = QCheckBox()
+        self.track_locations_check.setChecked(
+            self.settings_manager.get("intel.track_character_locations", True)
+        )
+        self.track_locations_check.stateChanged.connect(
+            lambda: self.setting_changed.emit(
+                "intel.track_character_locations",
+                self.track_locations_check.isChecked(),
+            )
+        )
+        self.track_locations_check.setToolTip(
+            "Read each EVE client's Local channel log to track which "
+            "system that character is currently in.\n"
+            "Required for smart per-character threat fan-out and the "
+            "system label on each chip in the dock.\n"
+            "Takes effect on next app restart."
+        )
+        loc_form.addRow("Track per-character location:", self.track_locations_check)
+
+        loc_group.setLayout(loc_form)
+        layout.addWidget(loc_group)
+
+        # ---- Adjacent-system threat tinting ---------------------------
+        threat_group = QGroupBox("Adjacent-System Threat Tinting")
+        threat_form = QFormLayout()
+
+        self.jumps_threshold_spin = QSpinBox()
+        self.jumps_threshold_spin.setRange(0, 5)
+        self.jumps_threshold_spin.setValue(
+            int(self.settings_manager.get("intel.threat_jumps_threshold", 1))
+        )
+        self.jumps_threshold_spin.setSuffix(" jumps")
+        self.jumps_threshold_spin.valueChanged.connect(
+            lambda v: self.setting_changed.emit("intel.threat_jumps_threshold", v)
+        )
+        self.jumps_threshold_spin.setToolTip(
+            "How many jumps away from an alert system a character can be "
+            "and still see a threat tint on their preview frame and chip.\n"
+            "0 = exact-match only (no adjacent tinting).\n"
+            "1 = same system + immediate neighbors (default).\n"
+            "Higher values cast a wider net at proportionally lower alpha.\n"
+            "Takes effect on next app restart."
+        )
+        threat_form.addRow("Max jumps for tinting:", self.jumps_threshold_spin)
+
+        threat_group.setLayout(threat_form)
+        layout.addWidget(threat_group)
+
+        # ---- Replay strip toggle (read-only summary) ------------------
+        # Per-character toggles live in each window's right-click menu;
+        # we surface the count here so users discover the feature exists.
+        replay_group = QGroupBox("Replay Strip")
+        replay_form = QFormLayout()
+
+        store = self.settings_manager.get("replay_strip_enabled", {}) or {}
+        active_count = sum(1 for v in store.values() if v) if isinstance(store, dict) else 0
+        replay_label = QLabel(
+            f"{active_count} character(s) have the replay strip enabled.\n"
+            "Right-click a preview frame and choose 'Toggle Replay Strip' "
+            "to enable or disable per character."
+        )
+        replay_label.setWordWrap(True)
+        replay_label.setStyleSheet("color: #aaa; padding: 4px;")
+        replay_form.addRow(replay_label)
+
+        replay_group.setLayout(replay_form)
+        layout.addWidget(replay_group)
+
+        layout.addStretch()
+        self.setLayout(layout)
+
+
 class AppearancePanel(QWidget):
     """Appearance settings"""
 
@@ -632,6 +728,12 @@ class SettingsTab(QWidget):
         self.hotkeys_panel.setting_changed.connect(self._on_setting_changed)
         self.panel_stack.addWidget(self.hotkeys_panel)
 
+        # Intel panel surfaces the v3.2.0 chrome controls (per-character
+        # location tracking, jumps-from threshold, replay strip summary).
+        self.intel_panel = IntelPanel(self.settings_manager)
+        self.intel_panel.setting_changed.connect(self._on_setting_changed)
+        self.panel_stack.addWidget(self.intel_panel)
+
         self.appearance_panel = AppearancePanel(self.settings_manager)
         self.appearance_panel.setting_changed.connect(self._on_setting_changed)
         self.panel_stack.addWidget(self.appearance_panel)
@@ -663,7 +765,7 @@ class SettingsTab(QWidget):
         self.category_tree = QTreeWidget()
         self.category_tree.setHeaderHidden(True)
 
-        categories = ["General", "Performance", "Hotkeys", "Appearance", "Advanced"]
+        categories = ["General", "Performance", "Hotkeys", "Intel", "Appearance", "Advanced"]
 
         for category in categories:
             item = QTreeWidgetItem([category])
@@ -687,8 +789,9 @@ class SettingsTab(QWidget):
                 "General": 0,
                 "Performance": 1,
                 "Hotkeys": 2,
-                "Appearance": 3,
-                "Advanced": 4,
+                "Intel": 3,
+                "Appearance": 4,
+                "Advanced": 5,
             }
             category = current.text(0)
             if category in categories:
