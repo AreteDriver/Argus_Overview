@@ -1,3 +1,3 @@
-"""Argus Overview v2.6 - Performance & Layout Edition"""
+"""Argus Overview v3.2 - Intel-Aware Edition"""
 
-__version__ = "3.0.4"
+__version__ = "3.2.0"

@@ -5,6 +5,75 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] - 2026-04-26 — Intel-Aware Edition
+
+This release ships a 10-PR arc that turns Argus's preview chrome into an
+intel-aware UI. Frame borders and chip dots now carry threat state from
+the chat-log parser; per-character system tracking unlocks smart fan-out;
+adjacent-system alerts tint at reduced intensity with a "+Nj" badge.
+EVE-O Preview cannot match any tier of this — it has no access to
+the parser running inside the same process.
+
+### Added
+- **Intel-aware preview borders** — frames tint by IntelReport threat level
+  (clear / info / warning / danger / critical) with 30s linear alpha
+  decay and a 600ms pulse on upgrade into danger or critical.
+- **Character status dock** — horizontal chip strip above the preview
+  grid. Each chip shows a colored-initials avatar (deterministic
+  per-character accent), name, current system, and a threat-tint dot.
+  Click a chip to focus the matching window.
+- **Preview focus mode** — double-click any thumbnail to spotlight it
+  (scales up, others fade to 25% opacity). Press Escape or
+  double-click again to exit.
+- **Per-character system tracking** — new `intel/character_location.py`
+  polls EVE Local channel logs (UTF-16-LE), parses each file's
+  `Listener:` header, and tails for "Channel changed to Local : X" so
+  every character has an independent current-system map.
+- **Smart per-character threat fan-out** — alerts only tint frames + chips
+  for characters in the affected system. Unknown locations fall through
+  to full intensity (graceful upgrade).
+- **Jumps-from threat fan-out** — adjacent-system alerts also tint, with
+  per-jump alpha falloff (`0.5 ^ distance`, floor 0.4). Configurable via
+  `intel.threat_jumps_threshold` (default 1, set 0 to disable).
+- **"+Nj" distance badge** on chips and frames during adjacent-system
+  alerts. Tooltip explicitly shows `Threat: warning (1j away)`.
+- **Per-character accent border** on preview frames during clear state.
+  Same color as the chip avatar — instant visual identity at small
+  grid sizes.
+- **Replay strip** — toggleable horizontal strip below each preview that
+  holds the last ~5 seconds of capture as 6 thumbnails. Hover a cell to
+  swap the main image to that buffered frame; mouse leave restores live.
+  Toggle via right-click → "Show replay strip"; persists per-character
+  via `replay_strip_enabled` setting.
+
+### Internals
+- **`intel/threat_filter.resolve_tint`** — single-source-of-truth filter
+  used by both `WindowManager` and `StatusDock` so per-character tinting
+  rules stay symmetric across grid + dock.
+- **Promoted accent palette** to `main_tab.py` (`CHARACTER_ACCENT_COLORS`,
+  `character_accent_color`) so frame border + chip avatar + future
+  surfaces all draw the same color for the same character.
+- **`WindowPreviewWidget.set_threat_state`** gained `initial_alpha` and
+  `distance` kwargs. Pulse animation gates on `initial_alpha >= 0.9` so
+  distant adjacent alerts glow but don't pulse.
+
+### Settings (new)
+- `intel.threat_jumps_threshold` — int, default 1. Max jumps to consider
+  for adjacent-system tinting; 0 disables.
+- `intel.track_character_locations` — bool, default true. Toggles the
+  Local-log location tracker.
+- `replay_strip_enabled` — `dict[character_name, bool]`. Per-character
+  replay-strip visibility, persisted across sessions.
+
+### Tests
+- **+212 new tests**, full suite at 2391 passed / 5 skipped.
+- New test files: `test_character_location.py`, `test_threat_filter.py`,
+  `test_status_dock.py`, `test_replay_strip.py`.
+
+### CI
+- Ignored `CVE-2026-3219` (pip itself, no upstream patch yet) in
+  `pip-audit` so PRs aren't blocked by a vulnerability we can't fix.
+
 ## [3.1.2] - 2026-04-15
 
 ### Security
