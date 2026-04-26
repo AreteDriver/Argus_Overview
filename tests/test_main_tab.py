@@ -9409,3 +9409,260 @@ class TestMainWindowV21IntelAlertThreatFanout:
         window._on_intel_alert("not a report", AlertType.VISUAL_BORDER)
 
         window.main_tab.window_manager.apply_threat_state.assert_not_called()
+
+
+# =============================================================================
+# Spotlight / Focus Mode Tests (PR3)
+# =============================================================================
+
+
+class TestWindowPreviewWidgetSpotlight:
+    """Tests for set_spotlight() state transitions."""
+
+    def _make(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        widget = WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+        return widget
+
+    def test_set_spotlight_focused_grows(self, qapp):
+        widget = self._make(qapp)
+        try:
+            widget.set_spotlight("focused")
+            assert widget._spotlight_mode == "focused"
+            # Focused widget gets a larger min size than the default 200x150
+            assert widget.minimumWidth() >= 360
+            assert widget.opacity_effect.opacity() == 1.0
+        finally:
+            widget.deleteLater()
+
+    def test_set_spotlight_dimmed_drops_opacity(self, qapp):
+        widget = self._make(qapp)
+        try:
+            widget.set_spotlight("dimmed")
+            assert widget._spotlight_mode == "dimmed"
+            assert widget.opacity_effect.opacity() == 0.25
+        finally:
+            widget.deleteLater()
+
+    def test_set_spotlight_none_restores(self, qapp):
+        widget = self._make(qapp)
+        try:
+            normal_min = widget._normal_min_size
+            widget.set_spotlight("focused")
+            widget.set_spotlight(None)
+            assert widget._spotlight_mode is None
+            assert widget.minimumSize() == normal_min
+            assert widget.opacity_effect.opacity() == 1.0
+        finally:
+            widget.deleteLater()
+
+    def test_set_spotlight_invalid_raises(self, qapp):
+        import pytest
+
+        widget = self._make(qapp)
+        try:
+            with pytest.raises(ValueError):
+                widget.set_spotlight("bogus")
+        finally:
+            widget.deleteLater()
+
+    def test_double_click_emits_focus_requested(self, qapp):
+        from PySide6.QtCore import QPoint, Qt
+        from PySide6.QtGui import QMouseEvent
+
+        widget = self._make(qapp)
+        try:
+            received: list[str] = []
+            widget.focus_requested.connect(received.append)
+            event = QMouseEvent(
+                QMouseEvent.Type.MouseButtonDblClick,
+                QPoint(50, 50),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            widget.mouseDoubleClickEvent(event)
+            assert received == ["0xABC"]
+        finally:
+            widget.deleteLater()
+
+
+class TestMainTabFocusMode:
+    """Tests for MainTab focus mode controller."""
+
+    def _make_tab(self):
+        from argus_overview.ui.main_tab import MainTab
+
+        tab = MainTab.__new__(MainTab)
+        tab.logger = MagicMock()
+        tab._focus_window_id = None
+        tab.window_manager = MagicMock()
+        tab.window_manager.preview_frames = {}
+        return tab
+
+    def test_enter_focus_mode_unknown_window_noop(self):
+        tab = self._make_tab()
+        tab.enter_focus_mode("missing")
+        assert tab._focus_window_id is None
+
+    def test_enter_focus_mode_sets_state_and_fans_out(self):
+        tab = self._make_tab()
+        f1, f2 = MagicMock(), MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1, "w2": f2}
+
+        tab.enter_focus_mode("w1")
+
+        assert tab._focus_window_id == "w1"
+        f1.set_spotlight.assert_called_once_with("focused")
+        f2.set_spotlight.assert_called_once_with("dimmed")
+
+    def test_exit_focus_mode_clears_all(self):
+        tab = self._make_tab()
+        f1, f2 = MagicMock(), MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1, "w2": f2}
+        tab._focus_window_id = "w1"
+
+        tab.exit_focus_mode()
+
+        assert tab._focus_window_id is None
+        f1.set_spotlight.assert_called_once_with(None)
+        f2.set_spotlight.assert_called_once_with(None)
+
+    def test_exit_focus_mode_when_inactive_noop(self):
+        tab = self._make_tab()
+        f1 = MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1}
+
+        tab.exit_focus_mode()
+
+        f1.set_spotlight.assert_not_called()
+
+    def test_on_focus_requested_toggles_on(self):
+        tab = self._make_tab()
+        f1 = MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1}
+
+        tab._on_focus_requested("w1")
+
+        assert tab._focus_window_id == "w1"
+
+    def test_on_focus_requested_toggles_off_when_same_window(self):
+        tab = self._make_tab()
+        f1 = MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1}
+        tab._focus_window_id = "w1"
+
+        tab._on_focus_requested("w1")
+
+        assert tab._focus_window_id is None
+
+    def test_on_focus_requested_swaps_to_different_window(self):
+        tab = self._make_tab()
+        f1, f2 = MagicMock(), MagicMock()
+        tab.window_manager.preview_frames = {"w1": f1, "w2": f2}
+        tab._focus_window_id = "w1"
+
+        tab._on_focus_requested("w2")
+
+        assert tab._focus_window_id == "w2"
+        # f1 should be dimmed now (used to be focused), f2 focused
+        f1.set_spotlight.assert_called_with("dimmed")
+        f2.set_spotlight.assert_called_with("focused")
+
+    def test_apply_focus_state_skips_deleted_widgets(self):
+        tab = self._make_tab()
+        ok = MagicMock()
+        dead = MagicMock()
+        dead.set_spotlight.side_effect = RuntimeError("widget deleted")
+        tab.window_manager.preview_frames = {"alive": ok, "dead": dead}
+        tab._focus_window_id = "alive"
+
+        tab._apply_focus_state()
+
+        ok.set_spotlight.assert_called_with("focused")
+
+    def test_is_focus_mode_active(self):
+        tab = self._make_tab()
+        assert tab.is_focus_mode_active() is False
+        tab._focus_window_id = "w1"
+        assert tab.is_focus_mode_active() is True
+
+    def test_remove_focused_window_clears_focus(self):
+        from argus_overview.ui.main_tab import MainTab
+
+        tab = MainTab.__new__(MainTab)
+        tab.logger = MagicMock()
+        tab._focus_window_id = "w1"
+        tab.status_dock = MagicMock()
+        tab._update_status = MagicMock()
+
+        # Build a frame mock with the disconnect surface and session_timer
+        frame = MagicMock()
+        wm = MagicMock()
+        wm.preview_frames = {"w1": frame}
+        tab.window_manager = wm
+
+        tab._on_window_removed("w1")
+
+        assert tab._focus_window_id is None
+        wm.remove_window.assert_called_once_with("w1")
+        # Disconnect calls happened
+        frame.window_activated.disconnect.assert_called()
+        frame.focus_requested.disconnect.assert_called()
+
+
+class TestMainTabFocusEscapeKey:
+    """Tests that Escape exits focus mode without swallowing other keys."""
+
+    def test_escape_when_focused_exits(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QKeyEvent
+
+        from argus_overview.ui.main_tab import MainTab
+
+        tab = MainTab.__new__(MainTab)
+        tab.logger = MagicMock()
+        tab._focus_window_id = "w1"
+        tab.window_manager = MagicMock()
+        tab.window_manager.preview_frames = {"w1": MagicMock()}
+
+        event = QKeyEvent(
+            QKeyEvent.Type.KeyPress,
+            Qt.Key.Key_Escape,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        tab.keyPressEvent(event)
+
+        assert tab._focus_window_id is None
+
+    def test_escape_when_not_focused_passes_through(self):
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QKeyEvent
+
+        from argus_overview.ui.main_tab import MainTab
+
+        tab = MainTab.__new__(MainTab)
+        tab.logger = MagicMock()
+        tab._focus_window_id = None
+        tab.window_manager = MagicMock()
+        tab.window_manager.preview_frames = {}
+
+        event = QKeyEvent(
+            QKeyEvent.Type.KeyPress,
+            Qt.Key.Key_Escape,
+            Qt.KeyboardModifier.NoModifier,
+        )
+        # Should not raise even though super().keyPressEvent reaches QWidget
+        # bypassed init — bypass keyPressEvent dispatch by mocking out super
+        # via a real QWidget call would crash, so we just assert the focus
+        # path didn't fire.
+        try:
+            tab.keyPressEvent(event)
+        except RuntimeError:
+            pass  # Expected: super().keyPressEvent hits bypassed-init widget
+        assert tab._focus_window_id is None

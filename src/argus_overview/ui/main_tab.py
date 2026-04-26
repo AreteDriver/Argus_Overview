@@ -589,6 +589,7 @@ class WindowPreviewWidget(QWidget):
     window_activated = Signal(str)  # window_id
     window_removed = Signal(str)  # window_id
     label_changed = Signal(str, str)  # window_id, new_label
+    focus_requested = Signal(str)  # window_id — PR3 spotlight toggle
 
     def __init__(
         self,
@@ -686,10 +687,18 @@ class WindowPreviewWidget(QWidget):
         if self._show_session_timer:
             self.session_timer.start(60000)  # Update every minute
 
-        # Opacity effect for hover
+        # Opacity effect for hover (and PR3 spotlight dim state)
         self.opacity_effect = QGraphicsOpacityEffect(self)
         self.opacity_effect.setOpacity(1.0)
         self.setGraphicsEffect(self.opacity_effect)
+
+        # PR3 — focus/spotlight mode state.
+        # mode is one of: None (normal), "focused" (this widget is the
+        # spotlight target), "dimmed" (another widget has spotlight).
+        self._spotlight_mode: str | None = None
+        # Cached size constraints so we can restore them when leaving focus.
+        self._normal_min_size: QSize = self.minimumSize()
+        self._normal_max_size: QSize = self.maximumSize()
 
     def _load_settings(self):
         """Load settings from settings_manager"""
@@ -902,6 +911,36 @@ class WindowPreviewWidget(QWidget):
             self._pulse_timer.stop()
         self.update()
 
+    def set_spotlight(self, mode: str | None) -> None:
+        """
+        Apply or clear focus/spotlight presentation.
+
+        Args:
+            mode: 'focused' to upscale + full opacity (this widget is the
+                spotlight target), 'dimmed' to fade and desaturate (another
+                widget owns the spotlight), None to return to normal.
+        """
+        if mode not in (None, "focused", "dimmed"):
+            raise ValueError(f"Invalid spotlight mode: {mode!r}")
+        self._spotlight_mode = mode
+
+        if mode == "focused":
+            # Allow growth beyond the normal max so the focused widget
+            # actually uses the freed space when others are minimized/hidden.
+            self.setMinimumSize(QSize(360, 270))
+            self.setMaximumSize(QSize(16777215, 16777215))  # QWIDGETSIZE_MAX
+            self.opacity_effect.setOpacity(1.0)
+        elif mode == "dimmed":
+            self.setMinimumSize(self._normal_min_size)
+            self.setMaximumSize(self._normal_max_size)
+            self.opacity_effect.setOpacity(0.25)
+        else:  # None — restore baseline
+            self.setMinimumSize(self._normal_min_size)
+            self.setMaximumSize(self._normal_max_size)
+            # Hover state may want partial opacity; reset to full on exit.
+            self.opacity_effect.setOpacity(self._opacity_on_hover if self._is_hovered else 1.0)
+        self.update()
+
     def flash_border(self, color: str, duration_ms: int) -> None:
         """
         Legacy color/duration border flash hook used by border_flash_requested.
@@ -1017,6 +1056,18 @@ class WindowPreviewWidget(QWidget):
                 self.window_activated.emit(self.window_id)
                 self.logger.info(f"Activating window: {self.window_id}")
             self._drag_start_pos = None
+
+    def mouseDoubleClickEvent(self, event):
+        """PR3: double-click toggles spotlight focus mode for this window."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.focus_requested.emit(self.window_id)
+            event.accept()
+            # Cancel the pending single-click activation that the
+            # preceding press recorded; otherwise the window still
+            # activates beneath the focus toggle.
+            self._drag_start_pos = None
+            return
+        super().mouseDoubleClickEvent(event)
 
     def contextMenuEvent(self, event):
         """Handle right-click context menu (v2.3 - uses ActionRegistry)"""
@@ -1291,6 +1342,9 @@ class MainTab(QWidget):
         self.capture_system = capture_system
         self.character_manager = character_manager
         self.settings_manager = settings_manager
+
+        # PR3: focus mode state — None = normal, str = window_id holding spotlight
+        self._focus_window_id: str | None = None
 
         # v2.2 State
         self._thumbnails_visible = True
@@ -1756,6 +1810,9 @@ class MainTab(QWidget):
                 frame.window_removed.connect(
                     self._on_window_removed, Qt.ConnectionType.UniqueConnection
                 )
+                frame.focus_requested.connect(
+                    self._on_focus_requested, Qt.ConnectionType.UniqueConnection
+                )
 
                 # Add to layout
                 self.preview_layout.addWidget(frame)
@@ -1871,6 +1928,9 @@ class MainTab(QWidget):
             frame.window_removed.connect(
                 self._on_window_removed, Qt.ConnectionType.UniqueConnection
             )
+            frame.focus_requested.connect(
+                self._on_focus_requested, Qt.ConnectionType.UniqueConnection
+            )
             self.preview_layout.addWidget(frame)
             self._sync_status_dock()
             return True
@@ -1930,6 +1990,46 @@ class MainTab(QWidget):
                 self.logger.info(f"Added {added} windows to preview")
                 self._update_status()
 
+    # ----- PR3 focus mode controller --------------------------------------
+    def _on_focus_requested(self, window_id: str) -> None:
+        """Toggle spotlight focus for the given window."""
+        if self._focus_window_id == window_id:
+            self.exit_focus_mode()
+        else:
+            self.enter_focus_mode(window_id)
+
+    def enter_focus_mode(self, window_id: str) -> None:
+        """Spotlight one window: scale up, dim others. Idempotent."""
+        if window_id not in self.window_manager.preview_frames:
+            self.logger.debug(f"Cannot enter focus mode — unknown window {window_id}")
+            return
+        self._focus_window_id = window_id
+        self._apply_focus_state()
+
+    def exit_focus_mode(self) -> None:
+        """Restore normal grid presentation."""
+        if self._focus_window_id is None:
+            return
+        self._focus_window_id = None
+        self._apply_focus_state()
+
+    def is_focus_mode_active(self) -> bool:
+        return self._focus_window_id is not None
+
+    def _apply_focus_state(self) -> None:
+        """Push current focus mode to all preview frames."""
+        focus_id = self._focus_window_id
+        for wid, frame in list(self.window_manager.preview_frames.items()):
+            try:
+                if focus_id is None:
+                    frame.set_spotlight(None)
+                elif wid == focus_id:
+                    frame.set_spotlight("focused")
+                else:
+                    frame.set_spotlight("dimmed")
+            except RuntimeError:
+                continue
+
     def _on_window_activated(self, window_id: str):
         """Handle window activation with optional auto-minimize of previous window"""
         from argus_overview.utils.window_utils import run_x11_subprocess
@@ -1977,11 +2077,23 @@ class MainTab(QWidget):
                 frame.window_removed.disconnect(self._on_window_removed)
             except (RuntimeError, TypeError):
                 pass
+            try:
+                frame.focus_requested.disconnect(self._on_focus_requested)
+            except (RuntimeError, TypeError):
+                pass
             # Stop per-frame timers
             frame.session_timer.stop()
+        # If we just removed the spotlight target, drop focus state.
+        # getattr keeps this safe when called via test helpers that bypass __init__.
+        if getattr(self, "_focus_window_id", None) == window_id:
+            self._focus_window_id = None
         self.window_manager.remove_window(window_id)
         self._update_status()
-        self._sync_status_dock()
+        if hasattr(self, "status_dock"):
+            self._sync_status_dock()
+        if hasattr(self, "_focus_window_id"):
+            # Re-apply (covers both: focus cleared, or other tile removed mid-focus)
+            self._apply_focus_state()
 
     def _remove_all_windows(self):
         """Remove all windows from preview"""
@@ -2140,6 +2252,12 @@ class MainTab(QWidget):
     def keyPressEvent(self, event: QKeyEvent):
         """Handle keyboard shortcuts for window navigation"""
         key = event.key()
+
+        # PR3: Escape exits focus mode (only consume the key if active)
+        if key == Qt.Key.Key_Escape and self.is_focus_mode_active():
+            self.exit_focus_mode()
+            event.accept()
+            return
 
         # Number keys 1-9 to activate window by index
         if Qt.Key.Key_1 <= key <= Qt.Key.Key_9:
