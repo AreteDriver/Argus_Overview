@@ -303,6 +303,24 @@ class StatusDock(QWidget):
         chip.set_system(system)
         return True
 
+    def set_character_system(self, character_name: str, system: str | None) -> int:
+        """
+        Update every chip for a given character. Returns count updated.
+
+        Multi-boxers can run the same character in multiple windows, so
+        chips are matched by character_name, not window_id. Source of the
+        update is typically CharacterLocationTracker.
+        """
+        count = 0
+        for chip in list(self._chips.values()):
+            try:
+                if chip.character_name == character_name:
+                    chip.set_system(system)
+                    count += 1
+            except RuntimeError:
+                continue
+        return count
+
     def sync_from_window_ids(self, desired: dict[str, str]) -> tuple[list[str], list[str]]:
         """
         Bulk diff: ensure chips match `desired` mapping of window_id -> name.
