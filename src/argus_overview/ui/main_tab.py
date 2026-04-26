@@ -665,6 +665,10 @@ class WindowPreviewWidget(QWidget):
         # Intel threat state (PR1: intel-aware preview borders)
         self._threat_level: ThreatLevel | None = None
         self._threat_system: str | None = None
+        # PR9: jumps from this character to the alert system. None for
+        # same-system / unknown; positive int renders as "+Nj" near the
+        # top-left of the threat border.
+        self._threat_distance: int | None = None
         # Decay alpha drives the inset border; ranges 0.0 (off) to 1.0 (full)
         self._threat_alpha: float = 0.0
         self._threat_decay_steps: int = max(1, THREAT_DECAY_DURATION_MS // THREAT_DECAY_TICK_MS)
@@ -900,6 +904,7 @@ class WindowPreviewWidget(QWidget):
         level: ThreatLevel | None,
         system: str | None = None,
         initial_alpha: float = 1.0,
+        distance: int | None = None,
     ) -> None:
         """
         Update the intel threat state for this preview frame.
@@ -911,6 +916,9 @@ class WindowPreviewWidget(QWidget):
                 to 1.0 (full intensity for same-system alerts). Lower values
                 are used by WindowManager when fanning to characters in
                 adjacent systems via the jumps-from filter (PR6).
+            distance: Jumps from this character to the alert system.
+                None for same-system / unknown. Positive ints render as a
+                "+Nj" badge near the top-left of the frame (PR9).
         """
         prev_level = self._threat_level
 
@@ -918,6 +926,7 @@ class WindowPreviewWidget(QWidget):
             self._threat_level = None
             self._threat_system = None
             self._threat_alpha = 0.0
+            self._threat_distance = None
             self._threat_decay_timer.stop()
             self.update()
             return
@@ -925,6 +934,7 @@ class WindowPreviewWidget(QWidget):
         self._threat_level = level
         self._threat_system = system
         self._threat_alpha = max(0.0, min(1.0, initial_alpha))
+        self._threat_distance = distance if distance and distance > 0 else None
 
         # Pulse on upgrade into danger/critical (only at full-ish intensity —
         # don't pulse for distant adjacent-system alerts).
@@ -951,6 +961,7 @@ class WindowPreviewWidget(QWidget):
         if self._threat_alpha <= 0.0:
             self._threat_level = None
             self._threat_system = None
+            self._threat_distance = None
             self._threat_decay_timer.stop()
         self.update()
 
@@ -1054,6 +1065,25 @@ class WindowPreviewWidget(QWidget):
                 4,
                 4,
             )
+
+            # PR9: distance badge — "+Nj" near the top-left corner inside
+            # the threat border, in the threat color. Only renders for
+            # adjacent-system alerts (distance > 0).
+            if self._threat_distance and self._threat_distance > 0:
+                from PySide6.QtGui import QFont
+
+                badge_text = f"+{self._threat_distance}j"
+                badge_font = QFont(painter.font())
+                badge_font.setPointSize(8)
+                badge_font.setBold(True)
+                painter.setFont(badge_font)
+                # Foreground stays in the threat color, opaque so it's
+                # legible even when the border itself is dim.
+                text_color = QColor(r, g, b, max(200, alpha))
+                painter.setPen(QPen(text_color))
+                # Shifted right of where the lock icon sits (x=6) so they
+                # don't overlap when both are visible.
+                painter.drawText(28, 18, badge_text)
 
         # 2. Legacy flash overlay (compat with border_flash_requested)
         if self._flash_color is not None:
@@ -1382,7 +1412,20 @@ class WindowManager:
                 )
                 if not should_apply:
                     continue
-                frame.set_threat_state(level, system, initial_alpha=alpha)
+                # PR9: surface the jump distance for the +Nj frame badge.
+                # Mirrors StatusDock.set_threat_state behavior (PR7).
+                distance: int | None = None
+                if (
+                    alpha < 1.0
+                    and known
+                    and calculator is not None
+                    and known.lower() != system.lower()
+                ):
+                    try:
+                        distance = calculator.distance(known, system)
+                    except (AttributeError, TypeError, ValueError):
+                        distance = None
+                frame.set_threat_state(level, system, initial_alpha=alpha, distance=distance)
                 count += 1
             except RuntimeError:
                 continue

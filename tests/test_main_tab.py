@@ -9262,14 +9262,15 @@ class TestWindowManagerApplyThreatState:
             assert count == 3
             # PR6: smart-filter branch passes initial_alpha=1.0 explicitly when
             # the per-character system is unknown (graceful fallback).
+            # PR9: also passes distance=None for the +Nj badge surface.
             f1.set_threat_state.assert_called_once_with(
-                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
             )
             f2.set_threat_state.assert_called_once_with(
-                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
             )
             f3.set_threat_state.assert_called_once_with(
-                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+                ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
             )
 
     def test_apply_threat_state_empty_frames(self):
@@ -9832,7 +9833,7 @@ class TestWindowManagerApplyThreatStateSmartFanout:
 
         assert count == 1
         alice.set_threat_state.assert_called_once_with(
-            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
         )
         bob.set_threat_state.assert_not_called()
 
@@ -10090,10 +10091,10 @@ class TestWindowManagerJumpsFromFanout:
 
         assert count == 2
         bob.set_threat_state.assert_called_once_with(
-            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
         )
         alice.set_threat_state.assert_called_once_with(
-            ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5, distance=1
         )
 
     def test_beyond_threshold_skipped(self):
@@ -10306,3 +10307,167 @@ class TestWindowPreviewAccentBorder:
             widget.repaint()
         finally:
             widget.deleteLater()
+
+
+# =============================================================================
+# Frame distance badge (PR9 — symmetrize PR7 across grid + dock)
+# =============================================================================
+
+
+class TestWindowPreviewWidgetDistanceBadge:
+    def _make_widget(self, qapp):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        return WindowPreviewWidget(
+            window_id="0xABC",
+            character_name="TestPilot",
+            capture_system=MagicMock(),
+        )
+
+    def test_default_distance_is_none(self, qapp):
+        widget = self._make_widget(qapp)
+        try:
+            assert widget._threat_distance is None
+        finally:
+            widget.deleteLater()
+
+    def test_distance_stored_when_positive(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "HED-GP", initial_alpha=0.5, distance=2)
+            assert widget._threat_distance == 2
+        finally:
+            widget.deleteLater()
+
+    def test_zero_distance_treated_as_none(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=0)
+            assert widget._threat_distance is None
+        finally:
+            widget.deleteLater()
+
+    def test_clear_resets_distance(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "HED-GP", initial_alpha=0.5, distance=2)
+            widget.set_threat_state(ThreatLevel.CLEAR)
+            assert widget._threat_distance is None
+        finally:
+            widget.deleteLater()
+
+    def test_decay_to_zero_clears_distance(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.set_threat_state(ThreatLevel.WARNING, "HED-GP", initial_alpha=0.5, distance=2)
+            # Tighten decay so a single tick fully drains.
+            widget._threat_decay_steps = 1
+            widget._threat_alpha = 0.5  # ensure > 0 so first branch runs
+            widget._tick_threat_decay()
+            assert widget._threat_distance is None
+            assert widget._threat_level is None
+        finally:
+            widget.deleteLater()
+
+    def test_paint_with_distance_does_not_crash(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+
+        widget = self._make_widget(qapp)
+        try:
+            widget.resize(200, 150)
+            widget.set_threat_state(ThreatLevel.WARNING, "HED-GP", initial_alpha=0.5, distance=1)
+            widget.repaint()
+        finally:
+            widget.deleteLater()
+
+
+def _frame_mock_v2(character_name: str):
+    """Mock frame for WindowManager tests — preserves character_name."""
+    f = MagicMock()
+    f.character_name = character_name
+    return f
+
+
+class TestWindowManagerPassesDistanceToFrame:
+    def _make_calc(self, distance: int | None):
+        calc = MagicMock()
+        calc.distance.return_value = distance
+        return calc
+
+    def _make_manager(self, char_systems=None, max_jumps=0, calc=None):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.preview_frames = {}
+        manager._character_systems = dict(char_systems or {})
+        manager._jump_calculator = calc
+        manager._jump_max = max_jumps
+        return manager
+
+    def test_adjacent_frame_receives_distance(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        calc = self._make_calc(distance=1)
+        manager = self._make_manager(char_systems={"Alice": "Jita"}, max_jumps=2, calc=calc)
+        alice = _frame_mock_v2("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5, distance=1
+        )
+
+    def test_same_system_frame_distance_is_none(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        calc = self._make_calc(distance=0)
+        manager = self._make_manager(char_systems={"Alice": "HED-GP"}, max_jumps=2, calc=calc)
+        alice = _frame_mock_v2("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+        )
+        calc.distance.assert_not_called()
+
+    def test_unknown_character_distance_is_none(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        calc = self._make_calc(distance=99)
+        manager = self._make_manager(char_systems={}, max_jumps=2, calc=calc)
+        anon = _frame_mock_v2("Bob")
+        manager.preview_frames = {"w1": anon}
+
+        manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        anon.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=1.0, distance=None
+        )
+
+    def test_calculator_error_swallowed(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        calc = MagicMock()
+        # First call (inside resolve_tint) returns a usable distance, second
+        # call (PR9 explicit query for the badge) raises.
+        calc.distance.side_effect = [1, ValueError("graph corrupt")]
+        manager = self._make_manager(char_systems={"Alice": "Jita"}, max_jumps=2, calc=calc)
+        alice = _frame_mock_v2("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        alice.set_threat_state.assert_called_once_with(
+            ThreatLevel.DANGER, "HED-GP", initial_alpha=0.5, distance=None
+        )
