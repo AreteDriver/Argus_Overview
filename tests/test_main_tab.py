@@ -4068,9 +4068,13 @@ class TestMainTabWindowMethods:
     def test_on_window_removed(self):
         """Test _on_window_removed removes frame"""
         from argus_overview.ui.main_tab import MainTab
+        from tests._test_helpers import seed_main_tab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
+            seed_main_tab(tab)
+            tab._apply_focus_state = MagicMock()
+            tab._sync_status_dock = MagicMock()
             tab.logger = MagicMock()
             tab.window_manager = MagicMock()
             tab._update_status = MagicMock()
@@ -5710,9 +5714,11 @@ class TestWindowPreviewWidgetUpdateFrame:
         from datetime import datetime
 
         from argus_overview.ui.main_tab import WindowPreviewWidget
+        from tests._test_helpers import seed_preview_widget
 
         with patch.object(WindowPreviewWidget, "__init__", return_value=None):
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            seed_preview_widget(widget)
             widget.image_label = MagicMock()
             widget.current_pixmap = None
             widget.zoom_factor = 0.3
@@ -5785,9 +5791,11 @@ class TestFrameFingerprintCache:
     def test_identical_frame_skipped(self):
         """Test update_frame skips rendering when frame bytes are identical."""
         from argus_overview.ui.main_tab import WindowPreviewWidget
+        from tests._test_helpers import seed_preview_widget
 
         with patch.object(WindowPreviewWidget, "__init__", return_value=None):
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            seed_preview_widget(widget)
             widget.image_label = MagicMock()
             widget.current_pixmap = None
             widget._last_frame_hash = None
@@ -5829,9 +5837,11 @@ class TestFrameFingerprintCache:
     def test_different_frame_rendered(self):
         """Test update_frame renders when frame bytes differ."""
         from argus_overview.ui.main_tab import WindowPreviewWidget
+        from tests._test_helpers import seed_preview_widget
 
         with patch.object(WindowPreviewWidget, "__init__", return_value=None):
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            seed_preview_widget(widget)
             widget.image_label = MagicMock()
             widget.current_pixmap = None
             widget._last_frame_hash = None
@@ -5987,9 +5997,11 @@ class TestMemoryCleanup:
     def test_image_closed_on_success(self):
         """Test PIL image is closed after conversion."""
         from argus_overview.ui.main_tab import WindowPreviewWidget
+        from tests._test_helpers import seed_preview_widget
 
         with patch.object(WindowPreviewWidget, "__init__", return_value=None):
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            seed_preview_widget(widget)
             widget.image_label = MagicMock()
             widget.current_pixmap = None
             widget._last_frame_hash = None
@@ -8611,9 +8623,13 @@ class TestOnWindowRemovedExceptionPaths:
     def test_on_window_removed_disconnect_runtime_error(self):
         """Test RuntimeError on signal disconnect is caught silently"""
         from argus_overview.ui.main_tab import MainTab
+        from tests._test_helpers import seed_main_tab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
+            seed_main_tab(tab)
+            tab._apply_focus_state = MagicMock()
+            tab._sync_status_dock = MagicMock()
             tab.logger = MagicMock()
             tab.window_manager = MagicMock()
             tab._update_status = MagicMock()
@@ -8637,9 +8653,13 @@ class TestOnWindowRemovedExceptionPaths:
     def test_on_window_removed_disconnect_type_error(self):
         """Test TypeError on signal disconnect is caught silently"""
         from argus_overview.ui.main_tab import MainTab
+        from tests._test_helpers import seed_main_tab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
+            seed_main_tab(tab)
+            tab._apply_focus_state = MagicMock()
+            tab._sync_status_dock = MagicMock()
             tab.logger = MagicMock()
             tab.window_manager = MagicMock()
             tab._update_status = MagicMock()
@@ -8659,9 +8679,13 @@ class TestOnWindowRemovedExceptionPaths:
     def test_on_window_removed_no_frame_found(self):
         """Test _on_window_removed when frame not in preview_frames"""
         from argus_overview.ui.main_tab import MainTab
+        from tests._test_helpers import seed_main_tab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
+            seed_main_tab(tab)
+            tab._apply_focus_state = MagicMock()
+            tab._sync_status_dock = MagicMock()
             tab.logger = MagicMock()
             tab.window_manager = MagicMock()
             tab.window_manager.preview_frames = {}  # Empty — no frame
@@ -9251,9 +9275,11 @@ class TestWindowManagerApplyThreatState:
     def test_apply_threat_state_fans_out_to_all_frames(self):
         from argus_overview.intel.parser import ThreatLevel
         from argus_overview.ui.main_tab import WindowManager
+        from tests._test_helpers import seed_window_manager
 
         with patch.object(WindowManager, "__init__", return_value=None):
             manager = WindowManager.__new__(WindowManager)
+            seed_window_manager(manager)
             f1, f2, f3 = MagicMock(), MagicMock(), MagicMock()
             manager.preview_frames = {"w1": f1, "w2": f2, "w3": f3}
 
@@ -9288,9 +9314,11 @@ class TestWindowManagerApplyThreatState:
     def test_apply_threat_state_skips_deleted_widgets(self):
         from argus_overview.intel.parser import ThreatLevel
         from argus_overview.ui.main_tab import WindowManager
+        from tests._test_helpers import seed_window_manager
 
         with patch.object(WindowManager, "__init__", return_value=None):
             manager = WindowManager.__new__(WindowManager)
+            seed_window_manager(manager)
             ok = MagicMock()
             dead = MagicMock()
             dead.set_threat_state.side_effect = RuntimeError("widget deleted")
@@ -9772,6 +9800,8 @@ class TestWindowManagerApplyThreatStateSmartFanout:
         manager = WindowManager.__new__(WindowManager)
         manager.preview_frames = {}
         manager._character_systems = dict(char_systems or {})
+        manager._jump_calculator = None
+        manager._jump_max = 0
         return manager
 
     def test_clear_flushes_all_regardless_of_system(self):

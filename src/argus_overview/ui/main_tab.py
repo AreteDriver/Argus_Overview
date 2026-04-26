@@ -833,7 +833,7 @@ class WindowPreviewWidget(QWidget):
 
             # If the user is currently scrubbing through the strip, hold
             # the buffered view — don't overwrite it with the live frame.
-            if getattr(self, "_replay_view_index", None) is not None:
+            if self._replay_view_index is not None:
                 return
 
             # Scale to fit widget while maintaining aspect ratio
@@ -1063,11 +1063,8 @@ class WindowPreviewWidget(QWidget):
         """Throttle-sample a captured pixmap into the ring buffer."""
         if pixmap is None or pixmap.isNull():
             return
-        # Defensive: bypassed-init test helpers may not set these.
-        if not hasattr(self, "_replay_buffer"):
-            return
         now_ms = int(time.monotonic() * 1000)
-        if now_ms - getattr(self, "_replay_last_sample_ms", 0) < REPLAY_THROTTLE_MS:
+        if now_ms - self._replay_last_sample_ms < REPLAY_THROTTLE_MS:
             return
         # Store an immutable copy at modest size; full-res pixmaps would
         # blow up memory across many widgets. 240×180 keeps it ~170KB max.
@@ -1086,7 +1083,7 @@ class WindowPreviewWidget(QWidget):
                 self._replay_strip = None
 
     def is_replay_strip_enabled(self) -> bool:
-        return getattr(self, "_replay_strip", None) is not None
+        return self._replay_strip is not None
 
     def enable_replay_strip(self, enabled: bool) -> None:
         """Show or hide the replay strip below the main image."""
@@ -1143,11 +1140,7 @@ class WindowPreviewWidget(QWidget):
         # 0. Per-character accent border (PR8) — only visible when no
         # threat or legacy-flash overlay is active. Gives instant visual
         # identity at small grid sizes and matches the chip avatar color.
-        if (
-            self._threat_level is None
-            and self._flash_color is None
-            and getattr(self, "_accent_color", None) is not None
-        ):
+        if self._threat_level is None and self._flash_color is None:
             pen = QPen(self._accent_color)
             pen.setWidth(2)
             painter.setPen(pen)
@@ -1527,19 +1520,16 @@ class WindowManager:
         if level is None or level == ThreatLevel.CLEAR or not system:
             return self._fan_to_all(level, system)
 
-        char_systems = getattr(self, "_character_systems", {}) or {}
-        calculator = getattr(self, "_jump_calculator", None)
-        max_jumps = getattr(self, "_jump_max", 0)
         count = 0
         for frame in list(self.preview_frames.values()):
             try:
                 char_name = getattr(frame, "character_name", None)
-                known = char_systems.get(char_name) if char_name else None
+                known = self._character_systems.get(char_name) if char_name else None
                 should_apply, alpha = resolve_tint(
                     known_system=known,
                     alert_system=system,
-                    jump_calculator=calculator,
-                    max_jumps=max_jumps,
+                    jump_calculator=self._jump_calculator,
+                    max_jumps=self._jump_max,
                 )
                 if not should_apply:
                     continue
@@ -1549,11 +1539,11 @@ class WindowManager:
                 if (
                     alpha < 1.0
                     and known
-                    and calculator is not None
+                    and self._jump_calculator is not None
                     and known.lower() != system.lower()
                 ):
                     try:
-                        distance = calculator.distance(known, system)
+                        distance = self._jump_calculator.distance(known, system)
                     except (AttributeError, TypeError, ValueError):
                         distance = None
                 frame.set_threat_state(level, system, initial_alpha=alpha, distance=distance)
@@ -2414,16 +2404,13 @@ class MainTab(QWidget):
             # Stop per-frame timers
             frame.session_timer.stop()
         # If we just removed the spotlight target, drop focus state.
-        # getattr keeps this safe when called via test helpers that bypass __init__.
-        if getattr(self, "_focus_window_id", None) == window_id:
+        if self._focus_window_id == window_id:
             self._focus_window_id = None
         self.window_manager.remove_window(window_id)
         self._update_status()
-        if hasattr(self, "status_dock"):
-            self._sync_status_dock()
-        if hasattr(self, "_focus_window_id"):
-            # Re-apply (covers both: focus cleared, or other tile removed mid-focus)
-            self._apply_focus_state()
+        self._sync_status_dock()
+        # Re-apply (covers both: focus cleared, or other tile removed mid-focus)
+        self._apply_focus_state()
 
     def _remove_all_windows(self):
         """Remove all windows from preview"""
