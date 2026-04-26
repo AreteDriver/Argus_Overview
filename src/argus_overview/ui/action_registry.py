@@ -677,6 +677,21 @@ class ActionRegistry:
             )
         )
 
+        # PR10 follow-up: replay-strip toggle. The label stays static
+        # ("Toggle replay strip") because ActionSpec doesn't model
+        # state-dependent labels — the dynamic label was the reason this
+        # action lived inline in contextMenuEvent before this PR.
+        self.register(
+            ActionSpec(
+                id="toggle_replay_strip",
+                label="Toggle Replay Strip",
+                scope=ActionScope.OBJECT,
+                primary_home=PrimaryHome.WINDOW_CONTEXT,
+                tooltip="Show/hide a strip of recent capture frames at the bottom of this preview",
+                handler_name="_toggle_replay_strip",
+            )
+        )
+
         # Character Context Menu
         self.register(
             ActionSpec(
