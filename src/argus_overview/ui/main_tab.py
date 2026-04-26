@@ -73,6 +73,32 @@ THREAT_DECAY_DURATION_MS = 30_000  # full fade time after last alert
 THREAT_PULSE_TICK_MS = 33  # ~30 fps pulse
 THREAT_PULSE_DURATION_MS = 600  # one pulse cycle
 
+# Per-character accent palette (PR8). Shared by both frames + chips so
+# the same character renders in the same color across the preview grid
+# and the status dock. Palette is fixed-length; deterministic hash maps
+# names to indices.
+CHARACTER_ACCENT_COLORS: list[tuple[int, int, int]] = [
+    (255, 100, 100),
+    (100, 255, 100),
+    (100, 150, 255),
+    (255, 200, 80),
+    (220, 120, 220),
+    (100, 220, 220),
+    (255, 165, 60),
+    (170, 130, 255),
+]
+
+
+def character_accent_color(name: str) -> QColor:
+    """Deterministic accent color for a character name.
+
+    Used by both WindowPreviewWidget (frame border) and CharacterChip
+    (avatar fill) so visual identity is consistent across surfaces.
+    """
+    r, g, b = CHARACTER_ACCENT_COLORS[abs(hash(name)) % len(CHARACTER_ACCENT_COLORS)]
+    return QColor(r, g, b)
+
+
 # Module-level constant: avoids re-creating the dict on every pil_to_qimage call
 _FORMAT_MAP = {
     "RGB": (3, QImage.Format.Format_RGB888),
@@ -633,6 +659,9 @@ class WindowPreviewWidget(QWidget):
         # WindowManager.apply_threat_state for smart fan-out.
         self._character_system: str | None = None
 
+        # PR8: per-character accent color, shared with the chip.
+        self._accent_color: QColor = character_accent_color(character_name)
+
         # Intel threat state (PR1: intel-aware preview borders)
         self._threat_level: ThreatLevel | None = None
         self._threat_system: str | None = None
@@ -983,11 +1012,25 @@ class WindowPreviewWidget(QWidget):
         self.update()
 
     def paintEvent(self, event):
-        """Custom paint: threat border, focus dot, lock icon, legacy flash."""
+        """Custom paint: accent, threat border, focus dot, lock icon, flash."""
         super().paintEvent(event)
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # 0. Per-character accent border (PR8) — only visible when no
+        # threat or legacy-flash overlay is active. Gives instant visual
+        # identity at small grid sizes and matches the chip avatar color.
+        if (
+            self._threat_level is None
+            and self._flash_color is None
+            and getattr(self, "_accent_color", None) is not None
+        ):
+            pen = QPen(self._accent_color)
+            pen.setWidth(2)
+            painter.setPen(pen)
+            painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
 
         # 1. Threat-tint border (PR1) — drawn first so dot/lock paint over it
         if self._threat_level is not None and self._threat_alpha > 0.0:
