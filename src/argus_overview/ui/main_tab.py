@@ -866,13 +866,22 @@ class WindowPreviewWidget(QWidget):
     def get_character_system(self) -> str | None:
         return self._character_system
 
-    def set_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> None:
+    def set_threat_state(
+        self,
+        level: ThreatLevel | None,
+        system: str | None = None,
+        initial_alpha: float = 1.0,
+    ) -> None:
         """
         Update the intel threat state for this preview frame.
 
         Args:
             level: Threat level. None or CLEAR clears the border.
             system: System name the threat refers to (kept for tooltip + dock).
+            initial_alpha: Starting alpha [0.0, 1.0] for the border. Defaults
+                to 1.0 (full intensity for same-system alerts). Lower values
+                are used by WindowManager when fanning to characters in
+                adjacent systems via the jumps-from filter (PR6).
         """
         prev_level = self._threat_level
 
@@ -886,13 +895,18 @@ class WindowPreviewWidget(QWidget):
 
         self._threat_level = level
         self._threat_system = system
-        self._threat_alpha = 1.0
+        self._threat_alpha = max(0.0, min(1.0, initial_alpha))
 
-        # Pulse on upgrade into danger/critical
+        # Pulse on upgrade into danger/critical (only at full-ish intensity —
+        # don't pulse for distant adjacent-system alerts).
         upgraded = prev_level is None or THREAT_LEVEL_RANK.get(
             prev_level, 0
         ) < THREAT_LEVEL_RANK.get(level, 0)
-        if upgraded and level in (ThreatLevel.DANGER, ThreatLevel.CRITICAL):
+        if (
+            upgraded
+            and level in (ThreatLevel.DANGER, ThreatLevel.CRITICAL)
+            and initial_alpha >= 0.9
+        ):
             self._start_pulse()
 
         # Restart decay timer
@@ -1168,6 +1182,11 @@ class WindowManager:
         # Survives window add/remove cycles. Used for chip system labels and
         # (in a follow-up PR) smart per-character threat fan-out.
         self._character_systems: dict[str, str] = {}
+        # PR6: optional jump calculator + max-jumps threshold for the
+        # adjacency-aware fan-out. Default max_jumps=0 preserves the PR5
+        # exact-match-only filter when no calculator is wired up.
+        self._jump_calculator = None  # type: ignore[var-annotated]
+        self._jump_max: int = 0
         self.pending_requests: dict[
             str, tuple[str, float]
         ] = {}  # request_id -> (window_id, timestamp)
@@ -1272,46 +1291,55 @@ class WindowManager:
     def get_character_system(self, character_name: str) -> str | None:
         return self._character_systems.get(character_name)
 
+    def set_jump_calculator(self, calculator, max_jumps: int = 1) -> None:
+        """
+        Wire an adjacency calculator for the jumps-from threat filter (PR6).
+
+        Args:
+            calculator: A JumpCalculator (or None to disable adjacency).
+            max_jumps: Maximum jump distance to consider "near"; 0 disables
+                adjacency tinting (exact-match-only). Default 1.
+        """
+        self._jump_calculator = calculator
+        self._jump_max = max(0, int(max_jumps))
+
     def apply_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> int:
         """
         Fan an intel threat state out to preview frames, filtered by system.
 
-        Filter rules (PR5 smart fan-out):
-          1. CLEAR or None level: flush every frame regardless of system.
-             Explicit clears must always win.
-          2. system is None / unknown: fall back to fanning all frames
-             (legacy behavior — preserves correctness when intel can't
-             attribute the report to a system).
-          3. Otherwise: only frames whose character's known system matches
-             the alert system. Frames whose character has no known system
-             fall through and still get tinted (graceful upgrade — until
-             every active character is being tracked, we don't want intel
-             to silently skip frames).
+        Filter rules:
+          1. CLEAR / None level → flush every frame regardless of system.
+          2. system is None / empty → fan to all (legacy fallback).
+          3. Otherwise → resolve_tint() decides per-frame: same-system at
+             full alpha, adjacent within max_jumps at falloff alpha,
+             beyond threshold skipped, unknown character system tinted at
+             full alpha (graceful upgrade).
 
-        Returns count of frames actually updated for logs + tests.
+        Returns count of frames actually updated.
         """
-        # Rule 1: clear path bypasses filter
-        if level is None or level == ThreatLevel.CLEAR:
+        from argus_overview.intel.threat_filter import resolve_tint
+
+        # Rule 1 + 2: explicit-flush branches
+        if level is None or level == ThreatLevel.CLEAR or not system:
             return self._fan_to_all(level, system)
 
-        # Rule 2: no system to filter on
-        if not system:
-            return self._fan_to_all(level, system)
-
-        # Rule 3: filter by per-character known system. Lookup goes through
-        # _character_systems (the canonical map) rather than frame attrs so
-        # bypassed-init test helpers without per-char data fall through to
-        # the legacy "tint all" semantics.
         char_systems = getattr(self, "_character_systems", {}) or {}
+        calculator = getattr(self, "_jump_calculator", None)
+        max_jumps = getattr(self, "_jump_max", 0)
         count = 0
         for frame in list(self.preview_frames.values()):
             try:
                 char_name = getattr(frame, "character_name", None)
                 known = char_systems.get(char_name) if char_name else None
-                # Known mismatch → skip; unknown or match → apply.
-                if known is not None and known != system:
+                should_apply, alpha = resolve_tint(
+                    known_system=known,
+                    alert_system=system,
+                    jump_calculator=calculator,
+                    max_jumps=max_jumps,
+                )
+                if not should_apply:
                     continue
-                frame.set_threat_state(level, system)
+                frame.set_threat_state(level, system, initial_alpha=alpha)
                 count += 1
             except RuntimeError:
                 continue

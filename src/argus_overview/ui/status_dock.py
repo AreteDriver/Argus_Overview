@@ -226,6 +226,10 @@ class StatusDock(QWidget):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self._chips: dict[str, CharacterChip] = {}
+        # PR6 jumps-from filter — set via set_jump_calculator. Default
+        # max_jumps=0 keeps the PR5 exact-match-only behavior.
+        self._jump_calculator = None
+        self._jump_max: int = 0
 
         self.setFixedHeight(56)
         outer = QVBoxLayout(self)
@@ -285,28 +289,46 @@ class StatusDock(QWidget):
         for window_id in list(self._chips.keys()):
             self.remove_chip(window_id)
 
+    def set_jump_calculator(self, calculator, max_jumps: int = 1) -> None:
+        """Wire an adjacency calculator for the jumps-from filter (PR6)."""
+        self._jump_calculator = calculator
+        self._jump_max = max(0, int(max_jumps))
+
     def set_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> int:
         """
-        Fan a threat state out to chips, filtered by system (PR5 smart fan-out).
+        Fan a threat state out to chips, filtered by system.
 
-        Mirrors WindowManager.apply_threat_state filter rules:
+        Filter rules (mirror WindowManager.apply_threat_state for symmetry):
           1. CLEAR / None level → flush every chip.
           2. system is None / empty → fan to all (legacy fallback).
-          3. Otherwise → only chips whose tracked system matches, or whose
-             system is unknown (graceful upgrade until every chip has a
-             system from CharacterLocationTracker).
+          3. Otherwise → resolve_tint() per chip. Same-system at full alpha,
+             adjacent within max_jumps at falloff alpha, beyond skipped,
+             unknown chip-system tinted at full alpha (graceful upgrade).
 
         Returns count of chips updated.
         """
-        count = 0
+        from argus_overview.intel.threat_filter import resolve_tint
+
         flush = level is None or level == ThreatLevel.CLEAR or not system
+        count = 0
+        calculator = getattr(self, "_jump_calculator", None)
+        max_jumps = getattr(self, "_jump_max", 0)
         for chip in list(self._chips.values()):
             try:
-                if not flush:
-                    chip_system = getattr(chip, "_system", None)
-                    if chip_system is not None and chip_system != system:
-                        continue
-                chip.set_threat_state(level, system)
+                if flush:
+                    chip.set_threat_state(level, system)
+                    count += 1
+                    continue
+                chip_system = getattr(chip, "_system", None)
+                should_apply, alpha = resolve_tint(
+                    known_system=chip_system,
+                    alert_system=system,
+                    jump_calculator=calculator,
+                    max_jumps=max_jumps,
+                )
+                if not should_apply:
+                    continue
+                chip.set_threat_state(level, system, alpha=alpha)
                 count += 1
             except RuntimeError:
                 continue
