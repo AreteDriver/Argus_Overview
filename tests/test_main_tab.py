@@ -9666,3 +9666,280 @@ class TestMainTabFocusEscapeKey:
         except RuntimeError:
             pass  # Expected: super().keyPressEvent hits bypassed-init widget
         assert tab._focus_window_id is None
+
+
+# =============================================================================
+# Smart per-character threat fan-out (PR5)
+# =============================================================================
+
+
+def _frame_mock(character_name: str):
+    """Mock preview frame exposing the character_name + set_threat_state surface."""
+    f = MagicMock()
+    f.character_name = character_name
+    return f
+
+
+class TestWindowPreviewWidgetCharacterSystem:
+    """Tests for the per-frame _character_system setter."""
+
+    def test_set_and_get(self):
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget._character_system = None
+
+            widget.set_character_system("Jita")
+            assert widget.get_character_system() == "Jita"
+
+            widget.set_character_system(None)
+            assert widget.get_character_system() is None
+
+
+class TestWindowManagerSetCharacterSystemPushesToFrames:
+    """set_character_system updates the map AND pushes to matching frames."""
+
+    def _make_manager(self):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.preview_frames = {}
+        manager._character_systems = {}
+        return manager
+
+    def test_pushes_to_matching_frame_only(self):
+        manager = self._make_manager()
+        alice_frame = _frame_mock("Alice")
+        bob_frame = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice_frame, "w2": bob_frame}
+
+        manager.set_character_system("Alice", "Jita")
+
+        alice_frame.set_character_system.assert_called_once_with("Jita")
+        bob_frame.set_character_system.assert_not_called()
+
+    def test_pushes_to_multiple_frames_for_same_character(self):
+        manager = self._make_manager()
+        f1 = _frame_mock("Alice")
+        f2 = _frame_mock("Alice")
+        manager.preview_frames = {"w1": f1, "w2": f2}
+
+        manager.set_character_system("Alice", "Jita")
+
+        f1.set_character_system.assert_called_once_with("Jita")
+        f2.set_character_system.assert_called_once_with("Jita")
+
+    def test_clearing_character_pushes_none_to_frames(self):
+        manager = self._make_manager()
+        alice = _frame_mock("Alice")
+        manager.preview_frames = {"w1": alice}
+        manager._character_systems = {"Alice": "Jita"}
+
+        manager.set_character_system("Alice", None)
+
+        alice.set_character_system.assert_called_once_with(None)
+        assert "Alice" not in manager._character_systems
+
+    def test_skips_deleted_widgets(self):
+        manager = self._make_manager()
+        alive = _frame_mock("Alice")
+        dead = _frame_mock("Alice")
+        dead.set_character_system.side_effect = RuntimeError("widget deleted")
+        manager.preview_frames = {"alive": alive, "dead": dead}
+
+        # Should not raise even though one frame is gone.
+        manager.set_character_system("Alice", "Jita")
+
+        alive.set_character_system.assert_called_once_with("Jita")
+
+
+class TestWindowManagerApplyThreatStateSmartFanout:
+    """PR5 smart fan-out filter rules."""
+
+    def _make_manager(self, char_systems: dict[str, str] | None = None):
+        from argus_overview.ui.main_tab import WindowManager
+
+        manager = WindowManager.__new__(WindowManager)
+        manager.preview_frames = {}
+        manager._character_systems = dict(char_systems or {})
+        return manager
+
+    def test_clear_flushes_all_regardless_of_system(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "Jita", "Bob": "Amarr"})
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.CLEAR, "HED-GP")
+
+        assert count == 2
+        alice.set_threat_state.assert_called_once_with(ThreatLevel.CLEAR, "HED-GP")
+        bob.set_threat_state.assert_called_once_with(ThreatLevel.CLEAR, "HED-GP")
+
+    def test_none_level_flushes_all(self):
+        manager = self._make_manager(char_systems={"Alice": "Jita"})
+        alice = _frame_mock("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        count = manager.apply_threat_state(None, "HED-GP")
+
+        assert count == 1
+        alice.set_threat_state.assert_called_once()
+
+    def test_no_alert_system_falls_through_to_all(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "Jita"})
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.WARNING, None)
+
+        assert count == 2
+
+    def test_empty_alert_system_falls_through_to_all(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "Jita"})
+        alice = _frame_mock("Alice")
+        manager.preview_frames = {"w1": alice}
+
+        count = manager.apply_threat_state(ThreatLevel.WARNING, "")
+
+        assert count == 1
+
+    def test_only_matching_character_tints(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "HED-GP", "Bob": "Amarr"})
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 1
+        alice.set_threat_state.assert_called_once_with(ThreatLevel.DANGER, "HED-GP")
+        bob.set_threat_state.assert_not_called()
+
+    def test_unknown_character_falls_through_to_apply(self):
+        """Graceful upgrade: untracked characters still tint."""
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "HED-GP"})
+        alice = _frame_mock("Alice")
+        bob = _frame_mock("Bob")  # Bob has no known system
+        manager.preview_frames = {"w1": alice, "w2": bob}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 2
+        alice.set_threat_state.assert_called_once()
+        bob.set_threat_state.assert_called_once()
+
+    def test_no_per_char_data_fans_to_all_legacy_behavior(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={})
+        f1 = _frame_mock("Alice")
+        f2 = _frame_mock("Bob")
+        manager.preview_frames = {"w1": f1, "w2": f2}
+
+        count = manager.apply_threat_state(ThreatLevel.WARNING, "HED-GP")
+
+        assert count == 2
+
+    def test_skips_deleted_widgets(self):
+        from argus_overview.intel.parser import ThreatLevel
+
+        manager = self._make_manager(char_systems={"Alice": "HED-GP"})
+        alive = _frame_mock("Alice")
+        dead = _frame_mock("Alice")
+        dead.set_threat_state.side_effect = RuntimeError("widget deleted")
+        manager.preview_frames = {"alive": alive, "dead": dead}
+
+        count = manager.apply_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+        assert count == 1
+
+
+class TestStatusDockSmartFanout:
+    """PR5 smart fan-out applied to chips via their _system attribute."""
+
+    def test_only_matching_chips_tint(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "HED-GP")
+            dock.set_character_system("Bob", "Amarr")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            assert count == 1
+            assert dock._chips["0x1"]._threat_level == ThreatLevel.DANGER
+            assert dock._chips["0x2"]._threat_level is None
+        finally:
+            dock.deleteLater()
+
+    def test_unknown_chip_falls_through(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")  # Bob has no system
+            dock.set_character_system("Alice", "HED-GP")
+
+            count = dock.set_threat_state(ThreatLevel.DANGER, "HED-GP")
+
+            # Both tint: Alice matches, Bob unknown → graceful fallback.
+            assert count == 2
+        finally:
+            dock.deleteLater()
+
+    def test_clear_bypasses_filter(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "HED-GP")
+            dock.set_character_system("Bob", "Amarr")
+            # Tint both first
+            dock._chips["0x1"].set_threat_state(ThreatLevel.DANGER, "HED-GP")
+            dock._chips["0x2"].set_threat_state(ThreatLevel.WARNING, "Amarr")
+
+            count = dock.set_threat_state(ThreatLevel.CLEAR, "HED-GP")
+
+            assert count == 2
+            for chip in dock._chips.values():
+                assert chip._threat_level is None
+        finally:
+            dock.deleteLater()
+
+    def test_no_system_fans_to_all(self, qapp):
+        from argus_overview.intel.parser import ThreatLevel
+        from argus_overview.ui.status_dock import StatusDock
+
+        dock = StatusDock()
+        try:
+            dock.add_chip("0x1", "Alice")
+            dock.add_chip("0x2", "Bob")
+            dock.set_character_system("Alice", "Jita")
+            dock.set_character_system("Bob", "Amarr")
+
+            count = dock.set_threat_state(ThreatLevel.WARNING, None)
+            assert count == 2
+        finally:
+            dock.deleteLater()

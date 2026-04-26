@@ -286,10 +286,26 @@ class StatusDock(QWidget):
             self.remove_chip(window_id)
 
     def set_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> int:
-        """Fan out a single threat state to every chip. Returns count updated."""
+        """
+        Fan a threat state out to chips, filtered by system (PR5 smart fan-out).
+
+        Mirrors WindowManager.apply_threat_state filter rules:
+          1. CLEAR / None level → flush every chip.
+          2. system is None / empty → fan to all (legacy fallback).
+          3. Otherwise → only chips whose tracked system matches, or whose
+             system is unknown (graceful upgrade until every chip has a
+             system from CharacterLocationTracker).
+
+        Returns count of chips updated.
+        """
         count = 0
+        flush = level is None or level == ThreatLevel.CLEAR or not system
         for chip in list(self._chips.values()):
             try:
+                if not flush:
+                    chip_system = getattr(chip, "_system", None)
+                    if chip_system is not None and chip_system != system:
+                        continue
                 chip.set_threat_state(level, system)
                 count += 1
             except RuntimeError:

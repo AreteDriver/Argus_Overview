@@ -628,6 +628,11 @@ class WindowPreviewWidget(QWidget):
         self._show_session_timer = False
         self._load_settings()
 
+        # PR4/PR5: known current system for this frame's character.
+        # Pushed by WindowManager.set_character_system; consumed by
+        # WindowManager.apply_threat_state for smart fan-out.
+        self._character_system: str | None = None
+
         # Intel threat state (PR1: intel-aware preview borders)
         self._threat_level: ThreatLevel | None = None
         self._threat_system: str | None = None
@@ -853,6 +858,13 @@ class WindowPreviewWidget(QWidget):
         self.opacity_effect.setOpacity(1.0)
 
         super().leaveEvent(event)
+
+    def set_character_system(self, system: str | None) -> None:
+        """Record the current system for this frame's character (PR5)."""
+        self._character_system = system
+
+    def get_character_system(self) -> str | None:
+        return self._character_system
 
     def set_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> None:
         """
@@ -1240,33 +1252,78 @@ class WindowManager:
         """
         Record the current system for a character.
 
-        Stored on a per-character map (separate from preview_frames) so the
-        information survives across window add/remove cycles. PR4 uses this
-        only for storage + future smart fan-out; existing fan-out semantics
-        (one shared threat state) are unchanged.
+        Stored on a per-character map that survives across window add/remove
+        cycles, AND pushed to every active frame for that character so the
+        smart fan-out (apply_threat_state) can filter by frame state alone.
         """
         if system is None:
             self._character_systems.pop(character_name, None)
         else:
             self._character_systems[character_name] = system
 
+        # Push to active frames whose character matches.
+        for frame in list(self.preview_frames.values()):
+            try:
+                if getattr(frame, "character_name", None) == character_name:
+                    frame.set_character_system(system)
+            except RuntimeError:
+                continue
+
     def get_character_system(self, character_name: str) -> str | None:
         return self._character_systems.get(character_name)
 
     def apply_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> int:
         """
-        Fan out an intel threat state to every preview frame.
+        Fan an intel threat state out to preview frames, filtered by system.
 
-        Until per-character system tracking lands, every frame shares the
-        same state. Returns the count of frames updated for tests + logs.
+        Filter rules (PR5 smart fan-out):
+          1. CLEAR or None level: flush every frame regardless of system.
+             Explicit clears must always win.
+          2. system is None / unknown: fall back to fanning all frames
+             (legacy behavior — preserves correctness when intel can't
+             attribute the report to a system).
+          3. Otherwise: only frames whose character's known system matches
+             the alert system. Frames whose character has no known system
+             fall through and still get tinted (graceful upgrade — until
+             every active character is being tracked, we don't want intel
+             to silently skip frames).
+
+        Returns count of frames actually updated for logs + tests.
         """
+        # Rule 1: clear path bypasses filter
+        if level is None or level == ThreatLevel.CLEAR:
+            return self._fan_to_all(level, system)
+
+        # Rule 2: no system to filter on
+        if not system:
+            return self._fan_to_all(level, system)
+
+        # Rule 3: filter by per-character known system. Lookup goes through
+        # _character_systems (the canonical map) rather than frame attrs so
+        # bypassed-init test helpers without per-char data fall through to
+        # the legacy "tint all" semantics.
+        char_systems = getattr(self, "_character_systems", {}) or {}
+        count = 0
+        for frame in list(self.preview_frames.values()):
+            try:
+                char_name = getattr(frame, "character_name", None)
+                known = char_systems.get(char_name) if char_name else None
+                # Known mismatch → skip; unknown or match → apply.
+                if known is not None and known != system:
+                    continue
+                frame.set_threat_state(level, system)
+                count += 1
+            except RuntimeError:
+                continue
+        return count
+
+    def _fan_to_all(self, level: ThreatLevel | None, system: str | None) -> int:
         count = 0
         for frame in list(self.preview_frames.values()):
             try:
                 frame.set_threat_state(level, system)
                 count += 1
             except RuntimeError:
-                # Widget already deleted by Qt — skip
                 continue
         return count
 
