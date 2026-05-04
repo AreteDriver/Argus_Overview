@@ -709,10 +709,18 @@ class MainWindowV21(QMainWindow):
         if not isinstance(report, IntelReport):
             return
 
+        # Master toggle (v3.2.0): when off, suppress all visual chrome but
+        # still let other AlertTypes fire (audio, tray notification). The
+        # parser keeps running, only the preview/dock tints are gated.
+        # Defensive getattr: bypassed-init test helpers don't set
+        # settings_manager — default to chrome on.
+        sm = getattr(self, "settings_manager", None)
+        chrome_enabled = sm.get("intel.preview_chrome_enabled", True) if sm is not None else True
+
         # Fan out threat state to preview frames + status dock once per report
         # (filter on VISUAL_BORDER so we only trigger on a single AlertType
         # emission per report, not on every type the dispatcher fires).
-        if alert_type == AlertType.VISUAL_BORDER and hasattr(self, "main_tab"):
+        if chrome_enabled and alert_type == AlertType.VISUAL_BORDER and hasattr(self, "main_tab"):
             window_manager = getattr(self.main_tab, "window_manager", None)
             if window_manager is not None and hasattr(window_manager, "apply_threat_state"):
                 window_manager.apply_threat_state(report.threat_level, report.system)
@@ -727,6 +735,24 @@ class MainWindowV21(QMainWindow):
                     f"CRITICAL: {report.system or 'Unknown'}",
                     f"{report.hostile_count or '?'} hostiles - {', '.join(report.ship_types[:2]) or 'unknown ships'}",
                 )
+
+    def _clear_threat_chrome(self) -> None:
+        """Force-clear any active threat tints across previews + chips.
+
+        Called when the user toggles intel.preview_chrome_enabled off so
+        the change takes effect immediately rather than waiting for the
+        30s decay timer.
+        """
+        from argus_overview.intel.parser import ThreatLevel
+
+        if not hasattr(self, "main_tab"):
+            return
+        wm = getattr(self.main_tab, "window_manager", None)
+        if wm is not None and hasattr(wm, "apply_threat_state"):
+            wm.apply_threat_state(ThreatLevel.CLEAR, None)
+        dock = getattr(self.main_tab, "status_dock", None)
+        if dock is not None and hasattr(dock, "set_threat_state"):
+            dock.set_threat_state(ThreatLevel.CLEAR, None)
 
     @Slot(object)
     def _on_intel_received(self, report):
@@ -907,6 +933,12 @@ class MainWindowV21(QMainWindow):
             # Update hotkey manager
             # Will be implemented with hotkey functionality
             pass
+
+        elif key == "intel.preview_chrome_enabled" and not value:
+            # User just turned threat chrome off — flush any active tints
+            # so the change is visible immediately, not after the 30s
+            # decay window.
+            self._clear_threat_chrome()
 
     def _apply_low_power_mode(self, enabled: bool):
         """
