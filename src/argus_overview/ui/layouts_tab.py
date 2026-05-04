@@ -10,6 +10,7 @@ import subprocess
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QCheckBox,
     QComboBox,
     QFrame,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QScrollArea,
     QSpinBox,
     QVBoxLayout,
@@ -26,8 +28,9 @@ from PySide6.QtWidgets import (
 )
 
 from argus_overview.core.layout_manager import GridPattern
+from argus_overview.ui.layout_widgets import MonitorCardStrip, PatternThumbStrip
 from argus_overview.ui.main_tab import get_pattern_positions
-from argus_overview.utils.screen import ScreenGeometry, get_screen_geometry
+from argus_overview.utils.screen import ScreenGeometry, get_all_monitors, get_screen_geometry
 
 
 def get_all_patterns():
@@ -412,91 +415,221 @@ class LayoutsTab(QWidget):
         self._on_group_selected()
 
     def _create_top_section(self) -> QWidget:
-        """Create group selector and pattern options"""
-        section = QGroupBox("Layout Configuration")
-        layout = QHBoxLayout()
+        """Create the redesigned top section with thumbnails + monitor cards.
 
-        # Group selector
-        group_layout = QVBoxLayout()
-        group_layout.addWidget(QLabel("Select Group:"))
-
+        Legacy widgets (group_combo, pattern_combo, monitor_spin, etc.) are
+        constructed but NOT added to any visible layout — they continue to
+        hold the canonical state. The new widgets sync into them. This
+        keeps the existing apply path and ~58 test references working
+        without a destabilizing rename.
+        """
+        # ---- Legacy state holders (invisible) -------------------------
+        # The user no longer interacts with these directly, but the apply
+        # path and ~58 existing tests still read .currentText() / .value().
         self.group_combo = QComboBox()
         self._refresh_groups()
         self.group_combo.currentTextChanged.connect(self._on_group_selected)
-        group_layout.addWidget(self.group_combo)
-
-        self.refresh_groups_btn = QPushButton("Refresh Groups")
-        self.refresh_groups_btn.clicked.connect(self._refresh_groups)
-        group_layout.addWidget(self.refresh_groups_btn)
-
-        layout.addLayout(group_layout)
-
-        # Pattern selector
-        pattern_layout = QVBoxLayout()
-        pattern_layout.addWidget(QLabel("Grid Pattern:"))
 
         self.pattern_combo = QComboBox()
         self.pattern_combo.addItems(get_all_patterns())
         self.pattern_combo.currentTextChanged.connect(self._on_pattern_changed)
-        pattern_layout.addWidget(self.pattern_combo)
 
-        self.auto_arrange_btn = QPushButton("Auto-Arrange")
-        self.auto_arrange_btn.clicked.connect(self._auto_arrange)
-        pattern_layout.addWidget(self.auto_arrange_btn)
+        self.monitor_spin = QSpinBox()
+        self.monitor_spin.setRange(0, 3)
+        self.monitor_spin.setValue(0)
 
-        layout.addLayout(pattern_layout)
-
-        # Grid size options
-        size_layout = QVBoxLayout()
-        size_layout.addWidget(QLabel("Grid Size:"))
-
-        size_row = QHBoxLayout()
         self.rows_spin = QSpinBox()
         self.rows_spin.setRange(1, 6)
         self.rows_spin.setValue(3)
         self.rows_spin.setPrefix("Rows: ")
         self.rows_spin.valueChanged.connect(self._update_grid_size)
-        size_row.addWidget(self.rows_spin)
 
         self.cols_spin = QSpinBox()
         self.cols_spin.setRange(1, 6)
         self.cols_spin.setValue(4)
         self.cols_spin.setPrefix("Cols: ")
         self.cols_spin.valueChanged.connect(self._update_grid_size)
-        size_row.addWidget(self.cols_spin)
 
-        size_layout.addLayout(size_row)
-
-        # Spacing
-        spacing_row = QHBoxLayout()
-        spacing_row.addWidget(QLabel("Spacing:"))
         self.spacing_spin = QSpinBox()
         self.spacing_spin.setRange(0, 50)
         self.spacing_spin.setValue(10)
         self.spacing_spin.setSuffix(" px")
-        spacing_row.addWidget(self.spacing_spin)
-        size_layout.addLayout(spacing_row)
 
-        layout.addLayout(size_layout)
-
-        # Monitor selector
-        monitor_layout = QVBoxLayout()
-        monitor_layout.addWidget(QLabel("Monitor:"))
-
-        self.monitor_spin = QSpinBox()
-        self.monitor_spin.setRange(0, 3)
-        self.monitor_spin.setValue(0)
-        monitor_layout.addWidget(self.monitor_spin)
-
-        # Stacking checkbox
         self.stack_checkbox = QCheckBox("Stack Windows")
-        self.stack_checkbox.setToolTip("Place all windows at the same position (overlapping)")
-        monitor_layout.addWidget(self.stack_checkbox)
 
-        layout.addLayout(monitor_layout)
+        self.refresh_groups_btn = QPushButton("Refresh Groups")
+        self.refresh_groups_btn.clicked.connect(self._refresh_groups)
+
+        self.auto_arrange_btn = QPushButton("Auto-Arrange")
+        self.auto_arrange_btn.clicked.connect(self._auto_arrange)
+
+        # ---- Visible top section --------------------------------------
+        container = QWidget()
+        outer = QVBoxLayout(container)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(8)
+
+        # 1. Characters — radio toggle "All / Group: ..."
+        outer.addWidget(self._build_characters_section())
+        # 2. Pattern — thumbnail strip + spacing slider
+        outer.addWidget(self._build_pattern_section())
+        # 3. Monitor — card strip
+        outer.addWidget(self._build_monitor_section())
+        # 4. Grid size — kept compact for Custom pattern users
+        outer.addWidget(self._build_grid_size_section())
+
+        return container
+
+    def _build_characters_section(self) -> QGroupBox:
+        section = QGroupBox("1. Characters")
+        layout = QVBoxLayout()
+
+        radio_row = QHBoxLayout()
+        self._all_radio = QRadioButton("All Active Windows")
+        self._all_radio.setChecked(True)
+        self._group_radio = QRadioButton("Group:")
+        # Parent left as None — Qt re-parents the buttons via addButton anyway,
+        # and bypassed-init test sites can't safely pass `self` as parent.
+        self._group_btn_group = QButtonGroup()
+        self._group_btn_group.addButton(self._all_radio)
+        self._group_btn_group.addButton(self._group_radio)
+
+        # Inline group selector — only enabled when group_radio is on.
+        self._group_inline_combo = QComboBox()
+        self._group_inline_combo.addItem("Default")
+        self._group_inline_combo.setEnabled(False)
+        # Keep the inline combo in sync with the legacy group_combo.
+        self._group_inline_combo.currentTextChanged.connect(self._on_inline_group_changed)
+        self._all_radio.toggled.connect(self._on_chars_radio_toggled)
+        self._group_radio.toggled.connect(self._on_chars_radio_toggled)
+
+        radio_row.addWidget(self._all_radio)
+        radio_row.addWidget(self._group_radio)
+        radio_row.addWidget(self._group_inline_combo, stretch=1)
+        radio_row.addWidget(self.refresh_groups_btn)
+        layout.addLayout(radio_row)
+
+        # Sync inline combo with legacy combo's current items.
+        self._sync_inline_group_combo()
 
         section.setLayout(layout)
         return section
+
+    def _build_pattern_section(self) -> QGroupBox:
+        section = QGroupBox("2. Pattern")
+        layout = QVBoxLayout()
+
+        self._pattern_strip = PatternThumbStrip()
+        self._pattern_strip.pattern_selected.connect(self._on_pattern_strip_selected)
+        # Default selection mirrors the legacy combo
+        initial_pattern = self.pattern_combo.currentText() or "2x2 Grid"
+        self._pattern_strip.set_selected(initial_pattern)
+        layout.addWidget(self._pattern_strip)
+
+        # Spacing belongs with the pattern — it tunes the rendered output,
+        # not a separate concept. Move from the old "Grid Size" cluster.
+        spacing_row = QHBoxLayout()
+        spacing_row.addWidget(QLabel("Spacing:"))
+        spacing_row.addWidget(self.spacing_spin)
+        spacing_row.addStretch()
+        spacing_row.addWidget(self.auto_arrange_btn)
+        layout.addLayout(spacing_row)
+
+        section.setLayout(layout)
+        return section
+
+    def _build_monitor_section(self) -> QGroupBox:
+        section = QGroupBox("3. Monitor")
+        layout = QVBoxLayout()
+
+        self._monitor_strip = MonitorCardStrip()
+        self._monitor_strip.monitor_selected.connect(self._on_monitor_strip_selected)
+        layout.addWidget(self._monitor_strip)
+
+        # Populate from real screen geometry; fall back to a single-card
+        # placeholder when display detection fails (e.g., tests, headless).
+        try:
+            monitors = get_all_monitors() or []
+        except (OSError, RuntimeError, AttributeError):
+            monitors = []
+        cards = [
+            (i, mon.width, mon.height, getattr(mon, "is_primary", i == 0))
+            for i, mon in enumerate(monitors)
+        ]
+        if not cards:
+            cards = [(0, 1920, 1080, True)]
+        self._monitor_strip.set_monitors(cards)
+        self._monitor_strip.set_selected(cards[0][0])
+        # Resize the legacy spin range to match real monitor count.
+        self.monitor_spin.setRange(0, max(0, len(cards) - 1))
+
+        section.setLayout(layout)
+        return section
+
+    def _build_grid_size_section(self) -> QGroupBox:
+        section = QGroupBox("4. Grid Size")
+        layout = QHBoxLayout()
+        layout.addWidget(self.rows_spin)
+        layout.addWidget(self.cols_spin)
+        layout.addStretch()
+        self.stack_checkbox.setToolTip("Place all windows at the same position (overlapping).")
+        layout.addWidget(self.stack_checkbox)
+        section.setLayout(layout)
+        return section
+
+    # ---- New-widget → legacy-state sync -----------------------------------
+    def _on_chars_radio_toggled(self) -> None:
+        """Mirror the radio choice into the legacy group_combo."""
+        if self._all_radio.isChecked():
+            self._group_inline_combo.setEnabled(False)
+            # Trigger the legacy "All Active Windows" code path.
+            idx = self.group_combo.findText("All Active Windows")
+            if idx >= 0:
+                self.group_combo.setCurrentIndex(idx)
+        else:
+            self._group_inline_combo.setEnabled(True)
+            # Switch to the currently-selected inline group.
+            self._on_inline_group_changed(self._group_inline_combo.currentText())
+
+    def _on_inline_group_changed(self, group_name: str) -> None:
+        """Mirror the inline group combo into the legacy combo."""
+        if not group_name:
+            return
+        idx = self.group_combo.findText(group_name)
+        if idx >= 0:
+            self.group_combo.setCurrentIndex(idx)
+
+    def _on_pattern_strip_selected(self, pattern_name: str) -> None:
+        """Mirror the thumbnail strip choice into the legacy pattern combo."""
+        idx = self.pattern_combo.findText(pattern_name)
+        if idx >= 0:
+            self.pattern_combo.setCurrentIndex(idx)
+
+    def _on_monitor_strip_selected(self, index: int) -> None:
+        """Mirror the monitor card choice into the legacy spinbox."""
+        self.monitor_spin.setValue(index)
+
+    def _sync_inline_group_combo(self) -> None:
+        """Refresh the inline group combo from cycling_groups.
+
+        No-op on bypassed-init test sites that don't have the inline combo
+        or cycling_groups dict.
+        """
+        if not hasattr(self, "_group_inline_combo"):
+            return
+        groups = getattr(self, "cycling_groups", None)
+        if groups is None:
+            return
+        current = self._group_inline_combo.currentText()
+        self._group_inline_combo.blockSignals(True)
+        self._group_inline_combo.clear()
+        for name in sorted(groups.keys()):
+            self._group_inline_combo.addItem(name)
+        if current:
+            i = self._group_inline_combo.findText(current)
+            if i >= 0:
+                self._group_inline_combo.setCurrentIndex(i)
+        self._group_inline_combo.blockSignals(False)
 
     def _create_grid_section(self) -> QWidget:
         """Create arrangement grid"""
@@ -581,6 +714,9 @@ class LayoutsTab(QWidget):
                 self.group_combo.setCurrentIndex(idx)
 
         self.group_combo.blockSignals(False)
+
+        # Keep the new inline group combo in sync.
+        self._sync_inline_group_combo()
 
         self.logger.info(f"Loaded {len(self.cycling_groups)} groups")
 
