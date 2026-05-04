@@ -99,8 +99,17 @@ def character_accent_color(name: str) -> QColor:
 
     Used by both WindowPreviewWidget (frame border) and CharacterChip
     (avatar fill) so visual identity is consistent across surfaces.
+
+    Uses MD5 (not Python's built-in hash()) for cross-process determinism:
+    PYTHONHASHSEED is randomized by default, so hash() varies between
+    app launches, which would make the same character render in a
+    different color every session. MD5 is content-addressed and stable.
     """
-    r, g, b = CHARACTER_ACCENT_COLORS[abs(hash(name)) % len(CHARACTER_ACCENT_COLORS)]
+    import hashlib
+
+    digest = hashlib.md5(name.encode("utf-8"), usedforsecurity=False).digest()
+    index = digest[0] % len(CHARACTER_ACCENT_COLORS)
+    r, g, b = CHARACTER_ACCENT_COLORS[index]
     return QColor(r, g, b)
 
 

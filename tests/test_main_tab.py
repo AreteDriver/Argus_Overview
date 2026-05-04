@@ -10257,6 +10257,60 @@ class TestCharacterAccentColor:
 
         assert len(CHARACTER_ACCENT_COLORS) == 8
 
+    def test_cross_process_determinism(self):
+        """Accent color must be stable across processes (MD5-based, not hash())."""
+        import subprocess
+        import sys
+
+        # Run the same lookup in a fresh Python process (different PYTHONHASHSEED)
+        # twice with explicit randomized hash seeds and verify the result is
+        # identical. If the implementation relied on hash(), these would differ.
+        script = (
+            "from argus_overview.ui.main_tab import character_accent_color; "
+            "print(character_accent_color('TestPilot').rgb())"
+        )
+        env_a = {"PYTHONHASHSEED": "1"}
+        env_b = {"PYTHONHASHSEED": "999999"}
+
+        import os
+
+        env_base = os.environ.copy()
+        env_base.pop("QT_QPA_PLATFORM", None)
+        env_base["QT_QPA_PLATFORM"] = "offscreen"
+
+        run_a = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            env={**env_base, **env_a},
+        )
+        run_b = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+            env={**env_base, **env_b},
+        )
+
+        assert run_a.returncode == 0, run_a.stderr
+        assert run_b.returncode == 0, run_b.stderr
+        assert run_a.stdout.strip() == run_b.stdout.strip()
+
+    def test_uniform_distribution_over_palette(self):
+        """A wide range of character names should hit every palette index."""
+        from argus_overview.ui.main_tab import (
+            CHARACTER_ACCENT_COLORS,
+            character_accent_color,
+        )
+
+        # Generate 200 distinct names; expect coverage of every palette entry
+        seen_indices = set()
+        target = {(r, g, b) for r, g, b in CHARACTER_ACCENT_COLORS}
+        for i in range(200):
+            color = character_accent_color(f"Pilot{i:04d}")
+            seen_indices.add((color.red(), color.green(), color.blue()))
+        # 200 names should hit at least 6 of 8 palette entries.
+        assert len(seen_indices & target) >= 6
+
 
 class TestCharacterAccentChipFrameMatch:
     """Same character → same color across the frame and the chip."""
