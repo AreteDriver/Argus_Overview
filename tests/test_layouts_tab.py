@@ -1702,11 +1702,17 @@ class TestLayoutsTabCreateTopSection:
 
                 result = tab._create_top_section()
 
-                # Verify section created
-                mock_groupbox_cls.assert_called_with("Layout Configuration")
-                assert result == mock_section
+                # Verify section created — top section now has 4 group boxes
+                # (Characters, Pattern, Monitor, Grid Size) instead of one.
+                assert mock_groupbox_cls.call_count >= 4
+                titles = [c.args[0] for c in mock_groupbox_cls.call_args_list]
+                assert any("Characters" in t for t in titles)
+                assert any("Pattern" in t for t in titles)
+                assert any("Monitor" in t for t in titles)
+                assert result is not None
 
-                # Verify combos created for group and pattern
+                # Verify combos created for group and pattern (3 now: legacy
+                # group, legacy pattern, inline group selector).
                 assert mock_combo_cls.call_count >= 2
                 tab._refresh_groups.assert_called_once()
 
