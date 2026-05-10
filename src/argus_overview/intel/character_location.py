@@ -35,7 +35,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from PySide6.QtCore import QObject, QTimer, Signal
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 # Header line: "  Listener:      MyCharName"
 # Whitespace before label, around colon, and before/after name is variable.
@@ -121,9 +121,15 @@ class CharacterLocationTracker(QObject):
         character_system_changed(str, str): (character_name, system)
             Emitted when a character moves to a new system. Also fires
             once per character on initial detection.
+        character_logged_off(str): (character_name)
+            Emitted after the character's entry is removed from the
+            location map in response to CharacterDiscovery.character_gone
+            (the EVE client window for that character closed). Fires
+            exactly once per online -> offline transition.
     """
 
     character_system_changed = Signal(str, str)  # char_name, system
+    character_logged_off = Signal(str)  # char_name
 
     def __init__(
         self,
@@ -180,6 +186,29 @@ class CharacterLocationTracker(QObject):
 
     def is_running(self) -> bool:
         return self._running
+
+    @Slot(str, str)
+    def on_character_gone(self, char_name: str, window_id: str) -> None:
+        """Handle CharacterDiscovery.character_gone (EVE window closed).
+
+        Deletes char_name from the authoritative location map and emits
+        character_logged_off. No-op when char_name is empty/whitespace
+        or not currently tracked. Idempotent — calling twice for the
+        same name emits at most once. window_id is accepted for signal-
+        shape compatibility with CharacterDiscovery and not consulted
+        for routing.
+
+        File-tail state in _file_state is intentionally left intact so
+        re-login does not replay history.
+        """
+        if not char_name or not char_name.strip():
+            self.logger.debug("CharacterLocationTracker: ignoring empty char_name on logoff")
+            return
+        if char_name not in self._locations:
+            return
+        prev_system = self._locations.pop(char_name)
+        self.logger.info(f"CharacterLocationTracker: {char_name} logged off (was in {prev_system})")
+        self.character_logged_off.emit(char_name)
 
     # ---- Internals ---------------------------------------------------------
     def _poll(self) -> None:

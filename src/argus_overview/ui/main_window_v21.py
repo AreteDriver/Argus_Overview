@@ -1033,6 +1033,9 @@ class MainWindowV21(QMainWindow):
         ):
             self.characters_tab.update_character_status(char_name, None)
 
+        # Drop stale system from location tracker so chips clear on logoff
+        self.location_tracker.on_character_gone(char_name, window_id)
+
     @Slot(object)
     def _on_team_selected(self, team):
         """

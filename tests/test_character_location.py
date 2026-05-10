@@ -473,3 +473,135 @@ def test_channel_changed_regex_rejects_garbage(qapp, tmp_path, line):
         assert received == []
     finally:
         tracker.deleteLater()
+
+
+class TestCharacterLocationTrackerLogoff:
+    """Tests for the on_character_gone slot / character_logged_off signal."""
+
+    def test_on_character_gone_removes_known_character(self, qapp, tmp_path):
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        try:
+            tracker._update_location("Pilot1", "Jita")
+            tracker.on_character_gone("Pilot1", "win123")
+            assert tracker.get_all_locations() == {}
+        finally:
+            tracker.deleteLater()
+
+    def test_on_character_gone_emits_logged_off_signal(self, qapp, tmp_path):
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        received: list[str] = []
+        tracker.character_logged_off.connect(received.append)
+        try:
+            tracker._update_location("Pilot1", "Jita")
+            tracker.on_character_gone("Pilot1", "win123")
+            assert received == ["Pilot1"]
+        finally:
+            tracker.deleteLater()
+
+    def test_on_character_gone_unknown_character_is_noop(self, qapp, tmp_path):
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        received: list[str] = []
+        tracker.character_logged_off.connect(received.append)
+        try:
+            tracker.on_character_gone("GhostPilot", "win999")
+            assert received == []
+            assert tracker.get_all_locations() == {}
+        finally:
+            tracker.deleteLater()
+
+    def test_on_character_gone_does_not_clear_file_state(self, qapp, tmp_path):
+        path = _write_local_log(tmp_path, "Pilot1")
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        try:
+            tracker._poll()  # seeds _file_state for path
+            assert path in tracker._file_state
+            seeded = tracker._file_state[path]
+            tracker._update_location("Pilot1", "Jita")
+            tracker.on_character_gone("Pilot1", "win123")
+            assert path in tracker._file_state
+            assert tracker._file_state[path] is seeded
+        finally:
+            tracker.deleteLater()
+
+    def test_get_system_returns_none_after_logoff(self, qapp, tmp_path):
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        try:
+            tracker._update_location("Pilot1", "Jita")
+            tracker.on_character_gone("Pilot1", "win123")
+            assert tracker.get_system("Pilot1") is None
+        finally:
+            tracker.deleteLater()
+
+    def test_relogin_reuses_existing_path(self, qapp, tmp_path):
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        system_changes: list[tuple[str, str]] = []
+        logoffs: list[str] = []
+        tracker.character_system_changed.connect(lambda c, s: system_changes.append((c, s)))
+        tracker.character_logged_off.connect(logoffs.append)
+        try:
+            tracker._update_location("P", "Jita")
+            tracker.on_character_gone("P", "w1")
+            tracker._update_location("P", "Amarr")
+            assert tracker.get_all_locations() == {"P": "Amarr"}
+            assert system_changes == [("P", "Jita"), ("P", "Amarr")]
+            assert logoffs == ["P"]
+        finally:
+            tracker.deleteLater()
+
+    def test_logoff_signal_fires_after_dict_mutation(self, qapp, tmp_path):
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        observed: list[str | None] = []
+
+        def on_logoff(name: str) -> None:
+            observed.append(tracker.get_system(name))
+
+        tracker.character_logged_off.connect(on_logoff)
+        try:
+            tracker._update_location("Pilot1", "Jita")
+            tracker.on_character_gone("Pilot1", "win123")
+            assert observed == [None]
+        finally:
+            tracker.deleteLater()
+
+    def test_on_character_gone_empty_name_is_silent_noop(self, qapp, tmp_path):
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        received: list[str] = []
+        tracker.character_logged_off.connect(received.append)
+        try:
+            tracker._update_location("Pilot1", "Jita")
+            tracker.on_character_gone("", "w1")
+            tracker.on_character_gone("   ", "w1")
+            assert received == []
+            assert tracker.get_all_locations() == {"Pilot1": "Jita"}
+        finally:
+            tracker.deleteLater()
+
+    def test_on_character_gone_idempotent(self, qapp, tmp_path):
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        received: list[str] = []
+        tracker.character_logged_off.connect(received.append)
+        try:
+            tracker._update_location("Pilot1", "Jita")
+            tracker.on_character_gone("Pilot1", "win123")
+            tracker.on_character_gone("Pilot1", "win123")
+            assert received == ["Pilot1"]
+        finally:
+            tracker.deleteLater()
+
+    def test_logoff_latency_under_5ms(self, qapp, tmp_path):
+        import time
+
+        tracker = CharacterLocationTracker(log_directory=tmp_path)
+        try:
+            for i in range(100):
+                tracker._update_location(f"P{i}", "Jita")
+            durations_ns: list[int] = []
+            for i in range(100):
+                start = time.perf_counter_ns()
+                tracker.on_character_gone(f"P{i}", "w")
+                durations_ns.append(time.perf_counter_ns() - start)
+            durations_ns.sort()
+            p95 = durations_ns[94]
+            assert p95 < 5_000_000, f"p95 logoff latency {p95}ns exceeds 5ms budget"
+        finally:
+            tracker.deleteLater()

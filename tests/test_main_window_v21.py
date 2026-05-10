@@ -76,6 +76,7 @@ def create_mock_window():
     window._on_new_character_discovered = lambda c, wid, t: (
         MainWindowV21._on_new_character_discovered(window, c, wid, t)
     )
+    window._on_character_gone = lambda c, wid: MainWindowV21._on_character_gone(window, c, wid)
     window._apply_low_power_mode = lambda enabled: MainWindowV21._apply_low_power_mode(
         window, enabled
     )
@@ -2156,6 +2157,7 @@ class TestOnCharacterGone:
         window = MagicMock(spec=MainWindowV21)
         window.logger = MagicMock()
         window.character_manager = MagicMock()
+        window.location_tracker = MagicMock()
 
         MainWindowV21._on_character_gone(window, "TestPilot", "0x12345")
 
@@ -2170,6 +2172,7 @@ class TestOnCharacterGone:
         window.logger = MagicMock()
         window.character_manager = MagicMock()
         window.characters_tab = MagicMock()
+        window.location_tracker = MagicMock()
 
         MainWindowV21._on_character_gone(window, "TestPilot", "0x12345")
 
@@ -2182,12 +2185,14 @@ class TestOnCharacterGone:
         window = MagicMock(spec=MainWindowV21)
         window.logger = MagicMock()
         window.character_manager = MagicMock()
+        window.location_tracker = MagicMock()
         del window.characters_tab
 
         # Should not raise
         MainWindowV21._on_character_gone(window, "Pilot", "0x12345")
 
         window.character_manager.unassign_window.assert_called_with("Pilot")
+        window.location_tracker.on_character_gone.assert_called_with("Pilot", "0x12345")
 
 
 class TestDisconnectSignalsRecordingException:
@@ -2366,3 +2371,28 @@ class TestMainWindowV21InitPartial:
 
             # Theme applied
             mock_theme.apply_theme.assert_called()
+
+
+class TestMainWindowV21CharacterGoneWiring:
+    """Verify _on_character_gone clears the location tracker (A8)."""
+
+    def test_main_window_wires_tracker_to_discovery(self, qapp):
+        from argus_overview.intel.character_location import (
+            CharacterLocationTracker,
+        )
+
+        window = create_mock_window()
+        tracker = CharacterLocationTracker(log_directory=None)
+        try:
+            tracker._update_location("Pilot1", "Jita")
+            window.location_tracker = tracker
+            window.character_manager = MagicMock()
+            window.main_tab = MagicMock()
+            window.main_tab.window_manager = MagicMock()
+            window.characters_tab = MagicMock()
+
+            window._on_character_gone("Pilot1", "win123")
+
+            assert tracker.get_system("Pilot1") is None
+        finally:
+            tracker.deleteLater()
