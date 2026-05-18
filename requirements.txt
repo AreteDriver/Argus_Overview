@@ -1,6 +1,6 @@
 # Argus Overview v2.7 - Pinned versions for reproducible builds
-PySide6-Essentials==6.11.0
+PySide6-Essentials==6.11.1
 python-xlib==0.33
 Pillow==12.2.0
-pynput==1.8.1
+pynput==1.8.2
 watchdog==6.0.0
