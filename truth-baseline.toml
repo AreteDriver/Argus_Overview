@@ -1,0 +1,59 @@
+[metadata]
+name = "Argus_Overview"
+
+[[checks]]
+type = "version_consistency"
+name = "version_consistency"
+sources = [
+    { file = "pyproject.toml", pattern = 'version = "(\d+\.\d+\.\d+)"' },
+    { file = "README.md", pattern = 'v(\d+\.\d+\.\d+)' },
+    { file = "CLAUDE.md", pattern = '(\d+\.\d+\.\d+)' },
+]
+
+[[checks]]
+type = "file_exists"
+name = "v6_artifacts_absent"
+paths = [
+    "docs/artifacts/Argus_Architecture_Book_v6",
+    "docs/artifacts/ARGUS_V6_EXECUTION_PLAN.md",
+]
+should_exist = false
+
+[[checks]]
+type = "file_exists"
+name = "intel_module_present"
+paths = [
+    "src/argus_overview/intel/parser.py",
+    "src/argus_overview/intel/systems.py",
+    "src/argus_overview/intel/jumps.py",
+]
+should_exist = true
+
+[[checks]]
+type = "count"
+name = "esi_source_files"
+glob = "src/argus_overview/esi/*.py"
+expected = "0"
+op = "=="
+
+[[checks]]
+type = "regex_match"
+name = "architecture_package_name"
+file = "docs/ARCHITECTURE.md"
+pattern = 'eve_overview_pro'
+expected = ""
+op = "=="
+
+[[checks]]
+type = "regex_match"
+name = "architecture_mentions_intel"
+file = "docs/ARCHITECTURE.md"
+pattern = 'intel'
+
+[[checks]]
+type = "regex_match"
+name = "user_guide_version"
+file = "docs/USER_GUIDE.md"
+pattern = 'v(\d+\.\d+)'
+expected = "3.2"
+op = "=="

@@ -1,4 +1,4 @@
-# Argus Overview v3.0
+# Argus Overview v3.2.0
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 

@@ -1,0 +1,89 @@
+{
+  "project": "Argus_Overview",
+  "timestamp": "2026-06-19T19:19:17.422906+00:00",
+  "summary": {
+    "pass": 7,
+    "fail": 0,
+    "skip": 0,
+    "error": 0
+  },
+  "checks": [
+    {
+      "name": "version_consistency",
+      "check_type": "version_consistency",
+      "status": "PASS",
+      "expected": "3.2.0",
+      "actual": {
+        "pyproject.toml": "3.2.0",
+        "README.md": "3.2.0",
+        "CLAUDE.md": "3.2.0"
+      },
+      "claim_source": "",
+      "message": "Versions: {'pyproject.toml': '3.2.0', 'README.md': '3.2.0', 'CLAUDE.md': '3.2.0'}"
+    },
+    {
+      "name": "v6_artifacts_absent",
+      "check_type": "file_exists",
+      "status": "PASS",
+      "expected": [],
+      "actual": {
+        "missing": [],
+        "unexpected": []
+      },
+      "claim_source": "",
+      "message": "All paths match expectation"
+    },
+    {
+      "name": "intel_module_present",
+      "check_type": "file_exists",
+      "status": "PASS",
+      "expected": [
+        "src/argus_overview/intel/parser.py",
+        "src/argus_overview/intel/systems.py",
+        "src/argus_overview/intel/jumps.py"
+      ],
+      "actual": {
+        "missing": [],
+        "unexpected": []
+      },
+      "claim_source": "",
+      "message": "All paths match expectation"
+    },
+    {
+      "name": "esi_source_files",
+      "check_type": "count",
+      "status": "PASS",
+      "expected": 0,
+      "actual": 0,
+      "claim_source": "",
+      "message": "Found 0 files matching ['src/argus_overview/esi/*.py']; expected == 0"
+    },
+    {
+      "name": "architecture_package_name",
+      "check_type": "regex_match",
+      "status": "PASS",
+      "expected": "",
+      "actual": null,
+      "claim_source": "",
+      "message": "Extracted 'None' from docs/ARCHITECTURE.md; expected == ''"
+    },
+    {
+      "name": "architecture_mentions_intel",
+      "check_type": "regex_match",
+      "status": "PASS",
+      "expected": null,
+      "actual": "intel",
+      "claim_source": "",
+      "message": "Extracted 'intel' from docs/ARCHITECTURE.md"
+    },
+    {
+      "name": "user_guide_version",
+      "check_type": "regex_match",
+      "status": "PASS",
+      "expected": "3.2",
+      "actual": "3.2",
+      "claim_source": "",
+      "message": "Extracted '3.2' from docs/USER_GUIDE.md; expected == '3.2'"
+    }
+  ]
+}

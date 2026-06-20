@@ -8,7 +8,7 @@ Technical architecture documentation for developers and contributors.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           Argus Overview                                 │
+│                         Argus Overview v3.2                               │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                        UI Layer (PySide6/Qt)                     │   │
@@ -32,17 +32,17 @@ Technical architecture documentation for developers and contributors.
 │  │  │  Config    │  │   Hotkey        │  │   EVE Settings    │    │   │
 │  │  │  Detector  │  │   Manager       │  │      Sync         │    │   │
 │  │  └────────────┘  └─────────────────┘  └───────────────────┘    │   │
-│  │  ┌────────────┐  ┌─────────────────┐                           │   │
-│  │  │ Discovery  │  │  Config         │                           │   │
-│  │  │  Service   │  │  Watcher        │                           │   │
-│  │  └────────────┘  └─────────────────┘                           │   │
+│  │  ┌────────────┐  ┌─────────────────┐  ┌───────────────────┐    │   │
+│  │  │ Discovery  │  │  Config         │  │   Intel / Threat  │    │   │
+│  │  │  Service   │  │  Watcher        │  │   Detection       │    │   │
+│  │  └────────────┘  └─────────────────┘  └───────────────────┘    │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                │                                        │
 │  ┌─────────────────────────────┼───────────────────────────────────┐   │
 │  │                      Platform Layer                              │   │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────┐  │   │
-│  │  │  X11 / XWayland │  │    wmctrl       │  │    xdotool     │  │   │
-│  │  │  (python-xlib)  │  │  (subprocess)   │  │  (subprocess)  │  │   │
+│  │  │  X11 / XWayland │  │    Wayland      │  │    Windows     │  │   │
+│  │  │  (python-xlib)  │  │  (wlroots)      │  │  (Win32 API)   │  │   │
 │  │  └─────────────────┘  └─────────────────┘  └────────────────┘  │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -55,7 +55,7 @@ Technical architecture documentation for developers and contributors.
 ```
 src/
 ├── main.py                          # Application entry point
-└── eve_overview_pro/
+└── argus_overview/
     ├── __init__.py
     ├── core/                        # Business logic (no Qt dependencies)
     │   ├── position.py              # Window position utilities
@@ -67,6 +67,16 @@ src/
     │   ├── layout_manager.py        # Window arrangement patterns
     │   ├── position.py              # Window positioning utilities
     │   └── window_capture_threaded.py # Threaded screen capture
+    │
+    ├── intel/                       # Chat-log parsing & threat detection
+    │   ├── log_watcher.py           # EVE log file watcher
+    │   ├── parser.py                # Chat message parser
+    │   ├── alerts.py                # Threat alert engine
+    │   ├── threat_filter.py         # Threat filtering rules
+    │   ├── character_location.py    # Character location tracking
+    │   ├── jumps.py                 # Jump bridge / gate tracking
+    │   ├── systems.py               # EVE system database
+    │   └── data/                    # Intel data assets
     │
     ├── ui/                          # PySide6 widgets and windows
     │   ├── action_registry.py       # Single source of truth for actions
@@ -83,6 +93,12 @@ src/
     │   ├── settings_manager.py      # Settings persistence
     │   ├── hotkey_edit.py           # Hotkey recording widget
     │   └── about_dialog.py          # About dialog
+    │
+    ├── platform/                    # Platform abstraction
+    │   ├── base.py                  # Platform interface base
+    │   ├── linux.py                 # X11 implementation
+    │   ├── wayland.py               # Wayland implementation
+    │   └── windows.py               # Windows implementation
     │
     └── utils/                       # Shared utilities
         ├── constants.py             # Application constants
@@ -412,6 +428,56 @@ User clicks preview
 └───────────────────────────────────────────────────────────────────┘
 ```
 
+### Wayland Window Management
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                       Wayland Integration                          │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  WINDOW DISCOVERY (wlr-screenshot / wlroots protocols)           │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Uses wlroots-compatible screenshot protocols                  ││
+│  │ Falls back to XWayland when native protocol unavailable       ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+│  WINDOW CAPTURE (grim + slurp / wlr-screenshot)                  │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Screenshots via Wayland compositor protocol                 ││
+│  │ Converted to PIL Image for processing                         ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Windows Window Management
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                       Windows Integration                          │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  WINDOW DISCOVERY (EnumWindows + GetWindowText)                  │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Iterates top-level windows via Win32 API                      ││
+│  │ Filters by process name (exefile.exe)                         ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+│  WINDOW ACTIVATION (SetForegroundWindow + ShowWindow)            │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Raises and focuses the specified window                       ││
+│  │ Result caching: 1 second TTL                                  ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+│  WINDOW CAPTURE (PrintWindow / BitBlt)                           │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Screenshots via GDI/Win32 API                                  ││
+│  │ Converted to PIL Image for processing                         ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+└───────────────────────────────────────────────────────────────────┘
+```
+
 ### Security Considerations
 
 All subprocess calls validate window IDs to prevent command injection:
@@ -481,7 +547,7 @@ ruff check src/
 ruff format src/
 
 # Audit actions
-python -m eve_overview_pro.ui.action_registry
+python -m argus_overview.ui.action_registry
 ```
 
 ### Adding New Features
