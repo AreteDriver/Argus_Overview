@@ -1,3 +1,10 @@
+> **STATUS: FROZEN as of 2026-06-22**  
+> This repository is no longer actively developed. See [AreteDriver/notes/decisions/2026-04-21-portfolio-triage.md](https://github.com/AreteDriver/notes/blob/main/decisions/2026-04-21-portfolio-triage.md) for context.  
+> Archived for reference. No new deploys or feature work.
+>
+> ---
+>
+
 # Argus Overview v3.2.0
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
