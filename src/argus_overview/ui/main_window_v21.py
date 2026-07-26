@@ -78,7 +78,7 @@ class MainWindowV21(QMainWindow):
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.setWindowTitle(f"Argus Overview v{__version__}")
-        self.setMinimumSize(1000, 700)
+        self.setMinimumSize(960, 600)
 
         # Set window icon
         self._set_window_icon()

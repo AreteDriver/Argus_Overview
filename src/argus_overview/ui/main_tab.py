@@ -751,9 +751,11 @@ class WindowPreviewWidget(QWidget):
         self._replay_strip = None  # type: ignore[var-annotated]
         self._replay_view_index: int | None = None  # None = live; int = buffered
 
+        from argus_overview.ui.design_system import metrics as dm
+
         # Setup UI
-        self.setMinimumSize(200, 150)
-        self.setMaximumSize(600, 450)
+        self.setMinimumSize(dm.PREVIEW_MIN_WIDTH, dm.PREVIEW_MIN_HEIGHT)
+        self.setMaximumSize(dm.PREVIEW_MAX_WIDTH, dm.PREVIEW_MAX_HEIGHT)
         self._update_tooltip()
         self._update_accessible_name()
 
