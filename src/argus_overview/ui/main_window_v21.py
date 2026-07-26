@@ -152,6 +152,14 @@ class MainWindowV21(QMainWindow):
             QTabBar::tab:hover {{
                 background: {ds.SURFACE_HOVER};
             }}
+            QSplitter::handle:horizontal {{
+                background: {ds.BORDER_SUBTLE};
+                width: 2px;
+            }}
+            QSplitter::handle:vertical {{
+                background: {ds.BORDER_SUBTLE};
+                height: 2px;
+            }}
         """)
         layout.addWidget(self.tabs)
 

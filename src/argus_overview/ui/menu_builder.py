@@ -420,14 +420,23 @@ class ToolbarBuilder:
         """
 
     def _get_danger_style(self) -> str:
-        """Return stylesheet for destructive actions using design-system critical red."""
+        """Return stylesheet for destructive actions using design-system critical red.
+
+        Uses an outline style at rest to reduce visual alarm in toolbars,
+        filling on hover for clear affordance.
+        """
         from argus_overview.ui.design_system import colors as ds
         return f"""
             QPushButton {{
+                background-color: transparent;
+                color: {ds.CRITICAL};
+                border: 1px solid {ds.CRITICAL};
+                padding: 5px 10px;
+            }}
+            QPushButton:hover {{
                 background-color: {ds.CRITICAL};
                 color: black;
             }}
-            QPushButton:hover {{ background-color: {QColor(ds.CRITICAL).lighter(120).name()}; }}
         """
 
     def build_toolbar_buttons(

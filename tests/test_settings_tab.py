@@ -1144,15 +1144,16 @@ class TestSettingsTabSetupUI:
 
         with patch.object(SettingsTab, "_create_category_tree", return_value=MagicMock()):
             with patch.object(SettingsTab, "setLayout"):
-                with patch.object(SettingsTab, "_load_settings"):
-                    SettingsTab(mock_settings, mock_hotkey_mgr)
+                with patch.object(SettingsTab, "setStyleSheet"):
+                    with patch.object(SettingsTab, "_load_settings"):
+                        SettingsTab(mock_settings, mock_hotkey_mgr)
 
-                    assert mock_gen.called
-                    assert mock_perf.called
-                    assert mock_hk.called
-                    assert mock_intel.called
-                    assert mock_app.called
-                    assert mock_adv.called
+                        assert mock_gen.called
+                        assert mock_perf.called
+                        assert mock_hk.called
+                        assert mock_intel.called
+                        assert mock_app.called
+                        assert mock_adv.called
 
     @patch("argus_overview.ui.settings_tab.QWidget")
     @patch("argus_overview.ui.settings_tab.QVBoxLayout")
@@ -1181,6 +1182,54 @@ class TestSettingsTabSetupUI:
             # Should create 5 tree items (General, Performance, Hotkeys, Appearance, Advanced)
             # Note: Alerts panel was removed for CCP EULA compliance
             assert mock_item.call_count >= 5
+
+    @patch("argus_overview.ui.settings_tab.QWidget")
+    @patch("argus_overview.ui.settings_tab.QVBoxLayout")
+    @patch("argus_overview.ui.settings_tab.QLabel")
+    @patch("argus_overview.ui.settings_tab.QFont")
+    @patch("argus_overview.ui.settings_tab.QTreeWidget")
+    @patch("argus_overview.ui.settings_tab.QTreeWidgetItem")
+    @patch("argus_overview.ui.settings_tab.QPushButton")
+    def test_create_category_tree_stylesheet_and_default_selection(
+        self, mock_btn, mock_item, mock_tree, mock_font, mock_label, mock_layout, mock_qwidget
+    ):
+        """Test _create_category_tree applies design-system stylesheet and selects first item"""
+        from argus_overview.ui.settings_tab import SettingsTab
+        from argus_overview.ui.design_system import colors as _ds
+
+        mock_settings = MagicMock()
+        mock_settings.get.return_value = {}
+        mock_hotkey_mgr = MagicMock()
+
+        # Capture the tree widget instance returned by QTreeWidget()
+        mock_tree_instance = MagicMock()
+        mock_tree.return_value = mock_tree_instance
+        # Mock topLevelItem so setCurrentItem works
+        mock_first_item = MagicMock()
+        mock_tree_instance.topLevelItem.return_value = mock_first_item
+
+        with patch.object(SettingsTab, "__init__", return_value=None):
+            tab = SettingsTab.__new__(SettingsTab)
+            tab.settings_manager = mock_settings
+            tab.hotkey_manager = mock_hotkey_mgr
+
+            tab._create_category_tree()
+
+            # Should select first category by default
+            mock_tree_instance.setCurrentItem.assert_called_once_with(mock_first_item)
+
+            # Should apply stylesheet with design-system tokens
+            mock_tree_instance.setStyleSheet.assert_called_once()
+            stylesheet = mock_tree_instance.setStyleSheet.call_args[0][0]
+            assert _ds.SURFACE in stylesheet
+            assert _ds.SURFACE_HOVER in stylesheet
+            assert _ds.SURFACE_RAISED in stylesheet
+            assert _ds.TEXT_PRIMARY in stylesheet
+            assert _ds.BORDER_SUBTLE in stylesheet
+            assert _ds.INFO in stylesheet
+            assert "::item:selected" in stylesheet
+            assert "::item:hover" in stylesheet
+            assert "border-left: 2px solid" in stylesheet
 
     @patch("argus_overview.ui.settings_tab.QWidget.__init__")
     def test_on_category_changed_none(self, mock_widget):

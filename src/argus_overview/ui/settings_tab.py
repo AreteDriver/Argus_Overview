@@ -780,6 +780,29 @@ class SettingsTab(QWidget):
 
         self.setLayout(layout)
 
+        # Style all settings panels with a cohesive card appearance
+        self.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {_ds.SURFACE_RAISED};
+                border: 1px solid {_ds.BORDER_SUBTLE};
+                border-radius: 6px;
+                margin-top: 12px;
+                padding-top: 8px;
+                padding-bottom: 8px;
+                padding-left: 12px;
+                padding-right: 12px;
+                color: {_ds.TEXT_SECONDARY};
+                font-weight: bold;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                subcontrol-position: top left;
+                left: 10px;
+                padding: 0 5px;
+                color: {_ds.TEXT_SECONDARY};
+            }}
+        """)
+
     def _create_category_tree(self) -> QWidget:
         """Create category tree widget"""
         widget = QWidget()
@@ -802,7 +825,35 @@ class SettingsTab(QWidget):
             item = QTreeWidgetItem([category])
             self.category_tree.addTopLevelItem(item)
 
+        self.category_tree.setCurrentItem(self.category_tree.topLevelItem(0))
         self.category_tree.currentItemChanged.connect(self._on_category_changed)
+
+        # Style nav tree with design-system tokens
+        self.category_tree.setStyleSheet(f"""
+            QTreeWidget {{
+                background-color: {_ds.SURFACE};
+                border: 1px solid {_ds.BORDER_SUBTLE};
+                border-radius: 4px;
+                outline: none;
+            }}
+            QTreeWidget::item {{
+                color: {_ds.TEXT_PRIMARY};
+                padding: 6px 10px;
+                border: none;
+            }}
+            QTreeWidget::item:selected,
+            QTreeWidget::item:selected:active,
+            QTreeWidget::item:selected:!active {{
+                background-color: {_ds.SURFACE_HOVER};
+                color: {_ds.TEXT_PRIMARY};
+                border-left: 2px solid {_ds.INFO};
+                padding-left: 8px;
+            }}
+            QTreeWidget::item:hover {{
+                background-color: {_ds.SURFACE_RAISED};
+            }}
+        """)
+
         layout.addWidget(self.category_tree)
 
         # Reset button

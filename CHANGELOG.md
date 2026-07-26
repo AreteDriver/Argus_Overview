@@ -5,6 +5,30 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Operational Truth UI Polish
+
+Visual consistency pass across all tabs following the Operational Truth
+release theme. Every surface now derives from the design-system token set
+instead of hardcoded values.
+
+### Changed
+- **Design system tokens** — semantic colors, spacing, typography, metrics,
+  and states centralized under `ui/design_system/`.
+- **Settings tab navigation** — `QTreeWidget` category list now shows a clear
+  selection highlight (`SURFACE_HOVER` background + `INFO` left accent bar)
+  and defaults to "General" on first open.
+- **Settings panels** — all `QGroupBox` containers styled as cards with
+  `SURFACE_RAISED` background, `BORDER_SUBTLE` border, and rounded corners.
+- **Danger buttons** — `ToolbarBuilder` destructive actions (`delete_character`,
+  `delete_group`, etc.) switched from solid bright-red fill to an outline style
+  (red text + red border) that fills on hover. Reduces visual alarm in toolbars.
+- **Splitter handles** — `QSplitter::handle` styled as a 2px `BORDER_SUBTLE`
+  line, eliminating default Qt grip dots in the Sync and Settings tabs.
+- **Tab bar** — styled with `CANVAS` pane, `SURFACE` tabs, `SURFACE_RAISED`
+  selected state, and `SURFACE_HOVER` hover state.
+- **Screenshots** — all README and docs screenshots regenerated at 1440×900
+  reflecting the current UI state.
+
 ## [3.2.0] - 2026-04-26 — Intel-Aware Edition
 
 This release ships a 10-PR arc that turns Argus's preview chrome into an
