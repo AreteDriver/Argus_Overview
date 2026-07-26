@@ -2283,15 +2283,6 @@ class MainTab(QWidget):
 
         toolbar_layout.addStretch()
 
-        # Refresh Rate (not from registry - it's a widget, not an action)
-        toolbar_layout.addWidget(QLabel("FPS:"))
-        self.refresh_rate_spin = QSpinBox()
-        self.refresh_rate_spin.setRange(1, 60)
-        self.refresh_rate_spin.setValue(30)
-        self.refresh_rate_spin.setToolTip("Capture framerate (higher = smoother but more CPU)")
-        self.refresh_rate_spin.valueChanged.connect(self._on_refresh_rate_changed)
-        toolbar_layout.addWidget(self.refresh_rate_spin)
-
         # Search/filter field
         toolbar_layout.addSpacing(10)
         self.search_field = QLineEdit()

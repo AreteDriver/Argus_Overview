@@ -6846,7 +6846,7 @@ class TestMainTabCreateToolbarReal:
             assert toolbar is not None
             assert tab.lock_btn is not None
             assert tab.minimize_inactive_btn is not None
-            assert tab.refresh_rate_spin is not None
+            assert tab.search_field is not None
 
 
 class TestMainTabCreateLayoutControlsReal:
