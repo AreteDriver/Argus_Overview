@@ -846,7 +846,9 @@ class SettingsTab(QWidget):
         reply = QMessageBox.question(
             self,
             "Confirm Reset",
-            "Reset all settings to defaults?\n\nThis action cannot be undone.",
+            "Reset all settings to defaults?\n\n"
+            "This will erase custom hotkeys, cycling groups, and appearance preferences. "
+            "A restart is required to apply changes. This action cannot be undone.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 

@@ -517,6 +517,7 @@ class GridApplier:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.last_apply_results: dict[str, bool] = {}
 
     def get_screen_geometry(self, monitor: int = 0) -> ScreenGeometry:
         """Get screen geometry for a monitor (delegates to shared utility)"""
@@ -533,6 +534,7 @@ class GridApplier:
         stacked: bool = False,
         stacked_use_grid_size: bool = True,
     ) -> bool:
+        results: dict[str, bool] = {}
         try:
             # Calculate grid cell size (used for both grid and optionally stacked)
             cell_width = (screen.width - spacing * (grid_cols + 1)) // grid_cols
@@ -545,11 +547,9 @@ class GridApplier:
 
                 for _char_name, window_id in window_map.items():
                     if stacked_use_grid_size:
-                        # Use grid cell size for stacked windows
-                        self._move_window(window_id, x, y, cell_width, cell_height)
+                        results[window_id] = self._move_window(window_id, x, y, cell_width, cell_height)
                     else:
-                        # Keep current size, just move to stack position
-                        self._move_window_position_only(window_id, x, y)
+                        results[window_id] = self._move_window_position_only(window_id, x, y)
             else:
                 for char_name, (row, col) in arrangement.items():
                     if char_name not in window_map:
@@ -558,28 +558,41 @@ class GridApplier:
                     window_id = window_map[char_name]
                     x = screen.x + spacing + col * (cell_width + spacing)
                     y = screen.y + spacing + row * (cell_height + spacing)
-                    self._move_window(window_id, x, y, cell_width, cell_height)
+                    results[window_id] = self._move_window(window_id, x, y, cell_width, cell_height)
 
-            self.logger.info(f"Applied arrangement to {len(window_map)} windows")
-            return True
+            self.last_apply_results = results
+            ok = all(results.values()) if results else True
+            self.logger.info(f"Applied arrangement to {len(window_map)} windows ({sum(results.values())}/{len(results)} succeeded)")
+            return ok
 
         except (AttributeError, OSError, RuntimeError, ValueError) as e:
             self.logger.error(f"Failed to apply arrangement: {e}")
+            self.last_apply_results = results
             return False
 
-    def _move_window(self, window_id: str, x: int, y: int, w: int, h: int):
+    def _move_window(self, window_id: str, x: int, y: int, w: int, h: int) -> bool:
         """Move and resize a window via platform abstraction layer."""
         from argus_overview.platform import get_window_manager
 
-        wm = get_window_manager()
-        wm.move_window(window_id, x, y, w, h)
+        try:
+            wm = get_window_manager()
+            wm.move_window(window_id, x, y, w, h)
+            return True
+        except (OSError, RuntimeError) as e:
+            self.logger.warning(f"Failed to move window {window_id}: {e}")
+            return False
 
-    def _move_window_position_only(self, window_id: str, x: int, y: int):
+    def _move_window_position_only(self, window_id: str, x: int, y: int) -> bool:
         """Move a window without resizing (w=0, h=0 convention)."""
         from argus_overview.platform import get_window_manager
 
-        wm = get_window_manager()
-        wm.move_window(window_id, x, y, 0, 0)
+        try:
+            wm = get_window_manager()
+            wm.move_window(window_id, x, y, 0, 0)
+            return True
+        except (OSError, RuntimeError) as e:
+            self.logger.warning(f"Failed to move window {window_id}: {e}")
+            return False
 
 
 def pil_to_qimage(pil_image: Image.Image, raw_data: bytes | None = None) -> QImage:
@@ -2402,13 +2415,24 @@ class MainTab(QWidget):
             stacked_use_grid_size=self.stack_resize_checkbox.isChecked(),
         )
 
+        results = self.grid_applier.last_apply_results
         if success:
             pattern = self.pattern_combo.currentText()
             self.status_label.setText(f"Applied {pattern} layout to {len(window_map)} windows")
             self.layout_applied.emit(pattern)
             self.logger.info(f"Applied {pattern} layout to {len(window_map)} windows")
         else:
-            QMessageBox.warning(self, "Error", "Failed to apply layout. Check logs for details.")
+            # PR3: report partial failures with specific character names
+            failed = [wid for wid, ok in results.items() if not ok]
+            char_map = {v: k for k, v in window_map.items()}
+            failed_names = [char_map.get(wid, wid) for wid in failed]
+            total = len(results)
+            moved = sum(results.values())
+            msg = (
+                f"Layout applied: {moved}/{total} windows moved.\n\n"
+                f"Failed: {', '.join(failed_names)}"
+            )
+            QMessageBox.warning(self, "Partial Failure", msg)
 
     def refresh_layout_groups(self):
         """Called when groups change in hotkeys tab"""
@@ -2611,12 +2635,20 @@ class MainTab(QWidget):
             spacing=10,
             stacked=(display_pattern == "Stacked (All Same Position)"),
         )
+        results = self.grid_applier.last_apply_results
         if success:
             self.status_label.setText(f"Applied preset: {preset_name}")
             self.layout_applied.emit(preset_name)
             self.logger.info(f"Applied layout preset '{preset_name}' to {len(window_map)} windows")
         else:
-            self.status_label.setText(f"Failed to apply preset: {preset_name}")
+            # PR3: report partial failures with specific character names
+            failed = [wid for wid, ok in results.items() if not ok]
+            char_map = {v: k for k, v in window_map.items()}
+            failed_names = [char_map.get(wid, wid) for wid in failed]
+            moved = sum(results.values())
+            self.status_label.setText(
+                f"Partial failure: {moved}/{len(results)} moved. Failed: {', '.join(failed_names)}"
+            )
 
     def _create_status_bar(self) -> QWidget:
         """Create status bar"""
@@ -2857,10 +2889,12 @@ class MainTab(QWidget):
         if not self.window_manager.preview_frames:
             return
 
+        count = len(self.window_manager.preview_frames)
         reply = QMessageBox.question(
             self,
             "Remove All Windows",
-            "Remove all windows from preview?",
+            f"Remove all {count} windows from preview?\n\n"
+            "This stops capture but does NOT close the EVE clients.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 

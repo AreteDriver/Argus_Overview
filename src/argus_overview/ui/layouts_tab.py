@@ -264,6 +264,7 @@ class GridApplier:
     def __init__(self, layout_manager):
         self.layout_manager = layout_manager
         self.logger = logging.getLogger(__name__)
+        self.last_apply_results: dict[str, bool] = {}
 
     def get_screen_geometry(self, monitor: int = 0) -> ScreenGeometry:
         """Get screen geometry for a monitor (delegates to shared utility)"""
@@ -280,7 +281,7 @@ class GridApplier:
         stacked: bool = False,
     ) -> bool:
         """
-        Apply arrangement to windows
+        Apply arrangement to windows.
 
         Args:
             arrangement: {char_name: (row, col)}
@@ -289,7 +290,12 @@ class GridApplier:
             grid_rows, grid_cols: Grid dimensions
             spacing: Spacing between windows
             stacked: If True, all windows at same position
+
+        Returns:
+            True if all windows were moved successfully.
+            Per-window results are stored in ``self.last_apply_results``.
         """
+        results: dict[str, bool] = {}
         try:
             if stacked:
                 # All windows same size and position
@@ -299,7 +305,7 @@ class GridApplier:
                     w = screen.width - spacing * 2
                     h = screen.height - spacing * 2
 
-                    self._move_window(window_id, x, y, w, h)
+                    results[window_id] = self._move_window(window_id, x, y, w, h)
             else:
                 # Grid-based arrangement
                 cell_width = (screen.width - spacing * (grid_cols + 1)) // grid_cols
@@ -314,53 +320,63 @@ class GridApplier:
                     x = screen.x + spacing + col * (cell_width + spacing)
                     y = screen.y + spacing + row * (cell_height + spacing)
 
-                    self._move_window(window_id, x, y, cell_width, cell_height)
+                    results[window_id] = self._move_window(window_id, x, y, cell_width, cell_height)
 
-            self.logger.info(f"Applied arrangement to {len(window_map)} windows")
-            return True
+            self.last_apply_results = results
+            ok = all(results.values()) if results else True
+            self.logger.info(f"Applied arrangement to {len(window_map)} windows ({sum(results.values())}/{len(results)} succeeded)")
+            return ok
 
         except (OSError, subprocess.SubprocessError, KeyError, ValueError) as e:
             self.logger.error(f"Failed to apply arrangement: {e}")
+            self.last_apply_results = results
             return False
 
-    def _move_window(self, window_id: str, x: int, y: int, w: int, h: int):
-        """Move and resize a single window, with fallback for Wine/Proton windows"""
+    def _move_window(self, window_id: str, x: int, y: int, w: int, h: int) -> bool:
+        """Move and resize a single window, with fallback for Wine/Proton windows.
+
+        Returns True if the move/resize commands completed without exception.
+        """
         import time
 
         # Validate window ID format (X11: 0x followed by hex digits)
         if not window_id or not re.match(r"^0x[0-9a-fA-F]+$", window_id):
             self.logger.warning(f"Invalid window ID format: {window_id}")
-            return
-
-        # Try with --sync first, fallback to no-sync for Wine/Proton windows
-        try:
-            subprocess.run(
-                ["xdotool", "windowmove", "--sync", window_id, str(x), str(y)],
-                capture_output=True,
-                timeout=2,
-            )
-        except subprocess.TimeoutExpired:
-            # Wine windows don't respond to sync, retry without it
-            subprocess.run(
-                ["xdotool", "windowmove", window_id, str(x), str(y)],
-                capture_output=True,
-                timeout=2,
-            )
-            time.sleep(0.1)  # Brief pause for window to settle
+            return False
 
         try:
-            subprocess.run(
-                ["xdotool", "windowsize", "--sync", window_id, str(w), str(h)],
-                capture_output=True,
-                timeout=2,
-            )
-        except subprocess.TimeoutExpired:
-            subprocess.run(
-                ["xdotool", "windowsize", window_id, str(w), str(h)],
-                capture_output=True,
-                timeout=2,
-            )
-            time.sleep(0.1)
+            # Try with --sync first, fallback to no-sync for Wine/Proton windows
+            try:
+                subprocess.run(
+                    ["xdotool", "windowmove", "--sync", window_id, str(x), str(y)],
+                    capture_output=True,
+                    timeout=2,
+                )
+            except subprocess.TimeoutExpired:
+                subprocess.run(
+                    ["xdotool", "windowmove", window_id, str(x), str(y)],
+                    capture_output=True,
+                    timeout=2,
+                )
+                time.sleep(0.1)
+
+            try:
+                subprocess.run(
+                    ["xdotool", "windowsize", "--sync", window_id, str(w), str(h)],
+                    capture_output=True,
+                    timeout=2,
+                )
+            except subprocess.TimeoutExpired:
+                subprocess.run(
+                    ["xdotool", "windowsize", window_id, str(w), str(h)],
+                    capture_output=True,
+                    timeout=2,
+                )
+                time.sleep(0.1)
+            return True
+        except (OSError, subprocess.SubprocessError) as e:
+            self.logger.warning(f"Failed to move window {window_id}: {e}")
+            return False
 
 
 class LayoutsTab(QWidget):
@@ -877,13 +893,24 @@ class LayoutsTab(QWidget):
             stacked=self.stack_checkbox.isChecked(),
         )
 
+        results = self.grid_applier.last_apply_results
         if success:
             QMessageBox.information(
                 self, "Success", f"Applied layout to {len(window_map)} windows!"
             )
             self.layout_applied.emit(self.pattern_combo.currentText())
         else:
-            QMessageBox.warning(self, "Error", "Failed to apply layout. Check logs for details.")
+            # PR3: report partial failures with specific character names
+            failed = [wid for wid, ok in results.items() if not ok]
+            char_map = {v: k for k, v in window_map.items()}
+            failed_names = [char_map.get(wid, wid) for wid in failed]
+            total = len(results)
+            moved = sum(results.values())
+            msg = (
+                f"Layout applied: {moved}/{total} windows moved.\n\n"
+                f"Failed: {', '.join(failed_names)}"
+            )
+            QMessageBox.warning(self, "Partial Failure", msg)
 
     def refresh_groups_from_settings(self):
         """Called when groups change in hotkeys tab"""

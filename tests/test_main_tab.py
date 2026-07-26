@@ -7996,8 +7996,8 @@ class TestMainTabApplyLayoutFailure:
 
                 mock_msgbox.warning.assert_called_once()
                 args = mock_msgbox.warning.call_args[0]
-                assert "Error" in args[1]
-                assert "Failed to apply layout" in args[2]
+                assert "Partial Failure" in args[1]
+                assert "Layout applied:" in args[2]
 
 
 class TestOneClickImportNoWindows:

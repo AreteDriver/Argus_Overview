@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import time
 
-from PySide6.QtCore import Qt, QPropertyAnimation, Signal
+from PySide6.QtCore import Qt, QPropertyAnimation, Signal, QTimer
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -84,6 +84,14 @@ class CharacterChip(QFrame):
         # PR1: has any intel report ever been received for this character?
         self._intel_report_received: bool = False
 
+        # PR3: staleness timer — if no location update in 60s, label goes stale
+        self._stale_timer = QTimer(self)
+        self._stale_timer.setSingleShot(True)
+        self._stale_timer.setInterval(60_000)
+        self._stale_timer.timeout.connect(self._on_stale_location)
+        self._last_system: str | None = None
+        self._last_system_at: float = 0.0
+
         self.setFixedHeight(40)
         self.setMinimumWidth(160)
         self.setMaximumWidth(260)
@@ -124,6 +132,8 @@ class CharacterChip(QFrame):
         parts = [f"Character {self.character_name}"]
         if self._system:
             parts.append(f"system {self._system}")
+        elif self._last_system:
+            parts.append(f"system unknown, last known {self._last_system}")
         if self._threat_level is not None and self._threat_alpha > 0.0:
             parts.append(f"threat {self._threat_level.value}")
         elif not self._intel_report_received:
@@ -169,6 +179,8 @@ class CharacterChip(QFrame):
         parts = [self.character_name]
         if self._system:
             parts.append(f"System: {self._system}")
+        elif self._last_system:
+            parts.append(f"System: Unknown (last: {self._last_system})")
         if self._threat_level is not None and self._threat_alpha > 0.0:
             line = f"Threat: {self._threat_level.value}"
             if self._threat_distance and self._threat_distance > 0:
@@ -190,7 +202,28 @@ class CharacterChip(QFrame):
     # ----- public API -------------------------------------------------------
     def set_system(self, system: str | None) -> None:
         self._system = system
-        self._system_label.setText(system or "—")
+        if system:
+            self._last_system = system
+            self._last_system_at = time.monotonic()
+            self._stale_timer.stop()
+            self._stale_timer.start()
+            self._system_label.setStyleSheet("color: #aaa; font-size: 9pt;")
+            self._system_label.setText(system)
+        else:
+            self._stale_timer.stop()
+            self._system_label.setStyleSheet("color: #aaa; font-size: 9pt;")
+            self._system_label.setText("—")
+        self.setToolTip(self._tooltip_text())
+        self._update_accessible_name()
+
+    def _on_stale_location(self) -> None:
+        """PR3: transition to stale location label after 60s without an update."""
+        self._system = None
+        if self._last_system:
+            self._system_label.setText(f"Unknown · last: {self._last_system}")
+        else:
+            self._system_label.setText("Unknown")
+        self._system_label.setStyleSheet("color: #777; font-size: 9pt; opacity: 0.7;")
         self.setToolTip(self._tooltip_text())
         self._update_accessible_name()
 
@@ -373,6 +406,11 @@ class StatusDock(QWidget):
         if chip is None:
             return False
         self._strip_layout.removeWidget(chip)
+        # PR3: stop staleness timer so it doesn't fire after deletion
+        try:
+            chip._stale_timer.stop()
+        except (AttributeError, RuntimeError):
+            pass
         chip.deleteLater()
         self._update_height()
         return True

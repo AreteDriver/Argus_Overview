@@ -26,6 +26,7 @@ class HotkeyManager(QObject):
 
     hotkey_triggered = Signal(str)
     _invoke_callback = Signal(str)  # hotkey name → looked up and called on GUI thread
+    health_changed = Signal(str, str)  # status, detail
 
     def __init__(self):
         super().__init__()
@@ -33,9 +34,12 @@ class HotkeyManager(QObject):
         self.combo_listener = None
         self.key_listener = None
         self.logger = logging.getLogger(__name__)
+        self._health_status = "healthy"
+        self._health_detail = ""
 
         if not PYNPUT_AVAILABLE:
             self.logger.warning("pynput not available — global hotkeys disabled")
+            self._set_health("unavailable", "pynput not installed")
 
         # Track single-key hotkeys separately
         self.single_key_hotkeys: dict[str, dict] = {}  # key_char -> {name, callback}
@@ -93,9 +97,12 @@ class HotkeyManager(QObject):
 
             self._restart_listeners()
             self.logger.info(f"Registered hotkey '{name}': {normalized_combo}")
+            # If we successfully register, ensure health is healthy (recover from degraded)
+            self._set_health("healthy", f"{len(self.hotkeys)} hotkey(s) active")
             return True
         except (ValueError, RuntimeError, OSError) as e:
             self.logger.error(f"Failed to register hotkey: {e}")
+            self._set_health("degraded", f"registration failed: {e}")
             return False
 
     def _is_single_key(self, key_combo: str) -> bool:
@@ -160,12 +167,19 @@ class HotkeyManager(QObject):
             self.key_listener = None
 
         # Start combo listener if we have combo hotkeys
+        combo_ok = True
         if self.combo_hotkeys:
             self._start_combo_listener()
+            combo_ok = self.combo_listener is not None and self.combo_listener.is_alive()
 
         # Start key listener if we have single-key hotkeys
+        key_ok = True
         if self.single_key_hotkeys:
             self._start_key_listener()
+            key_ok = self.key_listener is not None and self.key_listener.is_alive()
+
+        if combo_ok and key_ok and self._health_status != "unavailable":
+            self._set_health("healthy", f"{len(self.hotkeys)} hotkey(s) active")
 
     def _dispatch_callback(self, hotkey_name: str):
         """Dispatch hotkey callback on the GUI thread (connected via queued signal)."""
@@ -196,6 +210,7 @@ class HotkeyManager(QObject):
             self.combo_listener.start()
         except (RuntimeError, OSError) as e:
             self.logger.error(f"Failed to start combo listener: {e}")
+            self._set_health("degraded", f"combo listener failed: {e}")
 
     def _start_key_listener(self):
         """Start the Listener for single-key hotkeys"""
@@ -206,6 +221,7 @@ class HotkeyManager(QObject):
             self.key_listener.start()
         except (RuntimeError, OSError) as e:
             self.logger.error(f"Failed to start key listener: {e}")
+            self._set_health("degraded", f"key listener failed: {e}")
 
     # Modifier key name mappings
     _MODIFIER_KEYS = {
@@ -317,6 +333,19 @@ class HotkeyManager(QObject):
             except (RuntimeError, OSError) as e:
                 self.logger.debug(f"Error stopping key listener: {e}")
                 self.key_listener = None
+
+    def _set_health(self, status: str, detail: str) -> None:
+        """PR3: update health status and emit signal if changed."""
+        if self._health_status == status and self._health_detail == detail:
+            return
+        self._health_status = status
+        self._health_detail = detail
+        self.health_changed.emit(status, detail)
+        self.logger.info(f"Hotkey health: {status} — {detail}")
+
+    def get_health(self) -> tuple[str, str]:
+        """PR3: return current health status and detail."""
+        return self._health_status, self._health_detail
 
     def parse_key_combo(self, combo_string: str) -> str:
         """Parse human-readable key combo"""

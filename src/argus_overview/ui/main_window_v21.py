@@ -66,6 +66,7 @@ from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
 from argus_overview.ui.action_registry import ActionRegistry, PrimaryHome
 from argus_overview.ui.menu_builder import MenuBuilder
 from argus_overview.ui.settings_manager import SettingsManager
+from argus_overview.ui.system_status_bar import SystemStatusBar
 from argus_overview.ui.themes import get_theme_manager
 from argus_overview.ui.tray import SystemTray
 
@@ -146,6 +147,9 @@ class MainWindowV21(QMainWindow):
 
         # v2.2: Create system tray
         self._create_system_tray()
+
+        # PR3: System status bar — per-subsystem health indicators
+        self._create_system_status_bar()
 
         # v2.2: Register hotkeys
         self._register_hotkeys()
@@ -235,6 +239,36 @@ class MainWindowV21(QMainWindow):
         # Show tray icon
         self.system_tray.show()
         self.logger.info("System tray initialized (ActionRegistry)")
+
+    def _create_system_status_bar(self) -> None:
+        """PR3: create per-subsystem health indicator bar in the status bar."""
+        try:
+            statusbar = self.statusBar()
+        except RuntimeError:
+            # Defensive: tests patch QMainWindow.__init__ so statusBar is unavailable.
+            self.system_status_bar = None
+            return
+        self.system_status_bar = SystemStatusBar()
+        statusbar.addPermanentWidget(self.system_status_bar)
+
+        # Initial states
+        self.system_status_bar.set_status("capture", "healthy", "capture workers running")
+        self.system_status_bar.set_status("discovery", "healthy", "auto-discovery idle")
+        self.system_status_bar.set_status("intel", "healthy", "intel pipeline active")
+        self.system_status_bar.set_status("location", "healthy", "location tracker active")
+
+        # Wire hotkey health signal
+        self.hotkey_manager.health_changed.connect(self._on_hotkey_health_changed)
+
+        # Seed current hotkey health if already known
+        hk_status, hk_detail = self.hotkey_manager.get_health()
+        self.system_status_bar.set_status("hotkeys", hk_status, hk_detail)
+
+    @Slot(str, str)
+    def _on_hotkey_health_changed(self, status: str, detail: str) -> None:
+        """PR3: update hotkeys indicator when HotkeyManager reports health change."""
+        if getattr(self, "system_status_bar", None) is not None:
+            self.system_status_bar.set_status("hotkeys", status, detail)
 
     def _register_hotkeys(self):
         """Register global hotkeys (v2.2)"""

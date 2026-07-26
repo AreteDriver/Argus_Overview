@@ -774,7 +774,9 @@ class CharactersTeamsTab(QWidget):
         reply = QMessageBox.question(
             self,
             "Confirm Delete",
-            f"Delete character '{char_name}'?\n\nThis will also remove them from all teams.",
+            f"Delete character '{char_name}'?\n\n"
+            "This will remove them from all teams and delete any per-character hotkeys. "
+            "This action cannot be undone.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 

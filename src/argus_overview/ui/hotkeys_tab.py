@@ -446,7 +446,8 @@ class HotkeysTab(QWidget):
         reply = QMessageBox.question(
             self,
             "Delete Group",
-            f"Delete cycling group '{self.current_group}'?",
+            f"Delete cycling group '{self.current_group}'?\n\n"
+            "This will remove all member assignments and unbind any cycling hotkeys for this group.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
@@ -471,7 +472,8 @@ class HotkeysTab(QWidget):
         reply = QMessageBox.question(
             self,
             "Clear Group",
-            "Remove all members from this group?",
+            f"Remove all members from '{self.current_group}'?\n\n"
+            "This empties the group but keeps the group itself and its hotkey binding.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
