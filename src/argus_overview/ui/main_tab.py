@@ -661,6 +661,13 @@ class WindowPreviewWidget(QWidget):
         # Frame fingerprint cache — skip identical frames
         self._last_frame_hash: int | None = None
 
+        # PR1: Capture health state — tracks when we last received a frame and
+        # whether it was deduplicated, so the UI can show LIVE / STATIC /
+        # STALE / ERROR explicitly rather than leaving the operator to guess.
+        self._last_frame_received_at: float = 0.0
+        self._last_frame_was_dedup: bool = False
+        self._capture_error_count: int = 0
+
         # v2.2 Settings (from settings_manager or defaults)
         self._opacity_on_hover = 0.3
         self._zoom_on_hover = 1.5
@@ -689,6 +696,15 @@ class WindowPreviewWidget(QWidget):
         self._threat_decay_timer = QTimer(self)
         self._threat_decay_timer.timeout.connect(self._tick_threat_decay)
 
+        # PR1: timestamp when the current threat state was set, so paintEvent
+        # can render report age and the tooltip can show exact observation time.
+        self._threat_set_at: float = 0.0
+        # PR1: has ANY intel report ever been received for this character?
+        # False until the first set_threat_state call with a non-None level.
+        # When False and threat_level is None, the frame shows Unknown instead
+        # of the accent "clear" border.
+        self._intel_report_received: bool = False
+
         # Pulse animation (oneshot on transition into danger/critical)
         self._pulse_phase: float = 0.0  # 1.0 -> 0.0 over PULSE_DURATION
         self._pulse_steps: int = max(1, THREAT_PULSE_DURATION_MS // THREAT_PULSE_TICK_MS)
@@ -700,6 +716,13 @@ class WindowPreviewWidget(QWidget):
         self._flash_timer = QTimer(self)
         self._flash_timer.setSingleShot(True)
         self._flash_timer.timeout.connect(self._clear_flash)
+
+        # PR1: periodic timer to evaluate capture health and repaint the badge.
+        # Fires every 500 ms so the STALE age text updates smoothly without
+        # burning CPU on the UI thread.
+        self._capture_health_timer = QTimer(self)
+        self._capture_health_timer.timeout.connect(self._tick_capture_health)
+        self._capture_health_timer.start(500)
 
         # PR10: replay strip — bounded ring buffer of recent frame pixmaps,
         # sampled at most once per REPLAY_THROTTLE_MS so the buffer covers
@@ -715,6 +738,7 @@ class WindowPreviewWidget(QWidget):
         self.setMinimumSize(200, 150)
         self.setMaximumSize(600, 450)
         self._update_tooltip()
+        self._update_accessible_name()
 
         # Enable mouse tracking for hover effects
         self.setMouseTracking(True)
@@ -796,13 +820,44 @@ class WindowPreviewWidget(QWidget):
         return self.character_name
 
     def _update_tooltip(self):
-        """Update tooltip text"""
-        tooltip = f"{self.character_name}"
-        if self.custom_label:
-            tooltip = f"{self.custom_label}\n{self.character_name}"
-        tooltip += f"\nWindow ID: {self.window_id}"
-        tooltip += "\nClick to activate | Right-click for menu"
-        self.setToolTip(tooltip)
+        """Update tooltip text (PR1: enriched with state, age, and actions)."""
+        char_name = getattr(self, "character_name", "")
+        tooltip = f"{char_name}"
+        custom_label = getattr(self, "custom_label", None)
+        if custom_label:
+            tooltip = f"{custom_label}\n{char_name}"
+
+        # PR1: system and capture health (use getattr for test resilience)
+        system = getattr(self, "_character_system", None)
+        if system:
+            tooltip += f"\nSystem: {system}"
+        health = self._capture_health_label()
+        if health:
+            tooltip += f"\nCapture: {health}"
+
+        # PR1: threat state with age and source
+        threat_level = getattr(self, "_threat_level", None)
+        threat_alpha = getattr(self, "_threat_alpha", 0.0)
+        if threat_level is not None and threat_alpha > 0.0:
+            age = ""
+            threat_set_at = getattr(self, "_threat_set_at", 0.0)
+            if threat_set_at > 0.0:
+                secs = int(time.monotonic() - threat_set_at)
+                age = f" · {secs}s ago"
+            src = getattr(self, "_threat_system", None) or "unknown"
+            tooltip += f"\nThreat: {threat_level.value}{age} · source: {src}"
+        elif not getattr(self, "_intel_report_received", False):
+            tooltip += "\nThreat: Unknown (no intel data received)"
+
+        window_id = getattr(self, "window_id", "")
+        tooltip += f"\nWindow ID: {window_id}"
+        # PR1: focus-mode affordance
+        tooltip += "\nDouble-click to spotlight · Esc to exit"
+        tooltip += "\nClick to activate · Right-click for menu"
+        try:
+            self.setToolTip(tooltip)
+        except RuntimeError:
+            pass
 
     def update_frame(self, image: Image.Image):
         """
@@ -811,6 +866,8 @@ class WindowPreviewWidget(QWidget):
         Args:
             image: PIL Image
         """
+        # PR1: record frame arrival time for capture-health badge.
+        self._last_frame_received_at = time.monotonic()
         try:
             # Frame fingerprint — sample a small crop to detect duplicates
             # without copying the full image. Only call tobytes() on the full
@@ -819,8 +876,11 @@ class WindowPreviewWidget(QWidget):
             sample_data = image.crop((0, 0, image.width, sample_h)).tobytes()
             frame_hash = hash(sample_data)
             if frame_hash == self._last_frame_hash:
+                self._last_frame_was_dedup = True
                 image.close()
                 return  # Frame unchanged, skip conversion pipeline
+            self._last_frame_was_dedup = False
+            self._capture_error_count = 0  # PR1: reset error streak on success
             self._last_frame_hash = frame_hash
 
             # Full tobytes() only for frames that actually changed
@@ -881,6 +941,7 @@ class WindowPreviewWidget(QWidget):
         self.custom_label = label
         self.info_label.setText(self._get_display_name())
         self._update_tooltip()
+        self._update_accessible_name()
         self.label_changed.emit(self.window_id, label or "")
 
         # Save to settings if available
@@ -940,9 +1001,33 @@ class WindowPreviewWidget(QWidget):
     def set_character_system(self, system: str | None) -> None:
         """Record the current system for this frame's character (PR5)."""
         self._character_system = system
+        self._update_tooltip()
+        self._update_accessible_name()
 
     def get_character_system(self) -> str | None:
         return self._character_system
+
+    def _update_accessible_name(self) -> None:
+        """PR1: expose character, system, and threat state to assistive tech."""
+        char_name = getattr(self, "character_name", "")
+        parts = [f"Preview of {char_name}"]
+        system = getattr(self, "_character_system", None)
+        if system:
+            parts.append(f"system {system}")
+        threat_level = getattr(self, "_threat_level", None)
+        threat_alpha = getattr(self, "_threat_alpha", 0.0)
+        if threat_level is not None and threat_alpha > 0.0:
+            parts.append(f"threat {threat_level.value}")
+        elif not getattr(self, "_intel_report_received", False):
+            parts.append("threat unknown")
+        else:
+            parts.append("no active threat")
+        try:
+            self.setAccessibleName(". ".join(parts))
+        except RuntimeError:
+            # Defensive: tests that bypass __init__ create half-initialised
+            # Qt objects; accessible name is non-critical, so swallow.
+            pass
 
     def set_threat_state(
         self,
@@ -967,15 +1052,24 @@ class WindowPreviewWidget(QWidget):
         """
         prev_level = self._threat_level
 
+        # PR1: any non-None report (including CLEAR) proves the intel pipeline
+        # has delivered data for this character. Once set, the frame is no longer
+        # in the "Unknown" state.
+        if level is not None:
+            self._intel_report_received = True
+
         if level is None or level == ThreatLevel.CLEAR:
             self._threat_level = None
             self._threat_system = None
             self._threat_alpha = 0.0
             self._threat_distance = None
             self._threat_decay_timer.stop()
+            self._update_tooltip()
             self.update()
             return
 
+        # PR1: record when this report was observed so the UI can show age.
+        self._threat_set_at = time.monotonic()
         self._threat_level = level
         self._threat_system = system
         self._threat_alpha = max(0.0, min(1.0, initial_alpha))
@@ -995,6 +1089,8 @@ class WindowPreviewWidget(QWidget):
 
         # Restart decay timer
         self._threat_decay_timer.start(THREAT_DECAY_TICK_MS)
+        self._update_tooltip()
+        self._update_accessible_name()
         self.update()
 
     def _tick_threat_decay(self) -> None:
@@ -1021,6 +1117,47 @@ class WindowPreviewWidget(QWidget):
         if self._pulse_phase <= 0.0:
             self._pulse_timer.stop()
         self.update()
+
+    def _tick_capture_health(self) -> None:
+        """PR1: Periodic health evaluation. Triggers repaint so the badge
+        text (e.g. 'STALE · 7s') stays current without requiring a frame."""
+        self.update()
+
+    def _capture_health_label(self) -> str:
+        """PR1: Human-readable capture state for the bottom-right badge.
+
+        Returns empty string when the widget should not display a badge
+        (e.g. not yet initialized and not visible).
+        """
+        try:
+            if not self.isVisible():
+                return "PAUSED"
+        except RuntimeError:
+            return ""  # Defensive: mock widgets in tests
+        if getattr(self, "_capture_error_count", 0) > 0:
+            return "ERROR"
+        last_frame_at = getattr(self, "_last_frame_received_at", 0.0)
+        if last_frame_at == 0.0:
+            return "INITIALIZING"
+        elapsed = time.monotonic() - last_frame_at
+        if elapsed > 2.0:
+            return f"STALE · {int(elapsed)}s"
+        if getattr(self, "_last_frame_was_dedup", False):
+            return "STATIC"
+        return "LIVE"
+
+    def _capture_health_color(self) -> QColor:
+        """PR1: Subtle color for the capture-health badge text."""
+        label = self._capture_health_label()
+        if label.startswith("LIVE"):
+            return QColor(68, 255, 68, 220)   # green
+        if label == "STATIC":
+            return QColor(204, 204, 204, 220)  # white-gray
+        if label.startswith("STALE"):
+            return QColor(255, 204, 0, 220)    # yellow
+        if label == "ERROR":
+            return QColor(255, 68, 68, 220)    # red
+        return QColor(136, 136, 136, 180)    # gray (INIT/PAUSED)
 
     def set_spotlight(self, mode: str | None) -> None:
         """
@@ -1149,12 +1286,25 @@ class WindowPreviewWidget(QWidget):
         # 0. Per-character accent border (PR8) — only visible when no
         # threat or legacy-flash overlay is active. Gives instant visual
         # identity at small grid sizes and matches the chip avatar color.
+        # PR1: if no intel report has ever been received, show Unknown
+        # (dashed gray border + question mark) instead of the accent "clear".
         if self._threat_level is None and self._flash_color is None:
-            pen = QPen(self._accent_color)
-            pen.setWidth(2)
-            painter.setPen(pen)
-            painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
-            painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
+            if not self._intel_report_received:
+                # Unknown — dashed gray border with question mark
+                pen = QPen(QColor(128, 128, 128, 180))
+                pen.setWidth(2)
+                pen.setStyle(Qt.PenStyle.DashLine)
+                painter.setPen(pen)
+                painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+                painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
+                painter.setPen(QPen(QColor(128, 128, 128, 200)))
+                painter.drawText(6, 14, "?")
+            else:
+                pen = QPen(self._accent_color)
+                pen.setWidth(2)
+                painter.setPen(pen)
+                painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+                painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
 
         # 1. Threat-tint border (PR1) — drawn first so dot/lock paint over it
         if self._threat_level is not None and self._threat_alpha > 0.0:
@@ -1198,6 +1348,25 @@ class WindowPreviewWidget(QWidget):
                 # don't overlap when both are visible.
                 painter.drawText(28, 18, badge_text)
 
+            # PR1: report age — small text at bottom-center when the threat
+            # is decaying (alpha < 0.9) so the operator knows how old the
+            # alert is without hovering for the tooltip.
+            if self._threat_alpha < 0.9 and self._threat_set_at > 0.0:
+                age_secs = int(time.monotonic() - self._threat_set_at)
+                age_text = f"{age_secs}s"
+                from PySide6.QtGui import QFont
+
+                age_font = QFont(painter.font())
+                age_font.setPointSize(8)
+                painter.setFont(age_font)
+                age_color = QColor(r, g, b, max(160, alpha))
+                painter.setPen(QPen(age_color))
+                metrics = painter.fontMetrics()
+                text_w = metrics.horizontalAdvance(age_text)
+                text_x = (self.width() - text_w) // 2
+                text_y = self.height() - 6
+                painter.drawText(text_x, text_y, age_text)
+
         # 2. Legacy flash overlay (compat with border_flash_requested)
         if self._flash_color is not None:
             pen = QPen(self._flash_color)
@@ -1225,6 +1394,41 @@ class WindowPreviewWidget(QWidget):
         if self._positions_locked:
             painter.setPen(QPen(QColor(200, 200, 200, 180)))
             painter.drawText(6, 14, "🔒")
+
+        # PR1: Focus-mode affordance — small crosshair icon visible on hover
+        # so users can discover the double-click spotlight feature.
+        if self._is_hovered and self._spotlight_mode is None:
+            painter.setPen(QPen(QColor(200, 200, 200, 160)))
+            painter.drawText(self.width() - 22, self.height() - 10, "🔍")
+
+        # PR1: Capture health badge — bottom-right, explicit text label so
+        # the operator can distinguish LIVE / STATIC / STALE / ERROR at a
+        # glance without inferring it from pixel motion.
+        health_text = self._capture_health_label()
+        if health_text:
+            from PySide6.QtGui import QFont
+
+            badge_font = QFont(painter.font())
+            badge_font.setPointSize(9)
+            painter.setFont(badge_font)
+            metrics = painter.fontMetrics()
+            text_w = metrics.horizontalAdvance(health_text)
+            pad = 4
+            badge_w = text_w + pad * 2
+            badge_h = metrics.height() + pad
+            badge_x = self.width() - badge_w - 4
+            badge_y = self.height() - badge_h - 4
+            # Semi-transparent dark background so the badge is legible
+            # over any preview content.
+            painter.setPen(QPen(Qt.PenStyle.NoPen))
+            painter.setBrush(QBrush(QColor(0, 0, 0, 160)))
+            painter.drawRoundedRect(badge_x, badge_y, badge_w, badge_h, 3, 3)
+            painter.setPen(QPen(self._capture_health_color()))
+            painter.drawText(
+                badge_x + pad,
+                badge_y + metrics.ascent() + (badge_h - metrics.height()) // 2,
+                health_text,
+            )
 
         painter.end()
 

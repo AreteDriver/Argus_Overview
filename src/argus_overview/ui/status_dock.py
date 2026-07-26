@@ -14,8 +14,9 @@ you're looking at a thumbnail grid or the dock.
 from __future__ import annotations
 
 import logging
+import time
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, QPropertyAnimation, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -78,6 +79,10 @@ class CharacterChip(QFrame):
         # PR7: jumps from this chip's character to the alert system. None when
         # same-system or unknown; positive int for adjacent. Renders as +Nj.
         self._threat_distance: int | None = None
+        # PR1: when the threat state was last set, so tooltip can show age.
+        self._threat_set_at: float = 0.0
+        # PR1: has any intel report ever been received for this character?
+        self._intel_report_received: bool = False
 
         self.setFixedHeight(40)
         self.setMinimumWidth(160)
@@ -112,6 +117,20 @@ class CharacterChip(QFrame):
         # Threat dot is painted in paintEvent (no widget needed — keeps chip compact)
 
         self.setToolTip(self._tooltip_text())
+        self._update_accessible_name()
+
+    def _update_accessible_name(self) -> None:
+        """PR1: expose character, system, and threat state to assistive tech."""
+        parts = [f"Character {self.character_name}"]
+        if self._system:
+            parts.append(f"system {self._system}")
+        if self._threat_level is not None and self._threat_alpha > 0.0:
+            parts.append(f"threat {self._threat_level.value}")
+        elif not self._intel_report_received:
+            parts.append("threat unknown")
+        else:
+            parts.append("no active threat")
+        self.setAccessibleName(". ".join(parts))
 
     # ----- styling helpers --------------------------------------------------
     def _apply_base_style(self) -> None:
@@ -150,11 +169,21 @@ class CharacterChip(QFrame):
         parts = [self.character_name]
         if self._system:
             parts.append(f"System: {self._system}")
-        if self._threat_level is not None:
+        if self._threat_level is not None and self._threat_alpha > 0.0:
             line = f"Threat: {self._threat_level.value}"
             if self._threat_distance and self._threat_distance > 0:
                 line += f" ({self._threat_distance}j away)"
+            # PR1: report age
+            if self._threat_set_at > 0.0:
+                secs = int(time.monotonic() - self._threat_set_at)
+                line += f" · {secs}s ago"
+                from datetime import datetime
+
+                dt = datetime.fromtimestamp(self._threat_set_at)
+                line += f"\n  Observed {dt.strftime('%Y-%m-%d %H:%M:%S')}"
             parts.append(line)
+        elif not self._intel_report_received:
+            parts.append("Threat: Unknown (no intel data received)")
         parts.append("Click to focus window")
         return "\n".join(parts)
 
@@ -163,6 +192,7 @@ class CharacterChip(QFrame):
         self._system = system
         self._system_label.setText(system or "—")
         self.setToolTip(self._tooltip_text())
+        self._update_accessible_name()
 
     def set_threat_state(
         self,
@@ -183,6 +213,10 @@ class CharacterChip(QFrame):
                 None for same-system or unknown. Positive ints render as
                 "+Nj" badge next to the threat dot (PR7).
         """
+        # PR1: any non-None report (including CLEAR) proves intel data exists.
+        if level is not None:
+            self._intel_report_received = True
+
         if level is None or level == ThreatLevel.CLEAR:
             self._threat_level = None
             self._threat_alpha = 0.0
@@ -191,10 +225,12 @@ class CharacterChip(QFrame):
             self._threat_level = level
             self._threat_alpha = max(0.0, min(1.0, alpha))
             self._threat_distance = distance if distance and distance > 0 else None
+            self._threat_set_at = time.monotonic()
         if system is not None:
             self.set_system(system)
         else:
             self.setToolTip(self._tooltip_text())
+        self._update_accessible_name()
         self.update()
 
     # ----- events -----------------------------------------------------------
@@ -268,10 +304,16 @@ class StatusDock(QWidget):
         self._jump_calculator = None
         self._jump_max: int = 0
 
-        self.setFixedHeight(56)
+        # PR1: dynamic height — collapses to 0 when empty to save vertical
+        # space, expands smoothly when chips are added.
+        self._normal_height = 56
+        self.setMaximumHeight(self._normal_height)
         outer = QVBoxLayout(self)
         outer.setContentsMargins(4, 2, 4, 2)
         outer.setSpacing(0)
+
+        self._height_anim = QPropertyAnimation(self, b"maximumHeight")
+        self._height_anim.setDuration(150)
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -295,6 +337,17 @@ class StatusDock(QWidget):
             }
             """
         )
+        self._update_height()
+
+    def _update_height(self) -> None:
+        """PR1: animate dock height based on chip count."""
+        target = self._normal_height if self._chips else 0
+        if self.maximumHeight() == target:
+            return
+        self._height_anim.stop()
+        self._height_anim.setStartValue(self.maximumHeight())
+        self._height_anim.setEndValue(target)
+        self._height_anim.start()
 
     # ----- public API -------------------------------------------------------
     def chip_count(self) -> int:
@@ -312,6 +365,7 @@ class StatusDock(QWidget):
         insert_at = max(0, self._strip_layout.count() - 1)
         self._strip_layout.insertWidget(insert_at, chip)
         self._chips[window_id] = chip
+        self._update_height()
         return chip
 
     def remove_chip(self, window_id: str) -> bool:
@@ -320,6 +374,7 @@ class StatusDock(QWidget):
             return False
         self._strip_layout.removeWidget(chip)
         chip.deleteLater()
+        self._update_height()
         return True
 
     def clear(self) -> None:
