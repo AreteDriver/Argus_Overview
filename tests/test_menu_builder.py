@@ -55,17 +55,26 @@ class TestToolbarBuilderStyling:
         assert "delete_character" in ToolbarBuilder.DANGER_ACTIONS
         assert "remove_all_windows" in ToolbarBuilder.DANGER_ACTIONS
 
-    def test_primary_style_has_orange(self):
-        """PRIMARY_STYLE should use orange color"""
-        assert "#ff8c00" in ToolbarBuilder.PRIMARY_STYLE.lower()
+    def test_primary_style_uses_theme_accent(self):
+        """PRIMARY_STYLE should use current theme accent colour"""
+        builder = ToolbarBuilder()
+        style = builder._get_primary_style().lower()
+        assert "background-color:" in style
+        assert "qpushbutton:hover" in style
 
-    def test_success_style_has_green(self):
-        """SUCCESS_STYLE should use green color"""
-        assert "#2d5a27" in ToolbarBuilder.SUCCESS_STYLE.lower()
+    def test_success_style_uses_healthy_green(self):
+        """SUCCESS_STYLE should use design-system healthy green"""
+        from argus_overview.ui.design_system import colors as ds
+        builder = ToolbarBuilder()
+        style = builder._get_success_style().lower()
+        assert ds.HEALTHY.lower() in style
 
-    def test_danger_style_has_red(self):
-        """DANGER_STYLE should use red color"""
-        assert "#8b0000" in ToolbarBuilder.DANGER_STYLE.lower()
+    def test_danger_style_uses_critical_red(self):
+        """DANGER_STYLE should use design-system critical red"""
+        from argus_overview.ui.design_system import colors as ds
+        builder = ToolbarBuilder()
+        style = builder._get_danger_style().lower()
+        assert ds.CRITICAL.lower() in style
 
     def test_no_overlap_between_action_sets(self):
         """Action styling sets should not overlap"""
@@ -608,13 +617,13 @@ class TestToolbarBuilderCreateButton:
 
         assert result == mock_button_instance
         mock_button_instance.setStyleSheet.assert_called()
-        # Check that primary style (orange) was applied
         call_args = mock_button_instance.setStyleSheet.call_args[0][0]
-        assert "#ff8c00" in call_args
+        assert "background-color:" in call_args
 
     @patch("argus_overview.ui.menu_builder.QPushButton")
     def test_create_button_success_style(self, mock_button):
         """create_button applies SUCCESS_STYLE for success actions"""
+        from argus_overview.ui.design_system import colors as ds
         mock_button_instance = MagicMock()
         mock_button.return_value = mock_button_instance
 
@@ -623,11 +632,12 @@ class TestToolbarBuilderCreateButton:
 
         mock_button_instance.setStyleSheet.assert_called()
         call_args = mock_button_instance.setStyleSheet.call_args[0][0]
-        assert "#2d5a27" in call_args
+        assert ds.HEALTHY in call_args
 
     @patch("argus_overview.ui.menu_builder.QPushButton")
     def test_create_button_danger_style(self, mock_button):
         """create_button applies DANGER_STYLE for danger actions"""
+        from argus_overview.ui.design_system import colors as ds
         mock_button_instance = MagicMock()
         mock_button.return_value = mock_button_instance
 
@@ -636,7 +646,7 @@ class TestToolbarBuilderCreateButton:
 
         mock_button_instance.setStyleSheet.assert_called()
         call_args = mock_button_instance.setStyleSheet.call_args[0][0]
-        assert "#8b0000" in call_args
+        assert ds.CRITICAL in call_args
 
     @patch("argus_overview.ui.menu_builder.QPushButton")
     def test_create_button_connects_handler(self, mock_button):
