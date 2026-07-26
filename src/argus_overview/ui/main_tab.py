@@ -1047,12 +1047,17 @@ class WindowPreviewWidget(QWidget):
         return self._character_system
 
     def _update_accessible_name(self) -> None:
-        """PR1: expose character, system, and threat state to assistive tech."""
+        """PR1: expose character, system, threat, and capture health to assistive tech."""
         char_name = getattr(self, "character_name", "")
         parts = [f"Preview of {char_name}"]
         system = getattr(self, "_character_system", None)
         if system:
             parts.append(f"system {system}")
+        # Capture health
+        health = self._capture_health_label()
+        if health:
+            parts.append(f"capture {health.lower()}")
+        # Threat state
         threat_level = getattr(self, "_threat_level", None)
         threat_alpha = getattr(self, "_threat_alpha", 0.0)
         if threat_level is not None and threat_alpha > 0.0:
