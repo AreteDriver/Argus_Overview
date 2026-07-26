@@ -2329,7 +2329,24 @@ class MainTab(QWidget):
 
     def _create_layout_controls(self) -> QWidget:
         """Create comprehensive layout controls panel with arrangement grid"""
+        from argus_overview.ui.design_system import colors as ds, metrics as dm
+
         section = QGroupBox("Window Layouts")
+        section.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {ds.SURFACE};
+                border: 1px solid {ds.BORDER_SUBTLE};
+                border-radius: {dm.RADIUS_PANEL}px;
+                margin-top: 8px;
+                padding-top: 8px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px;
+                color: {ds.TEXT_SECONDARY};
+            }}
+        """)
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(5, 5, 5, 5)
         main_layout.setSpacing(5)
