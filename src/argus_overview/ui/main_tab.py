@@ -1224,18 +1224,20 @@ class WindowPreviewWidget(QWidget):
             return "STATIC"
         return "LIVE"
 
-    def _capture_health_color(self) -> QColor:
-        """PR1: Subtle color for the capture-health badge text."""
+    def _capture_health_color(self) -> str:
+        """PR1: Semantic color for the capture-health badge text."""
+        from argus_overview.ui.design_system import colors as ds
+
         label = self._capture_health_label()
         if label.startswith("LIVE"):
-            return QColor(68, 255, 68, 220)   # green
+            return ds.HEALTHY
         if label == "STATIC":
-            return QColor(204, 204, 204, 220)  # white-gray
+            return ds.TEXT_SECONDARY
         if label.startswith("STALE"):
-            return QColor(255, 204, 0, 220)    # yellow
+            return ds.WARNING
         if label == "ERROR":
-            return QColor(255, 68, 68, 220)    # red
-        return QColor(136, 136, 136, 180)    # gray (INIT/PAUSED)
+            return ds.CRITICAL
+        return ds.TEXT_MUTED
 
     def set_spotlight(self, mode: str | None) -> None:
         """
@@ -1628,7 +1630,7 @@ class WindowPreviewWidget(QWidget):
                 0,
                 0,
                 health,
-                fg_color=health_color.name(),
+                fg_color=health_color,
                 bg_color=ds.CANVAS,
                 bg_alpha=180,
                 font_size_pt=9,
@@ -1642,7 +1644,7 @@ class WindowPreviewWidget(QWidget):
                 badge_rect.x(),
                 badge_rect.y(),
                 health,
-                fg_color=health_color.name(),
+                fg_color=health_color,
                 bg_color=ds.CANVAS,
                 bg_alpha=180,
                 font_size_pt=9,

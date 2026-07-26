@@ -41,6 +41,9 @@ instead of hardcoded values.
   above the preview grid to below it. This prioritizes vertical space for the
   live preview area, placing operational status in a bottom rail consistent with
   the Operational Truth principle that the preview grid is the primary product.
+- **Capture health badge colors** — migrated `_capture_health_color` from
+  hardcoded RGB `QColor` objects to design-system semantic tokens
+  (`HEALTHY`, `TEXT_SECONDARY`, `WARNING`, `CRITICAL`, `TEXT_MUTED`).
 
 ## [3.2.0] - 2026-04-26 — Intel-Aware Edition
 
