@@ -10,11 +10,13 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QWidget
 
+from argus_overview.ui.design_system import colors as _ds
+
 _STATUS_COLORS = {
-    "healthy": "#4caf50",      # green
-    "degraded": "#ff9800",     # amber
-    "unavailable": "#f44336",  # red
-    "unknown": "#9e9e9e",      # gray
+    "healthy": _ds.HEALTHY,
+    "degraded": _ds.WARNING,
+    "unavailable": _ds.CRITICAL,
+    "unknown": _ds.UNKNOWN,
 }
 
 _STATUS_ICONS = {
