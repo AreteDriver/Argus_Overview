@@ -10647,6 +10647,18 @@ class TestWindowPreviewReplayStripToggle:
         finally:
             widget.deleteLater()
 
+    def test_container_always_present_with_fixed_height(self, qapp):
+        from argus_overview.ui.replay_strip import ReplayStrip
+
+        widget = _replay_widget(qapp)
+        try:
+            assert hasattr(widget, "_replay_container")
+            assert widget._replay_container is not None
+            assert widget._replay_container.maximumHeight() == ReplayStrip.STRIP_HEIGHT
+            assert widget._replay_container.minimumHeight() == ReplayStrip.STRIP_HEIGHT
+        finally:
+            widget.deleteLater()
+
     def test_enable_creates_strip(self, qapp):
         widget = _replay_widget(qapp)
         try:

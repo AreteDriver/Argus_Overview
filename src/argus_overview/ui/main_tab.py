@@ -51,6 +51,7 @@ from argus_overview.core.discovery import scan_eve_windows
 from argus_overview.intel.parser import ThreatLevel
 from argus_overview.ui.action_registry import PrimaryHome
 from argus_overview.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
+from argus_overview.ui.replay_strip import ReplayStrip
 from argus_overview.ui.themes import get_theme_manager
 from argus_overview.utils.screen import ScreenGeometry, get_screen_geometry
 
@@ -780,6 +781,13 @@ class WindowPreviewWidget(QWidget):
         self.info_label.setStyleSheet("font-weight: bold; padding: 2px;")
         layout.addWidget(self.info_label)
 
+        # PR10: replay strip container — always present so cards keep uniform
+        # height in the flow layout even when the strip is disabled.
+        self._replay_container = QWidget()
+        self._replay_container.setFixedHeight(ReplayStrip.STRIP_HEIGHT)
+        QVBoxLayout(self._replay_container)
+        layout.addWidget(self._replay_container)
+
         # Session timer label (v2.2) — PR4: floating child so it does not
         # push the preview image up. Positioned at bottom-left in resizeEvent.
         self.timer_label = QLabel("", self)
@@ -1302,21 +1310,22 @@ class WindowPreviewWidget(QWidget):
         return self._replay_strip is not None
 
     def enable_replay_strip(self, enabled: bool) -> None:
-        """Show or hide the replay strip below the main image."""
-        if enabled and self._replay_strip is None:
-            from argus_overview.ui.replay_strip import ReplayStrip
+        """Show or hide the replay strip inside its fixed-height container.
 
-            self._replay_strip = ReplayStrip(parent=self)
+        The container is always present in the layout so cards keep uniform
+        height and the flow grid never shifts when the strip is toggled.
+        """
+        if enabled and self._replay_strip is None:
+            self._replay_strip = ReplayStrip(parent=self._replay_container)
             self._replay_strip.frame_hovered.connect(self._on_replay_frame_hovered)
-            # Append below the existing image_label / info_label / timer.
-            self.layout().addWidget(self._replay_strip)
+            self._replay_container.layout().addWidget(self._replay_strip)
             self._replay_strip.set_frames(list(self._replay_buffer))
         elif not enabled and self._replay_strip is not None:
             try:
                 self._replay_strip.frame_hovered.disconnect(self._on_replay_frame_hovered)
             except (RuntimeError, TypeError):
                 pass
-            self.layout().removeWidget(self._replay_strip)
+            self._replay_container.layout().removeWidget(self._replay_strip)
             self._replay_strip.deleteLater()
             self._replay_strip = None
             # Drop any held buffered view.

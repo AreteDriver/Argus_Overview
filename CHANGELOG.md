@@ -28,6 +28,15 @@ instead of hardcoded values.
   selected state, and `SURFACE_HOVER` hover state.
 - **Screenshots** — all README and docs screenshots regenerated at 1440×900
   reflecting the current UI state.
+- **Replay strip layout stability** — every `WindowPreviewWidget` now reserves a
+  fixed-height container for the replay strip in its internal layout. Toggling
+  the strip on/off no longer changes card height, preventing grid reflow shifts
+  in the `FlowLayout` preview area. The strip is parented inside the container
+  instead of being dynamically added/removed from the main card layout.
+- **Replay strip styling** — migrated hardcoded `rgba(20,20,20,220)` background
+  and `#3a3a3a` border to `SURFACE` + `BORDER_SUBTLE`. Cell borders and hover
+  highlight in the strip `paintEvent` now use design-system tokens
+  (`BORDER_SUBTLE`, `INFO`).
 
 ## [3.2.0] - 2026-04-26 — Intel-Aware Edition
 
