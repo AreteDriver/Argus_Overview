@@ -630,6 +630,7 @@ class WindowPreviewWidget(QWidget):
     window_removed = Signal(str)  # window_id
     label_changed = Signal(str, str)  # window_id, new_label
     focus_requested = Signal(str)  # window_id — PR3 spotlight toggle
+    retry_requested = Signal(str)  # window_id — PR2 retry capture
 
     def __init__(
         self,
@@ -795,6 +796,18 @@ class WindowPreviewWidget(QWidget):
                     self.enable_replay_strip(True)
             except (AttributeError, TypeError):
                 pass
+
+        # PR2: retry button overlay — visible when capture is ERROR or STALE.
+        # Created as a floating child widget (not in the layout) so it can be
+        # positioned in the top-right corner without affecting flow layout.
+        self._retry_button = QPushButton("↻", self)
+        self._retry_button.setFixedSize(28, 28)
+        self._retry_button.setToolTip("Retry capture")
+        self._retry_button.setVisible(False)
+        try:
+            self._retry_button.clicked.connect(self._on_retry_clicked)
+        except RuntimeError:
+            pass
 
     def _load_settings(self):
         """Load settings from settings_manager"""
@@ -1120,8 +1133,23 @@ class WindowPreviewWidget(QWidget):
 
     def _tick_capture_health(self) -> None:
         """PR1: Periodic health evaluation. Triggers repaint so the badge
-        text (e.g. 'STALE · 7s') stays current without requiring a frame."""
+        text (e.g. 'STALE · 7s') stays current without requiring a frame.
+
+        PR2: toggles the retry button visibility when the frame enters ERROR
+        or STALE so the operator can recover without digging into a menu.
+        """
         self.update()
+        btn = getattr(self, "_retry_button", None)
+        if btn is None:
+            return
+        try:
+            health = self._capture_health_label()
+            show = health in ("ERROR",) or health.startswith("STALE")
+            btn.setVisible(show)
+            if show:
+                btn.move(self.width() - btn.width() - 4, 4)
+        except RuntimeError:
+            pass
 
     def _capture_health_label(self) -> str:
         """PR1: Human-readable capture state for the bottom-right badge.
@@ -1252,6 +1280,23 @@ class WindowPreviewWidget(QWidget):
             # Drop any held buffered view.
             self._replay_view_index = None
 
+    def _on_retry_clicked(self) -> None:
+        """PR2: emit retry_requested so MainTab / WindowManager can restart
+        capture for this window."""
+        self._capture_error_count = 0
+        self._last_frame_received_at = time.monotonic()
+        self.retry_requested.emit(self.window_id)
+
+    def resizeEvent(self, event) -> None:
+        """PR2: keep the retry button pinned to the top-right corner."""
+        super().resizeEvent(event)
+        btn = getattr(self, "_retry_button", None)
+        if btn is not None:
+            try:
+                btn.move(self.width() - btn.width() - 4, 4)
+            except RuntimeError:
+                pass
+
     def _on_replay_frame_hovered(self, idx: int) -> None:
         """Swap the main image label between live capture and a buffered frame."""
         if idx < 0 or idx >= len(self._replay_buffer):
@@ -1329,24 +1374,43 @@ class WindowPreviewWidget(QWidget):
                 4,
             )
 
-            # PR9: distance badge — "+Nj" near the top-left corner inside
-            # the threat border, in the threat color. Only renders for
-            # adjacent-system alerts (distance > 0).
-            if self._threat_distance and self._threat_distance > 0:
+            # PR2: system-name pill — shows the affected system and optional
+            # jump distance at the top-left so the operator never has to look
+            # away from the preview grid to know which system is hostile.
+            if self._threat_system:
                 from PySide6.QtGui import QFont
 
-                badge_text = f"+{self._threat_distance}j"
-                badge_font = QFont(painter.font())
-                badge_font.setPointSize(8)
-                badge_font.setBold(True)
-                painter.setFont(badge_font)
-                # Foreground stays in the threat color, opaque so it's
-                # legible even when the border itself is dim.
-                text_color = QColor(r, g, b, max(200, alpha))
+                pill_parts = [self._threat_system]
+                if self._threat_distance and self._threat_distance > 0:
+                    pill_parts.append(f"+{self._threat_distance}j")
+                pill_text = " · ".join(pill_parts)
+
+                pill_font = QFont(painter.font())
+                pill_font.setPointSize(8)
+                pill_font.setBold(True)
+                painter.setFont(pill_font)
+                metrics = painter.fontMetrics()
+                text_w = metrics.horizontalAdvance(pill_text)
+                pad = 4
+                pill_w = text_w + pad * 2
+                pill_h = metrics.height() + pad
+                # Position at top-left, inset from the threat border
+                pill_x = 6
+                pill_y = 6
+                # Semi-transparent dark background so the pill is legible
+                # regardless of the underlying preview image
+                bg = QColor(10, 10, 15, max(160, alpha))
+                painter.setBrush(QBrush(bg))
+                painter.setPen(QPen(Qt.PenStyle.NoPen))
+                painter.drawRoundedRect(pill_x, pill_y, pill_w, pill_h, 3, 3)
+                # Foreground in threat color, opaque
+                text_color = QColor(r, g, b, max(220, alpha))
                 painter.setPen(QPen(text_color))
-                # Shifted right of where the lock icon sits (x=6) so they
-                # don't overlap when both are visible.
-                painter.drawText(28, 18, badge_text)
+                painter.drawText(
+                    pill_x + pad,
+                    pill_y + pad + metrics.ascent() - 2,
+                    pill_text,
+                )
 
             # PR1: report age — small text at bottom-center when the threat
             # is decaying (alpha < 0.9) so the operator knows how old the
@@ -1499,6 +1563,7 @@ class WindowPreviewWidget(QWidget):
             "close_window": self._close_window,
             "set_label": self._show_label_dialog,
             "toggle_replay_strip": self._toggle_replay_strip,
+            "retry_capture": self._on_retry_clicked,
             "remove_from_preview": lambda: self.window_removed.emit(self.window_id),
         }
 
@@ -1635,6 +1700,22 @@ class WindowManager:
         if self.capture_timer.isActive():
             self.stop_capture_loop()
             self.start_capture_loop()
+
+    def retry_window_capture(self, window_id: str) -> None:
+        """PR2: attempt an immediate re-capture for a single window."""
+        if window_id not in self.preview_frames:
+            return
+        frame = self.preview_frames[window_id]
+        frame._capture_error_count = 0
+        frame._last_frame_received_at = time.monotonic()
+        try:
+            request_id = self.capture_system.capture_window_async(window_id)
+            if request_id:
+                with self._pending_lock:
+                    self.pending_requests[request_id] = (window_id, time.monotonic())
+                self.logger.info(f"Retry capture requested for {window_id}")
+        except (OSError, RuntimeError) as e:
+            self.logger.error(f"Retry capture failed for {window_id}: {e}")
 
     def add_window(self, window_id: str, character_name: str) -> WindowPreviewWidget | None:
         """
@@ -1862,12 +1943,21 @@ class MainTab(QWidget):
     thumbnails_toggled = Signal(bool)  # visible
     layout_applied = Signal(str)  # pattern name
 
-    def __init__(self, capture_system, character_manager, settings_manager=None, parent=None):
+    def __init__(
+        self,
+        capture_system,
+        character_manager,
+        settings_manager=None,
+        layout_manager=None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.capture_system = capture_system
         self.character_manager = character_manager
         self.settings_manager = settings_manager
+        # PR2: optional layout manager for preset dropdown in Overview toolbar
+        self.layout_manager = layout_manager
 
         # PR3: focus mode state — None = normal, str = window_id holding spotlight
         self._focus_window_id: str | None = None
@@ -1994,6 +2084,7 @@ class MainTab(QWidget):
             "lock_positions": self._toggle_lock,
             "minimize_inactive": self.minimize_inactive_windows,
             "refresh_capture": self._refresh_all,
+            "toggle_replay_strips": self._toggle_replay_strips_global,
         }
 
         # Create buttons in specific order with layout control
@@ -2034,6 +2125,25 @@ class MainTab(QWidget):
         refresh_btn = toolbar_builder.create_button("refresh_capture", self._refresh_all)
         if refresh_btn:
             toolbar_layout.addWidget(refresh_btn)
+
+        # PR2: global replay-strips toggle
+        self.replay_strips_btn = toolbar_builder.create_button(
+            "toggle_replay_strips", self._toggle_replay_strips_global
+        )
+        if self.replay_strips_btn:
+            self.replay_strips_btn.setCheckable(True)
+            toolbar_layout.addWidget(self.replay_strips_btn)
+
+        # PR2: layout preset dropdown — 2-click apply without tab switching
+        if getattr(self, "layout_manager", None) is not None:
+            toolbar_layout.addSpacing(10)
+            toolbar_layout.addWidget(QLabel("Preset:"))
+            self.preset_combo = QComboBox()
+            self.preset_combo.setMinimumWidth(140)
+            self.preset_combo.setPlaceholderText("Select preset...")
+            self._refresh_preset_combo()
+            self.preset_combo.activated.connect(self._on_preset_activated)
+            toolbar_layout.addWidget(self.preset_combo)
 
         toolbar_layout.addStretch()
 
@@ -2346,6 +2456,9 @@ class MainTab(QWidget):
                 frame.focus_requested.connect(
                     self._on_focus_requested, Qt.ConnectionType.UniqueConnection
                 )
+                frame.retry_requested.connect(
+                    self._on_retry_requested, Qt.ConnectionType.UniqueConnection
+                )
 
                 # Add to layout
                 self.preview_layout.addWidget(frame)
@@ -2401,6 +2514,109 @@ class MainTab(QWidget):
 
         self.thumbnails_toggled.emit(self._thumbnails_visible)
         self.logger.info(f"Thumbnails {'shown' if self._thumbnails_visible else 'hidden'}")
+
+    def _toggle_replay_strips_global(self) -> None:
+        """PR2: toggle replay strips for all active preview windows."""
+        # Determine target state from the first frame (flip current majority)
+        frames = list(self.window_manager.preview_frames.values())
+        if not frames:
+            return
+        currently_on = sum(1 for f in frames if f.is_replay_strip_enabled())
+        target = currently_on < len(frames) / 2
+        for frame in frames:
+            frame.enable_replay_strip(target)
+        self.logger.info(f"Replay strips toggled globally: {'ON' if target else 'OFF'}")
+
+    def _refresh_preset_combo(self) -> None:
+        """PR2: repopulate the layout preset dropdown from LayoutManager."""
+        combo = getattr(self, "preset_combo", None)
+        lm = getattr(self, "layout_manager", None)
+        if combo is None or lm is None:
+            return
+        current = combo.currentText()
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("Select preset...")
+        for preset in lm.get_all_presets():
+            combo.addItem(preset.name)
+        if current:
+            idx = combo.findText(current)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+
+    def _on_preset_activated(self, index: int) -> None:
+        """PR2: apply the selected layout preset to all active windows."""
+        combo = getattr(self, "preset_combo", None)
+        if combo is None or index <= 0:
+            return
+        preset_name = combo.itemText(index)
+        self._apply_layout_preset(preset_name)
+        combo.setCurrentIndex(0)  # Reset to placeholder so same preset can be re-selected
+
+    def _apply_layout_preset(self, preset_name: str) -> None:
+        """PR2: apply a saved layout preset to currently active windows."""
+        lm = getattr(self, "layout_manager", None)
+        if lm is None:
+            return
+        preset = lm.get_preset(preset_name)
+        if preset is None:
+            self.status_label.setText(f"Preset '{preset_name}' not found")
+            return
+
+        active_chars = [
+            getattr(f, "character_name", wid)
+            for wid, f in self.window_manager.preview_frames.items()
+        ]
+        if not active_chars:
+            self.status_label.setText("No active windows to arrange")
+            return
+
+        pattern = preset.grid_pattern or "custom"
+        # Normalise pattern name to the display form used by get_pattern_positions
+        display_pattern = pattern.replace("_", " ").replace("2x2", "2x2 Grid").replace("3x1", "3x1 Row").replace("1x3", "1x3 Column").replace("4x1", "4x1 Row").replace("main+sides", "Main + Sides").replace("cascade", "Cascade").replace("custom", "Custom")
+        # Fallback: if the normalised name isn't in our map, try title-casing
+        if display_pattern not in get_all_layout_patterns() and display_pattern != "Custom":
+            display_pattern = "Custom"
+
+        positions = get_pattern_positions(display_pattern, len(active_chars), 4)
+        arrangement = {}
+        for i, char_name in enumerate(active_chars):
+            if i < len(positions):
+                arrangement[char_name] = positions[i]
+
+        window_map = {
+            f.character_name: wid
+            for wid, f in self.window_manager.preview_frames.items()
+            if f.character_name in arrangement
+        }
+        if not window_map:
+            self.status_label.setText("No matching windows for preset")
+            return
+
+        screen = self.grid_applier.get_screen_geometry(0)
+        if not screen:
+            screen = ScreenGeometry(0, 0, 1920, 1080, True)
+
+        # Infer grid dimensions from the pattern
+        grid_rows = max(1, max((pos[0] for pos in positions), default=0) + 1)
+        grid_cols = max(1, max((pos[1] for pos in positions), default=0) + 1)
+
+        success = self.grid_applier.apply_arrangement(
+            arrangement=arrangement,
+            window_map=window_map,
+            screen=screen,
+            grid_rows=grid_rows,
+            grid_cols=grid_cols,
+            spacing=10,
+            stacked=(display_pattern == "Stacked (All Same Position)"),
+        )
+        if success:
+            self.status_label.setText(f"Applied preset: {preset_name}")
+            self.layout_applied.emit(preset_name)
+            self.logger.info(f"Applied layout preset '{preset_name}' to {len(window_map)} windows")
+        else:
+            self.status_label.setText(f"Failed to apply preset: {preset_name}")
 
     def _create_status_bar(self) -> QWidget:
         """Create status bar"""
@@ -2463,6 +2679,9 @@ class MainTab(QWidget):
             )
             frame.focus_requested.connect(
                 self._on_focus_requested, Qt.ConnectionType.UniqueConnection
+            )
+            frame.retry_requested.connect(
+                self._on_retry_requested, Qt.ConnectionType.UniqueConnection
             )
             self.preview_layout.addWidget(frame)
             self._sync_status_dock()
@@ -2563,6 +2782,10 @@ class MainTab(QWidget):
             except RuntimeError:
                 continue
 
+    def _on_retry_requested(self, window_id: str) -> None:
+        """PR2: handle retry capture request from a preview frame."""
+        self.window_manager.retry_window_capture(window_id)
+
     def _on_window_activated(self, window_id: str):
         """Handle window activation with optional auto-minimize of previous window"""
         from argus_overview.utils.window_utils import run_x11_subprocess
@@ -2612,6 +2835,10 @@ class MainTab(QWidget):
                 pass
             try:
                 frame.focus_requested.disconnect(self._on_focus_requested)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                frame.retry_requested.disconnect(self._on_retry_requested)
             except (RuntimeError, TypeError):
                 pass
             # Stop per-frame timers

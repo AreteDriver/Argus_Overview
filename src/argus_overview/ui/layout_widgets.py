@@ -291,8 +291,17 @@ class PatternThumbStrip(QWidget):
     def selected_pattern(self) -> str | None:
         return self._selected
 
-    def set_selected(self, pattern_name: str) -> None:
-        """Highlight the named pattern. Emits pattern_selected if changed."""
+    def set_selected(self, pattern_name: str | None) -> None:
+        """Highlight the named pattern. Emits pattern_selected if changed.
+
+        Pass ``None`` to clear the current selection without selecting a new
+        pattern.
+        """
+        if pattern_name is None:
+            if self._selected and self._selected in self._thumbnails:
+                self._thumbnails[self._selected].set_selected(False)
+            self._selected = None
+            return
         if pattern_name not in self._thumbnails:
             return
         if self._selected == pattern_name:

@@ -202,6 +202,19 @@ class ActionRegistry:
             )
         )
 
+        # App Menu Actions
+        self.register(
+            ActionSpec(
+                id="toggle_replay_strips_app",
+                label="Replay Strips",
+                scope=ActionScope.GLOBAL,
+                primary_home=PrimaryHome.APP_MENU,
+                tooltip="Toggle replay strips for all preview windows",
+                handler_name="_toggle_replay_strips_global",
+                checkable=True,
+            )
+        )
+
         # App Menu / Help Menu Actions
         self.register(
             ActionSpec(
@@ -318,6 +331,18 @@ class ActionRegistry:
                 primary_home=PrimaryHome.OVERVIEW_TOOLBAR,
                 tooltip="Restart capture for all windows",
                 handler_name="_refresh_all",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="toggle_replay_strips",
+                label="Replay Strips",
+                scope=ActionScope.TAB,
+                primary_home=PrimaryHome.OVERVIEW_TOOLBAR,
+                tooltip="Toggle replay strips for all preview windows",
+                handler_name="_toggle_replay_strips_global",
+                checkable=True,
             )
         )
 
@@ -689,6 +714,17 @@ class ActionRegistry:
                 primary_home=PrimaryHome.WINDOW_CONTEXT,
                 tooltip="Show/hide a strip of recent capture frames at the bottom of this preview",
                 handler_name="_toggle_replay_strip",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="retry_capture",
+                label="Retry Capture",
+                scope=ActionScope.OBJECT,
+                primary_home=PrimaryHome.WINDOW_CONTEXT,
+                tooltip="Attempt to restart capture for this window",
+                handler_name="_retry_capture",
             )
         )
 

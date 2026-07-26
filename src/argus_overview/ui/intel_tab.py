@@ -62,8 +62,12 @@ class IntelLogTable(QTableWidget):
         self._setup_table()
 
     def _setup_table(self):
-        """Setup table columns and appearance."""
-        columns = ["Time", "Threat", "System", "Count", "Ships", "Message"]
+        """Setup table columns and appearance.
+
+        PR2: Message is the primary signal, so it is placed first with Stretch
+        resize mode so it remains readable at smaller window widths.
+        """
+        columns = ["Message", "Time", "Threat", "System", "Count", "Ships"]
         self.setColumnCount(len(columns))
         self.setHorizontalHeaderLabels(columns)
 
@@ -75,14 +79,14 @@ class IntelLogTable(QTableWidget):
         self.verticalHeader().setVisible(False)
         self.setShowGrid(False)
 
-        # Column sizing
+        # Column sizing — Message first, stretched; metadata compact
         header = self.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Time
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Threat
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # System
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Count
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)  # Ships
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Message
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Message
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Time
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Threat
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # System
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Count
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Ships
 
         # Selection signal
         self.itemSelectionChanged.connect(self._on_selection_changed)
@@ -94,42 +98,42 @@ class IntelLogTable(QTableWidget):
         # Insert at top
         self.insertRow(0)
 
+        # Message (primary column, first)
+        msg_text = report.raw_message[:100]
+        if len(report.raw_message) > 100:
+            msg_text += "..."
+        msg_item = QTableWidgetItem(msg_text)
+        msg_item.setToolTip(report.raw_message)
+        msg_item.setData(Qt.ItemDataRole.UserRole, report)
+        self.setItem(0, 0, msg_item)
+
         # Time
         time_str = report.timestamp.strftime("%H:%M:%S")
         time_item = QTableWidgetItem(time_str)
-        time_item.setData(Qt.ItemDataRole.UserRole, report)
-        self.setItem(0, 0, time_item)
+        self.setItem(0, 1, time_item)
 
         # Threat level
         threat_item = QTableWidgetItem(report.threat_level.value.upper())
         threat_color = self.THREAT_COLORS.get(report.threat_level, QColor("#888"))
         threat_item.setForeground(QBrush(threat_color))
         threat_item.setFont(QFont("", -1, QFont.Weight.Bold))
-        self.setItem(0, 1, threat_item)
+        self.setItem(0, 2, threat_item)
 
         # System
         system_item = QTableWidgetItem(report.system or "Unknown")
-        self.setItem(0, 2, system_item)
+        self.setItem(0, 3, system_item)
 
         # Count
         count_str = str(report.hostile_count) if report.hostile_count else "-"
         count_item = QTableWidgetItem(count_str)
-        self.setItem(0, 3, count_item)
+        self.setItem(0, 4, count_item)
 
         # Ships
         ships_str = ", ".join(report.ship_types[:3]) if report.ship_types else "-"
         if len(report.ship_types) > 3:
             ships_str += f" +{len(report.ship_types) - 3}"
         ships_item = QTableWidgetItem(ships_str)
-        self.setItem(0, 4, ships_item)
-
-        # Message (truncated)
-        msg_text = report.raw_message[:100]
-        if len(report.raw_message) > 100:
-            msg_text += "..."
-        msg_item = QTableWidgetItem(msg_text)
-        msg_item.setToolTip(report.raw_message)
-        self.setItem(0, 5, msg_item)
+        self.setItem(0, 5, ships_item)
 
         # Apply row background color based on threat
         for col in range(self.columnCount()):

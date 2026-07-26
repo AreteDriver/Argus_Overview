@@ -1412,8 +1412,8 @@ class TestCreateMenuBar:
 
         # Should build help menu
         mock_builder.build_help_menu.assert_called_once()
-        # Should add menu to menubar
-        window.menuBar().addMenu.assert_called_once()
+        # Should add App menu and Help menu to menubar (PR2)
+        assert window.menuBar().addMenu.call_count == 2
 
 
 # Test cycling when character not found (covers 244-246, 266-268)
@@ -1532,6 +1532,7 @@ class TestCreateMainTab:
         window.capture_system = MagicMock()
         window.character_manager = MagicMock()
         window.settings_manager = MagicMock()
+        window.layout_manager = MagicMock()
         window.tabs = MagicMock()
 
         mock_tab = MagicMock()

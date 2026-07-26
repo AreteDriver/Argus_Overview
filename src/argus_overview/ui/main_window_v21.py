@@ -63,7 +63,7 @@ from argus_overview.core.eve_settings_sync import EVESettingsSync
 from argus_overview.core.hotkey_manager import HotkeyManager
 from argus_overview.core.layout_manager import LayoutManager
 from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
-from argus_overview.ui.action_registry import ActionRegistry
+from argus_overview.ui.action_registry import ActionRegistry, PrimaryHome
 from argus_overview.ui.menu_builder import MenuBuilder
 from argus_overview.ui.settings_manager import SettingsManager
 from argus_overview.ui.themes import get_theme_manager
@@ -305,6 +305,12 @@ class MainWindowV21(QMainWindow):
         """Toggle thumbnail visibility"""
         if hasattr(self, "main_tab"):
             self.main_tab.toggle_thumbnails_visibility()
+
+    @Slot()
+    def _toggle_replay_strips_global(self):
+        """PR2: toggle replay strips for all preview windows (delegates to MainTab)."""
+        if hasattr(self, "main_tab"):
+            self.main_tab._toggle_replay_strips_global()
 
     @Slot()
     def _toggle_lock(self):
@@ -552,15 +558,23 @@ class MainWindowV21(QMainWindow):
                         )
 
     def _create_menu_bar(self):
-        """Create menu bar with Help menu (v2.4 - uses ActionRegistry)"""
+        """Create menu bar with App menu and Help menu (v2.4 - uses ActionRegistry)"""
         menubar = self.menuBar()
 
-        # Build Help menu using MenuBuilder (actions from ActionRegistry)
+        # Build App menu (PR2: replay strips toggle + other global actions)
         registry = ActionRegistry.get_instance()
         menu_builder = MenuBuilder(registry)
 
-        # Handler map for Help menu actions
-        handlers = {
+        app_handlers = {
+            "toggle_replay_strips_app": self._toggle_replay_strips_global,
+        }
+        app_menu = menu_builder.build_menu(
+            PrimaryHome.APP_MENU, parent=self, handlers=app_handlers
+        )
+        menubar.addMenu(app_menu)
+
+        # Build Help menu using MenuBuilder (actions from ActionRegistry)
+        help_handlers = {
             "about": self._show_about_dialog,
             "donate": self._open_donation_link,
             "documentation": lambda: self._open_url(
@@ -571,7 +585,7 @@ class MainWindowV21(QMainWindow):
             ),
         }
 
-        help_menu = menu_builder.build_help_menu(parent=self, handlers=handlers)
+        help_menu = menu_builder.build_help_menu(parent=self, handlers=help_handlers)
         menubar.addMenu(help_menu)
 
     def _show_about_dialog(self):
@@ -633,6 +647,7 @@ class MainWindowV21(QMainWindow):
             self.capture_system,
             self.character_manager,
             settings_manager=self.settings_manager,
+            layout_manager=self.layout_manager,
         )
         self.tabs.addTab(self.main_tab, "Overview")
 

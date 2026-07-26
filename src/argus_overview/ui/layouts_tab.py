@@ -519,12 +519,50 @@ class LayoutsTab(QWidget):
         section = QGroupBox("2. Pattern")
         layout = QVBoxLayout()
 
-        self._pattern_strip = PatternThumbStrip()
+        # PR2: progressive disclosure — 6 core patterns visible immediately,
+        # remaining 4 behind a toggle to reduce decision fatigue.
+        core_patterns = [
+            "2x2 Grid",
+            "3x1 Row",
+            "1x3 Column",
+            "4x1 Row",
+            "Main + Sides",
+            "Custom",
+        ]
+        more_patterns = [
+            "2x3 Grid",
+            "3x2 Grid",
+            "Cascade",
+            "Stacked (All Same Position)",
+        ]
+
+        self._pattern_strip = PatternThumbStrip(patterns=core_patterns)
         self._pattern_strip.pattern_selected.connect(self._on_pattern_strip_selected)
-        # Default selection mirrors the legacy combo
         initial_pattern = self.pattern_combo.currentText() or "2x2 Grid"
-        self._pattern_strip.set_selected(initial_pattern)
+        if initial_pattern in core_patterns:
+            self._pattern_strip.set_selected(initial_pattern)
         layout.addWidget(self._pattern_strip)
+
+        # More layouts toggle
+        self._more_patterns_widget = QWidget()
+        more_layout = QVBoxLayout()
+        more_layout.setContentsMargins(0, 0, 0, 0)
+        self._more_patterns_widget.setLayout(more_layout)
+        self._more_pattern_strip = PatternThumbStrip(patterns=more_patterns)
+        self._more_pattern_strip.pattern_selected.connect(self._on_pattern_strip_selected)
+        if initial_pattern in more_patterns:
+            self._more_pattern_strip.set_selected(initial_pattern)
+            self._more_patterns_widget.setVisible(True)
+        else:
+            self._more_patterns_widget.setVisible(False)
+        more_layout.addWidget(self._more_pattern_strip)
+        layout.addWidget(self._more_patterns_widget)
+
+        self._more_toggle_btn = QPushButton("More layouts ▼")
+        self._more_toggle_btn.setCheckable(True)
+        self._more_toggle_btn.setChecked(self._more_patterns_widget.isVisible())
+        self._more_toggle_btn.clicked.connect(self._toggle_more_patterns)
+        layout.addWidget(self._more_toggle_btn)
 
         # Spacing belongs with the pattern — it tunes the rendered output,
         # not a separate concept. Move from the old "Grid Size" cluster.
@@ -537,6 +575,12 @@ class LayoutsTab(QWidget):
 
         section.setLayout(layout)
         return section
+
+    def _toggle_more_patterns(self) -> None:
+        """Show or hide the additional pattern strip."""
+        show = self._more_toggle_btn.isChecked()
+        self._more_patterns_widget.setVisible(show)
+        self._more_toggle_btn.setText("More layouts ▲" if show else "More layouts ▼")
 
     def _build_monitor_section(self) -> QGroupBox:
         section = QGroupBox("3. Monitor")
@@ -600,10 +644,20 @@ class LayoutsTab(QWidget):
             self.group_combo.setCurrentIndex(idx)
 
     def _on_pattern_strip_selected(self, pattern_name: str) -> None:
-        """Mirror the thumbnail strip choice into the legacy pattern combo."""
+        """Mirror the thumbnail strip choice into the legacy pattern combo.
+
+        PR2: ensures only one pattern is highlighted across both the core and
+        the expanded "more" strips.
+        """
         idx = self.pattern_combo.findText(pattern_name)
         if idx >= 0:
             self.pattern_combo.setCurrentIndex(idx)
+        # Deselect the other strip so exactly one pattern is active
+        source = self.sender()
+        if source is self._pattern_strip and hasattr(self, "_more_pattern_strip"):
+            self._more_pattern_strip.set_selected(None)
+        elif source is self._more_pattern_strip and hasattr(self, "_pattern_strip"):
+            self._pattern_strip.set_selected(None)
 
     def _on_monitor_strip_selected(self, index: int) -> None:
         """Mirror the monitor card choice into the legacy spinbox."""
