@@ -2212,7 +2212,6 @@ class MainTab(QWidget):
         sm = getattr(self, "settings_manager", None)
         show_dock = sm.get("thumbnails.show_status_dock", True) if sm else True
         self.status_dock.setVisible(show_dock)
-        layout.addWidget(self.status_dock)
 
         # Scroll area for preview frames
         scroll = QScrollArea()
@@ -2227,6 +2226,10 @@ class MainTab(QWidget):
 
         scroll.setWidget(self.preview_container)
         layout.addWidget(scroll)
+
+        # Fleet status rail — placed below the preview grid so the operational
+        # area retains maximum vertical space.
+        layout.addWidget(self.status_dock)
 
         # Status bar
         status_bar = self._create_status_bar()

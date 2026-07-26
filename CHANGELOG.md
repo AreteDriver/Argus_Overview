@@ -37,6 +37,10 @@ instead of hardcoded values.
   and `#3a3a3a` border to `SURFACE` + `BORDER_SUBTLE`. Cell borders and hover
   highlight in the strip `paintEvent` now use design-system tokens
   (`BORDER_SUBTLE`, `INFO`).
+- **Fleet rail positioning** — the character status dock (`StatusDock`) moved from
+  above the preview grid to below it. This prioritizes vertical space for the
+  live preview area, placing operational status in a bottom rail consistent with
+  the Operational Truth principle that the preview grid is the primary product.
 
 ## [3.2.0] - 2026-04-26 — Intel-Aware Edition
 
