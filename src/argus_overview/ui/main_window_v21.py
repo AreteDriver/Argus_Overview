@@ -132,6 +132,27 @@ class MainWindowV21(QMainWindow):
 
         # Tab widget
         self.tabs = QTabWidget()
+        from argus_overview.ui.design_system import colors as ds, metrics as dm
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: none;
+                background: {ds.CANVAS};
+            }}
+            QTabBar::tab {{
+                background: {ds.SURFACE};
+                color: {ds.TEXT_SECONDARY};
+                padding: 6px 14px;
+                border-top-left-radius: {dm.RADIUS_CONTROL}px;
+                border-top-right-radius: {dm.RADIUS_CONTROL}px;
+            }}
+            QTabBar::tab:selected {{
+                background: {ds.SURFACE_RAISED};
+                color: {ds.TEXT_PRIMARY};
+            }}
+            QTabBar::tab:hover {{
+                background: {ds.SURFACE_HOVER};
+            }}
+        """)
         layout.addWidget(self.tabs)
 
         # Create tabs
