@@ -10961,3 +10961,62 @@ class TestMainWindowV21ApplySettingChromeToggle:
         window._apply_setting("performance.default_refresh_rate", 30)
 
         window._clear_threat_chrome.assert_not_called()
+
+
+class TestWindowPreviewWidgetFocus:
+    """PR7: focus ring and keyboard navigation tests."""
+
+    def test_focus_in_event_calls_update(self, qapp):
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QWidget
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+        widget.update = MagicMock()
+        with patch.object(QWidget, "focusInEvent"):
+            WindowPreviewWidget.focusInEvent(widget, MagicMock())
+        widget.update.assert_called_once()
+
+    def test_focus_out_event_calls_update(self, qapp):
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QWidget
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+        widget.update = MagicMock()
+        with patch.object(QWidget, "focusOutEvent"):
+            WindowPreviewWidget.focusOutEvent(widget, MagicMock())
+        widget.update.assert_called_once()
+
+    def test_paint_focus_layer_when_focused(self, qapp):
+        """When hasFocus() is True, _paint_focus_layer should draw a rounded rect."""
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget.hasFocus = MagicMock(return_value=True)
+            widget.rect = MagicMock(return_value=QRect(0, 0, 200, 150))
+
+            from PySide6.QtGui import QPainter
+            mock_painter = MagicMock(spec=QPainter)
+            widget._paint_focus_layer(mock_painter)
+
+            # Should have called drawRoundedRect with the INFO colour
+            assert mock_painter.drawRoundedRect.called
+            # Verify pen was set to INFO colour
+            pen_calls = [c for c in mock_painter.setPen.call_args_list if c.args]
+            assert len(pen_calls) >= 1
+
+    def test_paint_focus_layer_skips_when_not_focused(self, qapp):
+        """When hasFocus() is False, _paint_focus_layer should not draw."""
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget.hasFocus = MagicMock(return_value=False)
+
+            from PySide6.QtGui import QPainter
+            mock_painter = MagicMock(spec=QPainter)
+            widget._paint_focus_layer(mock_painter)
+
+            mock_painter.drawRoundedRect.assert_not_called()

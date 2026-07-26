@@ -1038,6 +1038,16 @@ class WindowPreviewWidget(QWidget):
 
         super().leaveEvent(event)
 
+    def focusInEvent(self, event):
+        """PR7: trigger repaint so the focus ring is drawn."""
+        super().focusInEvent(event)
+        self.update()
+
+    def focusOutEvent(self, event):
+        """PR7: trigger repaint so the focus ring is cleared."""
+        super().focusOutEvent(event)
+        self.update()
+
     def set_character_system(self, system: str | None) -> None:
         """Record the current system for this frame's character (PR5)."""
         self._character_system = system
@@ -1392,6 +1402,9 @@ class WindowPreviewWidget(QWidget):
         # Layer 5 — Badges
         self._paint_badge_layer(painter, health)
 
+        # PR7 — Focus ring (drawn last so it sits on top of everything)
+        self._paint_focus_layer(painter)
+
         painter.end()
 
     # -----------------------------------------------------------------
@@ -1627,6 +1640,19 @@ class WindowPreviewWidget(QWidget):
                 pad=4,
                 radius=dm.RADIUS_CONTROL,
             )
+
+    def _paint_focus_layer(self, painter: QPainter) -> None:
+        """PR7: draw a focus ring when this widget has keyboard focus."""
+        if not self.hasFocus():
+            return
+        from argus_overview.ui.design_system import colors as ds, metrics as dm
+
+        pen = QPen(QColor(ds.INFO))
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        painter.drawRoundedRect(rect, dm.RADIUS_CARD, dm.RADIUS_CARD)
 
     def mousePressEvent(self, event):
         """Handle mouse click - start drag or activate"""
