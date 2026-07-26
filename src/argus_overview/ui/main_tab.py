@@ -654,6 +654,9 @@ class WindowPreviewWidget(QWidget):
         parent=None,
     ):
         super().__init__(parent)
+        # PR4: accept focus for keyboard navigation (Tab into grid, arrows
+        # between frames, Enter/Space to activate, Esc to exit spotlight).
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.logger = logging.getLogger(__name__)
         self.window_id = window_id
         self.character_name = character_name
@@ -774,12 +777,12 @@ class WindowPreviewWidget(QWidget):
         self.info_label.setStyleSheet("font-weight: bold; padding: 2px;")
         layout.addWidget(self.info_label)
 
-        # Session timer label (v2.2)
-        self.timer_label = QLabel("")
-        self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.timer_label.setStyleSheet("color: #888; font-size: 9px;")
+        # Session timer label (v2.2) — PR4: floating child so it does not
+        # push the preview image up. Positioned at bottom-left in resizeEvent.
+        self.timer_label = QLabel("", self)
+        self.timer_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.timer_label.setStyleSheet("color: #888; font-size: 9px; background: transparent;")
         self.timer_label.setVisible(self._show_session_timer)
-        layout.addWidget(self.timer_label)
 
         # Session timer update (every minute)
         self.session_timer = QTimer()
@@ -874,6 +877,14 @@ class WindowPreviewWidget(QWidget):
             tooltip += f"\nThreat: {threat_level.value}{age} · source: {src}"
         elif not getattr(self, "_intel_report_received", False):
             tooltip += "\nThreat: Unknown (no intel data received)"
+
+        # PR4: session timer in tooltip when enabled
+        if getattr(self, "_show_session_timer", False):
+            elapsed = datetime.now() - self.session_start
+            hours = int(elapsed.total_seconds() // 3600)
+            minutes = int((elapsed.total_seconds() % 3600) // 60)
+            timer_text = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+            tooltip += f"\nSession: {timer_text}"
 
         window_id = getattr(self, "window_id", "")
         tooltip += f"\nWindow ID: {window_id}"
@@ -1301,12 +1312,19 @@ class WindowPreviewWidget(QWidget):
         self.retry_requested.emit(self.window_id)
 
     def resizeEvent(self, event) -> None:
-        """PR2: keep the retry button pinned to the top-right corner."""
+        """PR2: keep the retry button pinned to the top-right corner.
+        PR4: keep the session timer label at bottom-left."""
         super().resizeEvent(event)
         btn = getattr(self, "_retry_button", None)
         if btn is not None:
             try:
                 btn.move(self.width() - btn.width() - 4, 4)
+            except RuntimeError:
+                pass
+        lbl = getattr(self, "timer_label", None)
+        if lbl is not None:
+            try:
+                lbl.move(4, self.height() - lbl.height() - 2)
             except RuntimeError:
                 pass
 
@@ -1467,6 +1485,23 @@ class WindowPreviewWidget(QWidget):
             painter.setPen(QPen(Qt.PenStyle.NoPen))
             painter.drawEllipse(self.width() - 14, 6, 8, 8)
 
+            # PR4: text label next to dot for colorblind / low-brightness users
+            label_text = activity.capitalize()
+            text_color = QColor(indicator_color)
+            text_color.setAlpha(255)
+            painter.setPen(QPen(text_color))
+            from PySide6.QtGui import QFont
+
+            label_font = QFont(painter.font())
+            label_font.setPointSize(7)
+            label_font.setBold(True)
+            painter.setFont(label_font)
+            metrics = painter.fontMetrics()
+            text_w = metrics.horizontalAdvance(label_text)
+            text_x = self.width() - 18 - text_w
+            text_y = 6 + metrics.ascent()
+            painter.drawText(text_x, text_y, label_text)
+
         # 4. Lock icon if positions are locked
         if self._positions_locked:
             painter.setPen(QPen(QColor(200, 200, 200, 180)))
@@ -1561,6 +1596,20 @@ class WindowPreviewWidget(QWidget):
             self._drag_start_pos = None
             return
         super().mouseDoubleClickEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """PR4: keyboard navigation — Enter/Space activate, Esc exits spotlight."""
+        key = event.key()
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.window_activated.emit(self.window_id)
+            event.accept()
+            return
+        if key == Qt.Key.Key_Escape:
+            if self._spotlight_mode is not None:
+                self.focus_requested.emit(self.window_id)  # toggle off
+                event.accept()
+                return
+        super().keyPressEvent(event)
 
     def contextMenuEvent(self, event):
         """Handle right-click context menu (v2.3 - uses ActionRegistry)"""

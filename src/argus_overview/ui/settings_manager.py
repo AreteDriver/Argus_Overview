@@ -39,7 +39,7 @@ class SettingsManager:
             "capture_quality": "low",  # low, medium, high
         },
         "thumbnails": {
-            "opacity_on_hover": 0.3,
+            "opacity_on_hover": 0.85,  # PR4: default raised from 0.3 so previews remain readable on hover
             "zoom_on_hover": 1.5,
             "lock_positions": False,
             "show_labels": True,

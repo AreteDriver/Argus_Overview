@@ -112,8 +112,16 @@ class IntelLogTable(QTableWidget):
         time_item = QTableWidgetItem(time_str)
         self.setItem(0, 1, time_item)
 
-        # Threat level
-        threat_item = QTableWidgetItem(report.threat_level.value.upper())
+        # Threat level (PR4: shield icon prefix for icon+text redundancy)
+        shield_icons = {
+            ThreatLevel.CLEAR: "🛡",
+            ThreatLevel.INFO: "🛡",
+            ThreatLevel.WARNING: "⚠",
+            ThreatLevel.DANGER: "⚠",
+            ThreatLevel.CRITICAL: "☠",
+        }
+        icon = shield_icons.get(report.threat_level, "")
+        threat_item = QTableWidgetItem(f"{icon} {report.threat_level.value.upper()}")
         threat_color = self.THREAT_COLORS.get(report.threat_level, QColor("#888"))
         threat_item.setForeground(QBrush(threat_color))
         threat_item.setFont(QFont("", -1, QFont.Weight.Bold))

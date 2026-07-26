@@ -157,11 +157,35 @@ EVE_THEME = Theme(
     ),
 )
 
+HIGH_CONTRAST_THEME = Theme(
+    "high_contrast",
+    ThemeColors(
+        window="#000000",
+        window_text="#ffffff",
+        base="#000000",
+        alternate_base="#111111",
+        text="#ffffff",
+        bright_text="#ffffff",
+        button="#000000",
+        button_text="#ffffff",
+        highlight="#ffffff",
+        highlighted_text="#000000",
+        link="#00ffff",
+        tooltip_base="#000000",
+        tooltip_text="#ffffff",
+        accent="#ffffff",
+        alert_red="#ff0000",
+        alert_yellow="#ffff00",
+        alert_green="#00ff00",
+    ),
+)
+
 # All built-in themes
 BUILTIN_THEMES = {
     "dark": DARK_THEME,
     "light": LIGHT_THEME,
     "eve": EVE_THEME,
+    "high_contrast": HIGH_CONTRAST_THEME,
 }
 
 
@@ -191,6 +215,7 @@ class ThemeManager:
             "dark": "Dark",
             "light": "Light",
             "eve": "EVE Online",
+            "high_contrast": "High Contrast",
         }
 
         for name in self.custom_themes:

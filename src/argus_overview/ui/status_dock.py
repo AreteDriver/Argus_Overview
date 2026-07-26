@@ -97,6 +97,9 @@ class CharacterChip(QFrame):
         self.setMaximumWidth(260)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
+        # PR4: accept focus for keyboard navigation (arrow keys between chips,
+        # Enter/Space to activate window).
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self._apply_base_style()
 
         layout = QHBoxLayout(self)
@@ -274,6 +277,24 @@ class CharacterChip(QFrame):
             return
         super().mousePressEvent(event)
 
+    def keyPressEvent(self, event) -> None:
+        """PR4: keyboard navigation — Enter/Space activate, arrows move focus."""
+        from PySide6.QtGui import QKeyEvent
+
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.clicked.emit(self.window_id)
+            event.accept()
+            return
+        if event.key() == Qt.Key.Key_Right:
+            self.parentWidget().focusNextChild()
+            event.accept()
+            return
+        if event.key() == Qt.Key.Key_Left:
+            self.parentWidget().focusPreviousChild()
+            event.accept()
+            return
+        super().keyPressEvent(event)
+
     def paintEvent(self, event):
         super().paintEvent(event)
         if self._threat_level is None or self._threat_alpha <= 0.0:
@@ -291,6 +312,27 @@ class CharacterChip(QFrame):
             dot_x = self.width() - self.DOT_SIZE - 8
             dot_y = (self.height() - self.DOT_SIZE) // 2
             painter.drawEllipse(dot_x, dot_y, self.DOT_SIZE, self.DOT_SIZE)
+
+            # PR4: single-letter threat label inside the dot for colorblind
+            # and low-brightness users. "D"=Danger, "W"=Warning, "C"=Critical.
+            from PySide6.QtGui import QFont
+
+            level_map = {"danger": "D", "warning": "W", "critical": "C"}
+            level_text = level_map.get(self._threat_level.value.lower(), "")
+            if level_text:
+                dot_font = QFont(painter.font())
+                dot_font.setPointSize(6)
+                dot_font.setBold(True)
+                painter.setFont(dot_font)
+                # Contrast: light text on dark/bright colored dot
+                dot_lum = (r * 299 + g * 587 + b * 114) / 1000
+                label_color = QColor(255, 255, 255, alpha) if dot_lum < 140 else QColor(0, 0, 0, alpha)
+                painter.setPen(QPen(label_color))
+                fm = painter.fontMetrics()
+                tw = fm.horizontalAdvance(level_text)
+                tx = dot_x + (self.DOT_SIZE - tw) // 2
+                ty = dot_y + (self.DOT_SIZE + fm.ascent() - fm.descent()) // 2
+                painter.drawText(tx, ty, level_text)
 
             # PR7: distance badge for adjacent-system alerts.
             # Renders as "+Nj" just left of the threat dot in the same color.
