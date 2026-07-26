@@ -32,6 +32,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from argus_overview.ui.design_system import colors as _ds
+
 
 class HotkeyEditDialog(QDialog):
     """Dialog for editing hotkey bindings"""
@@ -56,7 +58,7 @@ class HotkeyEditDialog(QDialog):
 
         # Current binding
         current_label = QLabel(f"Current: {self.current_combo}")
-        current_label.setStyleSheet("color: #888;")
+        current_label.setStyleSheet(f"color: {_ds.TEXT_MUTED};")
         layout.addWidget(current_label)
 
         # Key input
@@ -69,7 +71,7 @@ class HotkeyEditDialog(QDialog):
         hint_label = QLabel(
             "Format: <ctrl>+<alt>+<key> or <shift>+<key>\nExamples: <ctrl>+<alt>+1, <shift>+f5"
         )
-        hint_label.setStyleSheet("color: #666; font-size: 9pt;")
+        hint_label.setStyleSheet(f"color: {_ds.TEXT_DISABLED}; font-size: 9pt;")
         hint_label.setWordWrap(True)
         layout.addWidget(hint_label)
 
@@ -80,7 +82,7 @@ class HotkeyEditDialog(QDialog):
 
         # Conflict check label
         self.conflict_label = QLabel("")
-        self.conflict_label.setStyleSheet("color: #e74c3c;")
+        self.conflict_label.setStyleSheet(f"color: {_ds.CRITICAL};")
         layout.addWidget(self.conflict_label)
 
         # Buttons
@@ -229,7 +231,7 @@ class PerformancePanel(QWidget):
             "• Reduces CPU/GPU load significantly\n\n"
             "Use when running multiple EVE clients."
         )
-        self.low_power_check.setStyleSheet("QCheckBox { font-weight: bold; color: #e67e22; }")
+        self.low_power_check.setStyleSheet(f"QCheckBox {{ font-weight: bold; color: {_ds.WARNING}; }}")
         form.addRow("⚡ Low Power Mode:", self.low_power_check)
 
         # Disable previews (GPU/CPU saver)
@@ -329,7 +331,7 @@ class HotkeysPanel(QWidget):
 
         # Format label
         format_label = QLabel("Format: <ctrl>+<alt>+<key> or <shift>+<key>")
-        format_label.setStyleSheet("color: #666; font-style: italic;")
+        format_label.setStyleSheet(f"color: {_ds.TEXT_DISABLED}; font-style: italic;")
         layout.addWidget(format_label)
 
         # Hotkeys table
@@ -525,7 +527,7 @@ class IntelPanel(QWidget):
             "to enable or disable per character."
         )
         replay_label.setWordWrap(True)
-        replay_label.setStyleSheet("color: #aaa; padding: 4px;")
+        replay_label.setStyleSheet(f"color: {_ds.TEXT_SECONDARY}; padding: 4px;")
         replay_form.addRow(replay_label)
 
         replay_group.setLayout(replay_form)
@@ -636,7 +638,7 @@ class AdvancedPanel(QWidget):
         self.config_dir_label = QLabel(
             self.settings_manager.get("advanced.config_directory", "~/.config/argus-overview")
         )
-        self.config_dir_label.setStyleSheet("color: #888;")
+        self.config_dir_label.setStyleSheet(f"color: {_ds.TEXT_MUTED};")
         form.addRow("Config directory:", self.config_dir_label)
 
         # Enable debug

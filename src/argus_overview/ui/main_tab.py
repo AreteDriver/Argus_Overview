@@ -51,6 +51,7 @@ from argus_overview.core.discovery import scan_eve_windows
 from argus_overview.intel.parser import ThreatLevel
 from argus_overview.ui.action_registry import PrimaryHome
 from argus_overview.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
+from argus_overview.ui.themes import get_theme_manager
 from argus_overview.utils.screen import ScreenGeometry, get_screen_geometry
 
 # Threat-tint config — tuned for a glanceable but non-distracting frame
@@ -2396,14 +2397,16 @@ class MainTab(QWidget):
 
         apply_btn = QPushButton("Apply Layout")
         apply_btn.setToolTip("Arrange EVE windows on screen")
-        apply_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ff8c00;
+        accent = get_theme_manager().get_accent_color()
+        hover = QColor(accent).lighter(120).name()
+        apply_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {accent};
                 color: black;
                 font-weight: bold;
                 padding: 8px 15px;
-            }
-            QPushButton:hover { background-color: #ffa500; }
+            }}
+            QPushButton:hover {{ background-color: {hover}; }}
         """)
         apply_btn.clicked.connect(self._apply_layout_to_windows)
         buttons_col.addWidget(apply_btn)
