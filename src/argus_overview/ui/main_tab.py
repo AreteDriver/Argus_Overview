@@ -1443,24 +1443,37 @@ class WindowPreviewWidget(QWidget):
                     pill_text,
                 )
 
-            # PR1: report age — small text at bottom-center when the threat
-            # is decaying (alpha < 0.9) so the operator knows how old the
-            # alert is without hovering for the tooltip.
+            # PR5: report age pill — semi-transparent rounded rect with text
+            # inside, drawn at bottom-center when the threat is decaying
+            # (alpha < 0.9) so the operator knows how old the alert is.
             if self._threat_alpha < 0.9 and self._threat_set_at > 0.0:
                 age_secs = int(time.monotonic() - self._threat_set_at)
-                age_text = f"{age_secs}s"
+                age_text = f"{age_secs}s ago"
                 from PySide6.QtGui import QFont
 
                 age_font = QFont(painter.font())
                 age_font.setPointSize(8)
                 painter.setFont(age_font)
-                age_color = QColor(r, g, b, max(160, alpha))
-                painter.setPen(QPen(age_color))
                 metrics = painter.fontMetrics()
                 text_w = metrics.horizontalAdvance(age_text)
-                text_x = (self.width() - text_w) // 2
-                text_y = self.height() - 6
-                painter.drawText(text_x, text_y, age_text)
+                pill_pad = 4
+                pill_w = text_w + pill_pad * 2
+                pill_h = metrics.height() + pill_pad
+                pill_x = (self.width() - pill_w) // 2
+                pill_y = self.height() - pill_h - 4
+                # Dark semi-transparent background pill
+                pill_bg = QColor(20, 20, 20, max(180, alpha))
+                painter.setPen(QPen(Qt.PenStyle.NoPen))
+                painter.setBrush(QBrush(pill_bg))
+                painter.drawRoundedRect(pill_x, pill_y, pill_w, pill_h, 4, 4)
+                # Foreground in threat color
+                age_color = QColor(r, g, b, max(220, alpha))
+                painter.setPen(QPen(age_color))
+                painter.drawText(
+                    pill_x + pill_pad,
+                    pill_y + pill_pad + metrics.ascent() - 2,
+                    age_text,
+                )
 
         # 2. Legacy flash overlay (compat with border_flash_requested)
         if self._flash_color is not None:
@@ -2141,8 +2154,6 @@ class MainTab(QWidget):
         toolbar_builder = ToolbarBuilder()
         handlers = {
             "import_windows": self.one_click_import,
-            "add_window": self.show_add_window_dialog,
-            "remove_all_windows": self._remove_all_windows,
             "lock_positions": self._toggle_lock,
             "minimize_inactive": self.minimize_inactive_windows,
             "refresh_capture": self._refresh_all,
@@ -2152,8 +2163,6 @@ class MainTab(QWidget):
         # Create buttons in specific order with layout control
         action_order = [
             "import_windows",
-            "add_window",
-            "remove_all_windows",
         ]
 
         buttons = toolbar_builder.build_toolbar_buttons(

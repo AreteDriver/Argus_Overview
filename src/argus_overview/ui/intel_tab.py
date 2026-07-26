@@ -189,6 +189,7 @@ class IntelTab(QWidget):
     # Signals
     intel_received = Signal(object)  # IntelReport
     alert_triggered = Signal(object, object)  # IntelReport, AlertType
+    pipeline_health_changed = Signal(str, str)  # status, detail
 
     def __init__(self, settings_manager, parent=None):
         super().__init__(parent)
@@ -529,6 +530,7 @@ class IntelTab(QWidget):
         self.status_label.setStyleSheet("color: #4CAF50; padding: 5px;")
         self._update_log_dir_label()
         self.logger.info("Intel monitoring started")
+        self.pipeline_health_changed.emit("healthy", "monitoring active")
 
     def _stop_monitoring(self):
         """Stop intel monitoring."""
@@ -538,6 +540,7 @@ class IntelTab(QWidget):
         self.status_label.setText("Status: Stopped")
         self.status_label.setStyleSheet("color: #888; padding: 5px;")
         self.logger.info("Intel monitoring stopped")
+        self.pipeline_health_changed.emit("unavailable", "monitoring stopped")
 
     @Slot()
     def _add_channel(self):
@@ -611,6 +614,7 @@ class IntelTab(QWidget):
         self.logger.error(f"Log watcher error: {error}")
         self.status_label.setText(f"Error: {error}")
         self.status_label.setStyleSheet("color: #F44336; padding: 5px;")
+        self.pipeline_health_changed.emit("degraded", error)
 
     @Slot(object)
     def _on_entry_selected(self, report: IntelReport):

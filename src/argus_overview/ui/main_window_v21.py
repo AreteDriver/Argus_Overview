@@ -739,6 +739,15 @@ class MainWindowV21(QMainWindow):
         alert_dispatcher = self.intel_tab.get_alert_dispatcher()
         alert_dispatcher.border_flash_requested.connect(self._flash_preview_borders)
 
+        # Connect pipeline health to system status bar
+        self.intel_tab.pipeline_health_changed.connect(
+            lambda s, d: (
+                self.system_status_bar.set_status("intel", s, d)
+                if getattr(self, "system_status_bar", None) is not None
+                else None
+            )
+        )
+
         self.logger.info("Intel tab created")
 
     @Slot(str, int)
