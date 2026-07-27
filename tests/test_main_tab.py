@@ -10253,9 +10253,9 @@ class TestCharacterAccentColor:
         assert isinstance(character_accent_color("X"), QColor)
 
     def test_palette_has_eight_entries(self):
-        from argus_overview.ui.main_tab import CHARACTER_ACCENT_COLORS
+        from argus_overview.ui.design_system.colors import ACCENT_POOL
 
-        assert len(CHARACTER_ACCENT_COLORS) == 8
+        assert len(ACCENT_POOL) == 8
 
     def test_cross_process_determinism(self):
         """Accent color must be stable across processes (MD5-based, not hash())."""
@@ -10277,6 +10277,10 @@ class TestCharacterAccentColor:
         env_base = os.environ.copy()
         env_base.pop("QT_QPA_PLATFORM", None)
         env_base["QT_QPA_PLATFORM"] = "offscreen"
+        # Ensure the subprocess can find argus_overview when running via pytest
+        import pathlib, sys
+        repo_root = str(pathlib.Path(__file__).resolve().parents[1] / "src")
+        env_base["PYTHONPATH"] = repo_root + os.pathsep + env_base.get("PYTHONPATH", "")
 
         run_a = subprocess.run(
             [sys.executable, "-c", script],
@@ -10297,14 +10301,12 @@ class TestCharacterAccentColor:
 
     def test_uniform_distribution_over_palette(self):
         """A wide range of character names should hit every palette index."""
-        from argus_overview.ui.main_tab import (
-            CHARACTER_ACCENT_COLORS,
-            character_accent_color,
-        )
+        from argus_overview.ui.design_system.colors import ACCENT_POOL
+        from argus_overview.ui.main_tab import character_accent_color
 
         # Generate 200 distinct names; expect coverage of every palette entry
         seen_indices = set()
-        target = {(r, g, b) for r, g, b in CHARACTER_ACCENT_COLORS}
+        target = {(r, g, b) for r, g, b in ACCENT_POOL}
         for i in range(200):
             color = character_accent_color(f"Pilot{i:04d}")
             seen_indices.add((color.red(), color.green(), color.blue()))
@@ -10332,13 +10334,11 @@ class TestCharacterAccentChipFrameMatch:
             chip.deleteLater()
 
     def test_legacy_chip_aliases_resolve_to_main_tab_helpers(self):
-        from argus_overview.ui.main_tab import (
-            CHARACTER_ACCENT_COLORS,
-            character_accent_color,
-        )
+        from argus_overview.ui.main_tab import character_accent_color
+        from argus_overview.ui.design_system.colors import ACCENT_POOL
         from argus_overview.ui.status_dock import CHIP_ACCENT_COLORS, accent_for
 
-        assert CHIP_ACCENT_COLORS is CHARACTER_ACCENT_COLORS
+        assert CHIP_ACCENT_COLORS is ACCENT_POOL
         assert accent_for is character_accent_color
 
 
@@ -11003,6 +11003,7 @@ class TestWindowPreviewWidgetFocus:
     def test_paint_focus_layer_when_focused(self, qapp):
         """When hasFocus() is True, _paint_focus_layer should draw a rounded rect."""
         from argus_overview.ui.main_tab import WindowPreviewWidget
+        from argus_overview.ui.design_system import colors as _ds
 
         with patch.object(WindowPreviewWidget, "__init__", return_value=None):
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
@@ -11013,11 +11014,13 @@ class TestWindowPreviewWidgetFocus:
             mock_painter = MagicMock(spec=QPainter)
             widget._paint_focus_layer(mock_painter)
 
-            # Should have called drawRoundedRect with the INFO colour
+            # Should have called drawRoundedRect with the BORDER_FOCUS colour
             assert mock_painter.drawRoundedRect.called
-            # Verify pen was set to INFO colour
+            # Verify pen was set to BORDER_FOCUS colour
             pen_calls = [c for c in mock_painter.setPen.call_args_list if c.args]
             assert len(pen_calls) >= 1
+            pen = pen_calls[0].args[0]
+            assert pen.color().name().lower() == _ds.BORDER_FOCUS.lower()
 
     def test_paint_focus_layer_skips_when_not_focused(self, qapp):
         """When hasFocus() is False, _paint_focus_layer should not draw."""
