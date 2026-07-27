@@ -1192,12 +1192,17 @@ class TestMainTab:
             tab.active_count_label = MagicMock()
             tab.status_label = MagicMock()
 
+            tab.preset_combo = MagicMock()
+            tab.remove_all_btn = MagicMock()
+
             tab._update_status()
 
             tab.active_count_label.setText.assert_called_once_with("Active: 0")
             tab.status_label.setText.assert_called_once()
             # Should show "No windows" message when empty
             assert "No windows" in tab.status_label.setText.call_args[0][0]
+            tab.preset_combo.setEnabled.assert_called_with(False)
+            tab.remove_all_btn.setEnabled.assert_called_with(False)
 
     def test_update_status_with_windows(self):
         """Test _update_status with windows"""
@@ -1211,6 +1216,9 @@ class TestMainTab:
             tab.active_count_label = MagicMock()
             tab.status_label = MagicMock()
 
+            tab.preset_combo = MagicMock()
+            tab.remove_all_btn = MagicMock()
+
             tab._update_status()
 
             tab.active_count_label.setText.assert_called_once_with("Active: 3")
@@ -1219,6 +1227,7 @@ class TestMainTab:
             status_text = tab.status_label.setText.call_args[0][0]
             assert "3" in status_text
             assert "5" in status_text  # FPS
+            tab.preset_combo.setEnabled.assert_called_with(True)
 
 
 # =============================================================================
@@ -2077,10 +2086,15 @@ class TestMainTabUpdateStatus:
             tab.active_count_label = MagicMock()
             tab.status_label = MagicMock()
 
+            tab.preset_combo = MagicMock()
+            tab.remove_all_btn = MagicMock()
+
             tab._update_status()
 
             tab.active_count_label.setText.assert_called_with("Active: 0")
             assert "No windows" in tab.status_label.setText.call_args[0][0]
+            tab.preset_combo.setEnabled.assert_called_with(False)
+            tab.remove_all_btn.setEnabled.assert_called_with(False)
 
     def test_update_status_with_windows(self):
         """Test _update_status with active windows"""
@@ -2094,12 +2108,16 @@ class TestMainTabUpdateStatus:
             tab.active_count_label = MagicMock()
             tab.status_label = MagicMock()
 
+            tab.preset_combo = MagicMock()
+            tab.remove_all_btn = MagicMock()
+
             tab._update_status()
 
             tab.active_count_label.setText.assert_called_with("Active: 3")
             status_text = tab.status_label.setText.call_args[0][0]
             assert "3 window(s)" in status_text
             assert "30 FPS" in status_text
+            tab.preset_combo.setEnabled.assert_called_with(True)
 
 
 # =============================================================================
@@ -4802,9 +4820,13 @@ class TestMainTabUpdateStatus:
             tab.active_count_label = MagicMock()
             tab.status_label = MagicMock()
 
+            tab.preset_combo = MagicMock()
+            tab.remove_all_btn = MagicMock()
+
             tab._update_status()
 
             tab.active_count_label.setText.assert_called_with("Active: 3")
+            tab.preset_combo.setEnabled.assert_called_with(True)
 
     def test_update_status_no_windows(self):
         """Test _update_status with no active windows"""
@@ -4817,12 +4839,18 @@ class TestMainTabUpdateStatus:
             tab.active_count_label = MagicMock()
             tab.status_label = MagicMock()
 
+            tab.preset_combo = MagicMock()
+            tab.remove_all_btn = MagicMock()
+
             tab._update_status()
 
             tab.active_count_label.setText.assert_called_with("Active: 0")
             tab.status_label.setText.assert_called_with(
-                "No windows in preview - Click 'Add Window' to start"
+                "No windows in preview - Click 'Import All' to start"
             )
+            tab.preset_combo.setEnabled.assert_called_with(False)
+            tab.preset_combo.setCurrentIndex.assert_called_with(0)
+            tab.remove_all_btn.setEnabled.assert_called_with(False)
 
 
 class TestMainTabRefreshRate:

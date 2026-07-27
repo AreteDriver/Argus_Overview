@@ -804,14 +804,19 @@ class LayoutsTab(QWidget):
 
         if group_name == "All Active Windows":
             # Get all active windows from main_tab
+            active_count = 0
             if hasattr(self.main_tab, "window_manager"):
                 for (
                     _window_id,
                     frame,
                 ) in self.main_tab.window_manager.preview_frames.items():
                     self.arrangement_grid.add_character(frame.character_name)
+                    active_count += 1
 
-            self.info_label.setText("Showing all active windows")
+            if active_count == 0:
+                self.info_label.setText("No active windows — import EVE clients in the Overview tab first")
+            else:
+                self.info_label.setText(f"Showing all active windows ({active_count})")
         else:
             # Get characters from group
             members = self.cycling_groups.get(group_name, [])

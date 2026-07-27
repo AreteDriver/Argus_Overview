@@ -2265,6 +2265,7 @@ class MainTab(QWidget):
         toolbar_builder = ToolbarBuilder()
         handlers = {
             "import_windows": self.one_click_import,
+            "remove_all_windows": self._remove_all_windows,
             "lock_positions": self._toggle_lock,
             "minimize_inactive": self.minimize_inactive_windows,
             "refresh_capture": self._refresh_all,
@@ -2274,6 +2275,7 @@ class MainTab(QWidget):
         # Create buttons in specific order with layout control
         action_order = [
             "import_windows",
+            "remove_all_windows",
         ]
 
         buttons = toolbar_builder.build_toolbar_buttons(
@@ -2282,11 +2284,15 @@ class MainTab(QWidget):
             action_order,
         )
 
-        # Add first group of buttons
+        # Add primary action group (import + remove)
         for action_id in action_order:
             if action_id in buttons:
                 toolbar_layout.addWidget(buttons[action_id])
 
+        # Store reference to Remove All button for state updates
+        self.remove_all_btn = buttons.get("remove_all_windows")
+
+        toolbar_layout.addSpacing(10)
         toolbar_layout.addStretch()
 
         # Add lock button (store reference for state updates)
@@ -3181,16 +3187,28 @@ class MainTab(QWidget):
             self._update_status()
 
     def _update_status(self):
-        """Update status bar"""
+        """Update status bar and dependent UI state."""
         count = self.window_manager.get_active_window_count()
         self.active_count_label.setText(f"Active: {count}")
 
         if count == 0:
-            self.status_label.setText("No windows in preview - Click 'Add Window' to start")
+            self.status_label.setText("No windows in preview - Click 'Import All' to start")
         else:
             self.status_label.setText(
                 f"Capturing {count} window(s) at {self.window_manager.refresh_rate} FPS"
             )
+
+        # PR2: disable layout preset dropdown when no windows are present
+        combo = getattr(self, "preset_combo", None)
+        if combo is not None:
+            combo.setEnabled(count > 0)
+            if count == 0:
+                combo.setCurrentIndex(0)  # Reset to "Select preset..."
+
+        # Update Remove All button state
+        remove_btn = getattr(self, "remove_all_btn", None)
+        if remove_btn is not None:
+            remove_btn.setEnabled(count > 0)
 
     def stop_capture_loop(self):
         """Stop capture loop and status timer for clean shutdown"""
