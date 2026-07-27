@@ -3,8 +3,8 @@
 **Project**: Argus Overview — EVE Online desktop multi-boxing / window-preview tool  
 **Classification**: Flagship  
 **Version**: 3.2.0  
-**Last updated**: 2026-06-18  
-**Next review**: 2026-07-18  
+**Last updated**: 2026-07-26  
+**Next review**: 2026-08-26  
 
 ---
 
@@ -28,10 +28,11 @@
 - [x] Verify `docs/SMOKE_TEST_v3.2.0.md` is still current
 - [x] Run truth baseline — 7/7 passing
 
-### Phase 2: ESI Integration Decision (Q3 2026)
-- [ ] Evaluate whether ESI integration is still a priority
-- [ ] If yes: design minimal ESI scope, create ADR
-- [x] If no: `esi/` directory removed (2026-07-26); document final decision in ADR
+### Phase 2: ESI Integration Decision (Q3 2026) — ✅ COMPLETE 2026-07-26
+- [x] Evaluate whether ESI integration is still a priority
+- [x] Decision: **Deprioritized** — chat-log parsing is sufficient
+- [x] ADR written: `docs/adr/ADR-001-esi-deprioritized.md`
+- [x] `esi/` directory removed (2026-07-26)
 
 ### Phase 2b: Runtime Validation (Q3 2026)
 - [ ] Run `docs/RUNTIME_VALIDATION_v3.2.0.md` manual protocol with real EVE clients
@@ -54,9 +55,9 @@
 ## Prioritized Next Actions
 
 1. **Run runtime validation protocol** — `docs/RUNTIME_VALIDATION_v3.2.0.md` with real EVE clients (2-4 hours, requires manual testing)
-2. **ESI Integration Decision** — write ADR: ESI deprioritized vs minimal scope (1 hour)
-3. **Wayland compatibility validation** — test on wlroots compositor with real capture (2-3 hours)
-4. **Windows build pipeline validation** — verify CI produces working installer (1-2 hours)
+2. **Wayland compatibility validation** — test on wlroots compositor with real capture (2-3 hours)
+3. **Windows build pipeline validation** — verify CI produces working installer (1-2 hours)
+4. **Phase 3: Platform Hardening** — begin Q4 platform validation work
 
 ---
 
