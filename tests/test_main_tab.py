@@ -10277,6 +10277,10 @@ class TestCharacterAccentColor:
         env_base = os.environ.copy()
         env_base.pop("QT_QPA_PLATFORM", None)
         env_base["QT_QPA_PLATFORM"] = "offscreen"
+        # Ensure the subprocess can find argus_overview when running via pytest
+        import pathlib
+        repo_root = str(pathlib.Path(__file__).resolve().parents[1] / "src")
+        env_base["PYTHONPATH"] = repo_root + os.pathsep + env_base.get("PYTHONPATH", "")
 
         run_a = subprocess.run(
             [sys.executable, "-c", script],
