@@ -25,7 +25,7 @@ cases. File issues against this checklist as you go.
 3. **Overview tab** — click "Import Windows" or use One-Click Import.
    Expect: thumbnails appear for every running EVE client, each with its
    character name in the info label.
-4. **Status dock** — verify it appears above the preview grid with one
+4. **Status dock** — verify it appears below the preview grid with one
    chip per imported character. Each chip shows:
    - Colored-initials avatar (e.g., "AB" for AreteBoss)
    - Character name in bold

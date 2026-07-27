@@ -97,7 +97,8 @@ Each preview shows:
 - **Character name** or custom label
 - **Activity indicator**: Green (focused), Yellow (recent), Gray (idle)
 - **Session timer** (optional): How long the character has been active
-- **Status border**: Shows window state
+- **Status border**: Character accent color (unique per character) or threat tint when intel is active
+- **Health badge** (bottom-right): `LIVE`, `STATIC`, `STALE`, `PAUSED`, or `ERROR` — shows capture pipeline health at a glance
 
 ### Preview Controls
 
@@ -317,12 +318,20 @@ The Intel tab provides real-time threat detection by monitoring EVE Online chat 
 
 ### Configuration
 
-Threat filters are configured in `~/.config/argus-overview/settings.json`:
+Intel settings are configured in `~/.config/argus-overview/settings.json` under the `intel` key:
 
 ```json
 {
-  "alert_sensitivity": 50,
-  "intel_enabled": true
+  "intel": {
+    "channels": ["Alliance", "Intel"],
+    "alerts_enabled": true,
+    "visual_border": true,
+    "visual_overlay": true,
+    "audio_enabled": true,
+    "min_threat_level": "warning",
+    "jumps_threshold": 5,
+    "master_toggle": true
+  }
 }
 ```
 

@@ -79,18 +79,29 @@ src/
     │   └── data/                    # Intel data assets
     │
     ├── ui/                          # PySide6 widgets and windows
+    │   ├── design_system/           # Token-based colors, metrics, typography
+    │   │   ├── colors.py            # Color tokens (threat, focus, accent)
+    │   │   ├── metrics.py           # Spacing and radius tokens
+    │   │   ├── typography.py        # Font tokens
+    │   │   ├── states.py            # UI state tokens
+    │   │   └── painting.py          # Shared paint helpers
     │   ├── action_registry.py       # Single source of truth for actions
     │   ├── main_window_v21.py       # Main application window
     │   ├── main_tab.py              # Overview/preview tab
     │   ├── characters_teams_tab.py  # Roster management tab
     │   ├── layouts_tab.py           # Layout presets tab
+    │   ├── layout_widgets.py        # Pattern thumbnails, monitor cards
     │   ├── hotkeys_tab.py           # Cycle Control tab
+    │   ├── intel_tab.py             # Intel log viewer & threat table
     │   ├── settings_sync_tab.py     # EVE sync tab
     │   ├── settings_tab.py          # Application settings tab
     │   ├── menu_builder.py          # Menu construction
     │   ├── tray.py                  # System tray integration
     │   ├── themes.py                # Theme definitions
     │   ├── settings_manager.py      # Settings persistence
+    │   ├── status_dock.py           # Per-character status chip strip
+    │   ├── system_status_bar.py     # Subsystem health indicators
+    │   ├── replay_strip.py          # 5-second capture timeline
     │   ├── hotkey_edit.py           # Hotkey recording widget
     │   └── about_dialog.py          # About dialog
     │
@@ -511,16 +522,67 @@ def validate_window_id(window_id: str) -> bool:
 
 ```json
 {
-  "preview_fps": 30,
-  "low_power_fps": 5,
-  "theme": "dark",
-  "auto_discovery": true,
-  "discovery_interval": 5,
-  "auto_minimize_inactive": false,
-  "minimize_to_tray": true,
-  "show_session_timers": false,
-  "hover_opacity": 0.3,
-  "alert_sensitivity": 50
+  "version": "2.3",
+  "general": {
+    "start_with_system": false,
+    "minimize_to_tray": true,
+    "show_notifications": true,
+    "auto_save_interval": 5,
+    "auto_discovery": true,
+    "auto_discovery_interval": 5,
+    "hot_reload": true
+  },
+  "performance": {
+    "low_power_mode": false,
+    "auto_minimize_inactive": false,
+    "disable_previews": false,
+    "default_refresh_rate": 1,
+    "capture_workers": 1,
+    "enable_caching": true,
+    "cache_size_mb": 50,
+    "capture_quality": "low"
+  },
+  "thumbnails": {
+    "opacity_on_hover": 0.85,
+    "zoom_on_hover": 1.5,
+    "lock_positions": false,
+    "show_labels": true,
+    "show_session_timer": false,
+    "show_activity_indicator": true,
+    "default_width": 280,
+    "default_height": 200
+  },
+  "hotkeys": {
+    "activate_window_1": "<ctrl>+<alt>+1",
+    "...": "..."
+  },
+  "character_hotkeys": {},
+  "character_labels": {},
+  "appearance": {
+    "theme": "dark",
+    "font_size": 10,
+    "compact_mode": false,
+    "accent_color": "#4287f5"
+  },
+  "advanced": {
+    "log_level": "INFO",
+    "config_directory": "~/.config/argus-overview",
+    "enable_debug": false
+  },
+  "intel": {
+    "channels": ["Alliance", "Intel"],
+    "alerts_enabled": true,
+    "visual_border": true,
+    "visual_overlay": true,
+    "audio_enabled": true,
+    "system_notification": false,
+    "min_threat_level": "warning",
+    "jumps_threshold": 5,
+    "cooldown_seconds": 5,
+    "current_system": "",
+    "custom_log_path": "",
+    "master_toggle": true
+  }
 }
 ```
 
@@ -562,7 +624,7 @@ python -m argus_overview.ui.action_registry
 
 ## See Also
 
-- [USER_GUIDE.md](USER_GUIDE.md) - End-user documentation
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
-- [DEV_NOTES.md](../DEV_NOTES.md) - Action Registry details
-- [CHANGELOG.md](../CHANGELOG.md) - Version history
+- [USER_GUIDE.md](USER_GUIDE.md) — End-user documentation
+- [API.md](API.md) — Action Registry audit details
+- [CHANGELOG.md](../CHANGELOG.md) — Version history
+- [SMOKE_TEST_v3.2.0.md](SMOKE_TEST_v3.2.0.md) — Release validation checklist

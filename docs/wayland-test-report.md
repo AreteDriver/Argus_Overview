@@ -2,7 +2,7 @@
 
 **Date**: 2026-03-13
 **Tester**: Claude (automated validation)
-**Argus_Overview version**: 3.1.0
+**Argus_Overview version**: 3.2.0
 
 ## System Information
 
