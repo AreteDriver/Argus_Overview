@@ -335,6 +335,45 @@ class ThemeManager:
             "green": DARK_THEME.colors.alert_green,
         }
 
+    def get_semantic_colors(self) -> dict[str, str]:
+        """Return the full semantic color palette.
+
+        These are the canonical dark-theme tokens from the design system.
+        In a future light-theme pass they can be remapped per-theme.
+        """
+        from argus_overview.ui.design_system import colors as ds
+
+        return {
+            "canvas": ds.CANVAS,
+            "surface": ds.SURFACE,
+            "surface_raised": ds.SURFACE_RAISED,
+            "surface_hover": ds.SURFACE_HOVER,
+            "border_subtle": ds.BORDER_SUBTLE,
+            "border_strong": ds.BORDER_STRONG,
+            "border_focus": ds.BORDER_FOCUS,
+            "text_primary": ds.TEXT_PRIMARY,
+            "text_secondary": ds.TEXT_SECONDARY,
+            "text_muted": ds.TEXT_MUTED,
+            "text_disabled": ds.TEXT_DISABLED,
+            "healthy": ds.HEALTHY,
+            "warning": ds.WARNING,
+            "critical": ds.CRITICAL,
+            "unknown": ds.UNKNOWN,
+            "info": ds.INFO,
+        }
+
+    def get_semantic_color(self, name: str) -> str:
+        """Return a single semantic color by key.
+
+        Args:
+            name: Semantic key such as ``surface``, ``text_primary``,
+                ``healthy``, etc.
+
+        Returns:
+            Hex color string.
+        """
+        return self.get_semantic_colors().get(name, "#000000")
+
 
 # Global theme manager instance
 _theme_manager: ThemeManager | None = None

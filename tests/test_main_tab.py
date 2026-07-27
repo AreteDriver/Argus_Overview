@@ -6846,7 +6846,7 @@ class TestMainTabCreateToolbarReal:
             assert toolbar is not None
             assert tab.lock_btn is not None
             assert tab.minimize_inactive_btn is not None
-            assert tab.refresh_rate_spin is not None
+            assert tab.search_field is not None
 
 
 class TestMainTabCreateLayoutControlsReal:
@@ -10253,9 +10253,9 @@ class TestCharacterAccentColor:
         assert isinstance(character_accent_color("X"), QColor)
 
     def test_palette_has_eight_entries(self):
-        from argus_overview.ui.main_tab import CHARACTER_ACCENT_COLORS
+        from argus_overview.ui.design_system.colors import ACCENT_POOL
 
-        assert len(CHARACTER_ACCENT_COLORS) == 8
+        assert len(ACCENT_POOL) == 8
 
     def test_cross_process_determinism(self):
         """Accent color must be stable across processes (MD5-based, not hash())."""
@@ -10301,14 +10301,12 @@ class TestCharacterAccentColor:
 
     def test_uniform_distribution_over_palette(self):
         """A wide range of character names should hit every palette index."""
-        from argus_overview.ui.main_tab import (
-            CHARACTER_ACCENT_COLORS,
-            character_accent_color,
-        )
+        from argus_overview.ui.design_system.colors import ACCENT_POOL
+        from argus_overview.ui.main_tab import character_accent_color
 
         # Generate 200 distinct names; expect coverage of every palette entry
         seen_indices = set()
-        target = {(r, g, b) for r, g, b in CHARACTER_ACCENT_COLORS}
+        target = {(r, g, b) for r, g, b in ACCENT_POOL}
         for i in range(200):
             color = character_accent_color(f"Pilot{i:04d}")
             seen_indices.add((color.red(), color.green(), color.blue()))
@@ -10336,13 +10334,11 @@ class TestCharacterAccentChipFrameMatch:
             chip.deleteLater()
 
     def test_legacy_chip_aliases_resolve_to_main_tab_helpers(self):
-        from argus_overview.ui.main_tab import (
-            CHARACTER_ACCENT_COLORS,
-            character_accent_color,
-        )
+        from argus_overview.ui.main_tab import character_accent_color
+        from argus_overview.ui.design_system.colors import ACCENT_POOL
         from argus_overview.ui.status_dock import CHIP_ACCENT_COLORS, accent_for
 
-        assert CHIP_ACCENT_COLORS is CHARACTER_ACCENT_COLORS
+        assert CHIP_ACCENT_COLORS is ACCENT_POOL
         assert accent_for is character_accent_color
 
 
@@ -10648,6 +10644,18 @@ class TestWindowPreviewReplayStripToggle:
         try:
             assert widget.is_replay_strip_enabled() is False
             assert widget._replay_strip is None
+        finally:
+            widget.deleteLater()
+
+    def test_container_always_present_with_fixed_height(self, qapp):
+        from argus_overview.ui.replay_strip import ReplayStrip
+
+        widget = _replay_widget(qapp)
+        try:
+            assert hasattr(widget, "_replay_container")
+            assert widget._replay_container is not None
+            assert widget._replay_container.maximumHeight() == ReplayStrip.STRIP_HEIGHT
+            assert widget._replay_container.minimumHeight() == ReplayStrip.STRIP_HEIGHT
         finally:
             widget.deleteLater()
 
@@ -10965,3 +10973,65 @@ class TestMainWindowV21ApplySettingChromeToggle:
         window._apply_setting("performance.default_refresh_rate", 30)
 
         window._clear_threat_chrome.assert_not_called()
+
+
+class TestWindowPreviewWidgetFocus:
+    """PR7: focus ring and keyboard navigation tests."""
+
+    def test_focus_in_event_calls_update(self, qapp):
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QWidget
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+        widget.update = MagicMock()
+        with patch.object(QWidget, "focusInEvent"):
+            WindowPreviewWidget.focusInEvent(widget, MagicMock())
+        widget.update.assert_called_once()
+
+    def test_focus_out_event_calls_update(self, qapp):
+        from unittest.mock import patch
+        from PySide6.QtWidgets import QWidget
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+        widget.update = MagicMock()
+        with patch.object(QWidget, "focusOutEvent"):
+            WindowPreviewWidget.focusOutEvent(widget, MagicMock())
+        widget.update.assert_called_once()
+
+    def test_paint_focus_layer_when_focused(self, qapp):
+        """When hasFocus() is True, _paint_focus_layer should draw a rounded rect."""
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+        from argus_overview.ui.design_system import colors as _ds
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget.hasFocus = MagicMock(return_value=True)
+            widget.rect = MagicMock(return_value=QRect(0, 0, 200, 150))
+
+            from PySide6.QtGui import QPainter
+            mock_painter = MagicMock(spec=QPainter)
+            widget._paint_focus_layer(mock_painter)
+
+            # Should have called drawRoundedRect with the BORDER_FOCUS colour
+            assert mock_painter.drawRoundedRect.called
+            # Verify pen was set to BORDER_FOCUS colour
+            pen_calls = [c for c in mock_painter.setPen.call_args_list if c.args]
+            assert len(pen_calls) >= 1
+            pen = pen_calls[0].args[0]
+            assert pen.color().name().lower() == _ds.BORDER_FOCUS.lower()
+
+    def test_paint_focus_layer_skips_when_not_focused(self, qapp):
+        """When hasFocus() is False, _paint_focus_layer should not draw."""
+        from argus_overview.ui.main_tab import WindowPreviewWidget
+
+        with patch.object(WindowPreviewWidget, "__init__", return_value=None):
+            widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
+            widget.hasFocus = MagicMock(return_value=False)
+
+            from PySide6.QtGui import QPainter
+            mock_painter = MagicMock(spec=QPainter)
+            widget._paint_focus_layer(mock_painter)
+
+            mock_painter.drawRoundedRect.assert_not_called()

@@ -27,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from argus_overview.ui.design_system import colors as _ds
 from argus_overview.ui.hotkey_edit import HotkeyEdit
 from argus_overview.ui.menu_builder import ToolbarBuilder
 
@@ -60,15 +61,15 @@ class CyclingGroupList(QListWidget):
         self.setAlternatingRowColors(True)
 
         # Style for drop target
-        self.setStyleSheet("""
-            QListWidget {
-                border: 2px dashed #555;
+        self.setStyleSheet(f"""
+            QListWidget {{
+                border: 2px dashed {_ds.BORDER_SUBTLE};
                 border-radius: 5px;
                 min-height: 200px;
-            }
-            QListWidget:focus {
-                border-color: #ff8c00;
-            }
+            }}
+            QListWidget:focus {{
+                border-color: {_ds.INFO};
+            }}
         """)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -188,7 +189,7 @@ class HotkeysTab(QWidget):
 
         # Instructions
         instructions = QLabel("Drag characters to the cycling group on the right")
-        instructions.setStyleSheet("color: #888; font-style: italic;")
+        instructions.setStyleSheet(f"color: {_ds.TEXT_MUTED}; font-style: italic;")
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
 
@@ -249,7 +250,7 @@ class HotkeysTab(QWidget):
 
         # Drop zone label
         drop_label = QLabel("Drop characters here to add them to the cycling group")
-        drop_label.setStyleSheet("color: #888; font-style: italic;")
+        drop_label.setStyleSheet(f"color: {_ds.TEXT_MUTED}; font-style: italic;")
         drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         members_layout.addWidget(drop_label)
 

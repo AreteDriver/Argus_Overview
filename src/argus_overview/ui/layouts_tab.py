@@ -28,8 +28,10 @@ from PySide6.QtWidgets import (
 )
 
 from argus_overview.core.layout_manager import GridPattern
+from argus_overview.ui.design_system import colors as _ds
 from argus_overview.ui.layout_widgets import MonitorCardStrip, PatternThumbStrip
 from argus_overview.ui.main_tab import get_pattern_positions
+from argus_overview.ui.themes import get_theme_manager
 from argus_overview.utils.screen import ScreenGeometry, get_all_monitors, get_screen_geometry
 
 
@@ -95,7 +97,7 @@ class DraggableTile(QFrame):
         # Position label
         self.pos_label = QLabel("(0, 0)")
         self.pos_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.pos_label.setStyleSheet("color: #888; font-size: 8pt;")
+        self.pos_label.setStyleSheet(f"color: {_ds.TEXT_MUTED}; font-size: 8pt;")
         layout.addWidget(self.pos_label)
 
         self.setLayout(layout)
@@ -152,12 +154,12 @@ class ArrangementGrid(QWidget):
                 cell.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
                 cell.setMinimumSize(130, 90)
                 cell.setAcceptDrops(True)
-                cell.setStyleSheet("""
-                    QFrame {
-                        background-color: #2a2a2a;
-                        border: 1px dashed #555;
+                cell.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {_ds.SURFACE_RAISED};
+                        border: 1px dashed {_ds.BORDER_SUBTLE};
                         border-radius: 3px;
-                    }
+                    }}
                 """)
                 self.grid_layout.addWidget(cell, row, col)
 
@@ -180,12 +182,12 @@ class ArrangementGrid(QWidget):
                 cell = QFrame()
                 cell.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Sunken)
                 cell.setMinimumSize(130, 90)
-                cell.setStyleSheet("""
-                    QFrame {
-                        background-color: #2a2a2a;
-                        border: 1px dashed #555;
+                cell.setStyleSheet(f"""
+                    QFrame {{
+                        background-color: {_ds.SURFACE_RAISED};
+                        border: 1px dashed {_ds.BORDER_SUBTLE};
                         border-radius: 3px;
-                    }
+                    }}
                 """)
                 self.grid_layout.addWidget(cell, row, col)
 
@@ -713,7 +715,7 @@ class LayoutsTab(QWidget):
             "or drag tiles to customize positions."
         )
         instructions.setWordWrap(True)
-        instructions.setStyleSheet("color: #888; font-style: italic; padding: 5px;")
+        instructions.setStyleSheet(f"color: {_ds.TEXT_MUTED}; font-style: italic; padding: 5px;")
         layout.addWidget(instructions)
 
         # Scroll area for grid
@@ -737,25 +739,28 @@ class LayoutsTab(QWidget):
 
         # Info label
         self.info_label = QLabel("Select a group to begin")
-        self.info_label.setStyleSheet("color: #888;")
+        self.info_label.setStyleSheet(f"color: {_ds.TEXT_MUTED};")
         layout.addWidget(self.info_label)
 
         layout.addStretch()
 
-        # Apply to active windows button
+        # Apply to active windows button — uses theme accent so it respects
+        # Dark (blue), EVE (orange), High Contrast (white), etc.
+        accent = get_theme_manager().get_accent_color()
+        hover = QColor(accent).lighter(120).name()
         self.apply_active_btn = QPushButton("Apply to Active Windows")
         self.apply_active_btn.setToolTip("Apply layout to currently detected EVE windows")
         self.apply_active_btn.clicked.connect(self._apply_to_active_windows)
-        self.apply_active_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ff8c00;
+        self.apply_active_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {accent};
                 color: black;
                 font-weight: bold;
                 padding: 10px 20px;
-            }
-            QPushButton:hover {
-                background-color: #ffa500;
-            }
+            }}
+            QPushButton:hover {{
+                background-color: {hover};
+            }}
         """)
         layout.addWidget(self.apply_active_btn)
 

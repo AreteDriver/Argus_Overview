@@ -51,6 +51,8 @@ from argus_overview.core.discovery import scan_eve_windows
 from argus_overview.intel.parser import ThreatLevel
 from argus_overview.ui.action_registry import PrimaryHome
 from argus_overview.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
+from argus_overview.ui.replay_strip import ReplayStrip
+from argus_overview.ui.themes import get_theme_manager
 from argus_overview.utils.screen import ScreenGeometry, get_screen_geometry
 
 # Threat-tint config — tuned for a glanceable but non-distracting frame
@@ -751,9 +753,11 @@ class WindowPreviewWidget(QWidget):
         self._replay_strip = None  # type: ignore[var-annotated]
         self._replay_view_index: int | None = None  # None = live; int = buffered
 
+        from argus_overview.ui.design_system import metrics as dm
+
         # Setup UI
-        self.setMinimumSize(200, 150)
-        self.setMaximumSize(600, 450)
+        self.setMinimumSize(dm.PREVIEW_MIN_WIDTH, dm.PREVIEW_MIN_HEIGHT)
+        self.setMaximumSize(dm.PREVIEW_MAX_WIDTH, dm.PREVIEW_MAX_HEIGHT)
         self._update_tooltip()
         self._update_accessible_name()
 
@@ -776,6 +780,13 @@ class WindowPreviewWidget(QWidget):
         self.info_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.info_label.setStyleSheet("font-weight: bold; padding: 2px;")
         layout.addWidget(self.info_label)
+
+        # PR10: replay strip container — always present so cards keep uniform
+        # height in the flow layout even when the strip is disabled.
+        self._replay_container = QWidget()
+        self._replay_container.setFixedHeight(ReplayStrip.STRIP_HEIGHT)
+        QVBoxLayout(self._replay_container)
+        layout.addWidget(self._replay_container)
 
         # Session timer label (v2.2) — PR4: floating child so it does not
         # push the preview image up. Positioned at bottom-left in resizeEvent.
@@ -1035,6 +1046,16 @@ class WindowPreviewWidget(QWidget):
 
         super().leaveEvent(event)
 
+    def focusInEvent(self, event):
+        """PR7: trigger repaint so the focus ring is drawn."""
+        super().focusInEvent(event)
+        self.update()
+
+    def focusOutEvent(self, event):
+        """PR7: trigger repaint so the focus ring is cleared."""
+        super().focusOutEvent(event)
+        self.update()
+
     def set_character_system(self, system: str | None) -> None:
         """Record the current system for this frame's character (PR5)."""
         self._character_system = system
@@ -1045,12 +1066,17 @@ class WindowPreviewWidget(QWidget):
         return self._character_system
 
     def _update_accessible_name(self) -> None:
-        """PR1: expose character, system, and threat state to assistive tech."""
+        """PR1: expose character, system, threat, and capture health to assistive tech."""
         char_name = getattr(self, "character_name", "")
         parts = [f"Preview of {char_name}"]
         system = getattr(self, "_character_system", None)
         if system:
             parts.append(f"system {system}")
+        # Capture health
+        health = self._capture_health_label()
+        if health:
+            parts.append(f"capture {health.lower()}")
+        # Threat state
         threat_level = getattr(self, "_threat_level", None)
         threat_alpha = getattr(self, "_threat_alpha", 0.0)
         if threat_level is not None and threat_alpha > 0.0:
@@ -1198,18 +1224,20 @@ class WindowPreviewWidget(QWidget):
             return "STATIC"
         return "LIVE"
 
-    def _capture_health_color(self) -> QColor:
-        """PR1: Subtle color for the capture-health badge text."""
+    def _capture_health_color(self) -> str:
+        """PR1: Semantic color for the capture-health badge text."""
+        from argus_overview.ui.design_system import colors as ds
+
         label = self._capture_health_label()
         if label.startswith("LIVE"):
-            return QColor(68, 255, 68, 220)   # green
+            return ds.HEALTHY
         if label == "STATIC":
-            return QColor(204, 204, 204, 220)  # white-gray
+            return ds.TEXT_SECONDARY
         if label.startswith("STALE"):
-            return QColor(255, 204, 0, 220)    # yellow
+            return ds.WARNING
         if label == "ERROR":
-            return QColor(255, 68, 68, 220)    # red
-        return QColor(136, 136, 136, 180)    # gray (INIT/PAUSED)
+            return ds.CRITICAL
+        return ds.TEXT_MUTED
 
     def set_spotlight(self, mode: str | None) -> None:
         """
@@ -1284,21 +1312,22 @@ class WindowPreviewWidget(QWidget):
         return self._replay_strip is not None
 
     def enable_replay_strip(self, enabled: bool) -> None:
-        """Show or hide the replay strip below the main image."""
-        if enabled and self._replay_strip is None:
-            from argus_overview.ui.replay_strip import ReplayStrip
+        """Show or hide the replay strip inside its fixed-height container.
 
-            self._replay_strip = ReplayStrip(parent=self)
+        The container is always present in the layout so cards keep uniform
+        height and the flow grid never shifts when the strip is toggled.
+        """
+        if enabled and self._replay_strip is None:
+            self._replay_strip = ReplayStrip(parent=self._replay_container)
             self._replay_strip.frame_hovered.connect(self._on_replay_frame_hovered)
-            # Append below the existing image_label / info_label / timer.
-            self.layout().addWidget(self._replay_strip)
+            self._replay_container.layout().addWidget(self._replay_strip)
             self._replay_strip.set_frames(list(self._replay_buffer))
         elif not enabled and self._replay_strip is not None:
             try:
                 self._replay_strip.frame_hovered.disconnect(self._on_replay_frame_hovered)
             except (RuntimeError, TypeError):
                 pass
-            self.layout().removeWidget(self._replay_strip)
+            self._replay_container.layout().removeWidget(self._replay_strip)
             self._replay_strip.deleteLater()
             self._replay_strip = None
             # Drop any held buffered view.
@@ -1353,44 +1382,70 @@ class WindowPreviewWidget(QWidget):
         self.image_label.setPixmap(scaled)
 
     def paintEvent(self, event):
-        """Custom paint: accent, threat border, focus dot, lock icon, flash."""
+        """Custom paint: decomposed into semantic layers using the design system.
+
+        Layer order (back to front):
+        1. Border (accent identity or threat tint)
+        2. Health overlay (dimming when stale/error)
+        3. Legacy flash overlay
+        4. Chrome (activity dot, lock, focus affordance)
+        5. Text badges (system pill, age pill, capture health badge)
+        """
         super().paintEvent(event)
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # 0. Per-character accent border (PR8) — only visible when no
-        # threat or legacy-flash overlay is active. Gives instant visual
-        # identity at small grid sizes and matches the chip avatar color.
-        # PR1: if no intel report has ever been received, show Unknown
-        # (dashed gray border + question mark) instead of the accent "clear".
-        if self._threat_level is None and self._flash_color is None:
-            if not self._intel_report_received:
-                # Unknown — dashed gray border with question mark
-                pen = QPen(QColor(128, 128, 128, 180))
-                pen.setWidth(2)
-                pen.setStyle(Qt.PenStyle.DashLine)
-                painter.setPen(pen)
-                painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
-                painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
-                painter.setPen(QPen(QColor(128, 128, 128, 200)))
-                painter.drawText(6, 14, "?")
-            else:
-                pen = QPen(self._accent_color)
-                pen.setWidth(2)
-                painter.setPen(pen)
-                painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
-                painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
+        health = self._capture_health_label()
 
-        # 1. Threat-tint border (PR1) — drawn first so dot/lock paint over it
-        if self._threat_level is not None and self._threat_alpha > 0.0:
+        # Layer 1 — Border
+        self._paint_border_layer(painter, health)
+
+        # Layer 2 — Health overlay (dim stale/error previews)
+        self._paint_health_overlay_layer(painter, health)
+
+        # Layer 3 — Legacy flash
+        self._paint_flash_layer(painter)
+
+        # Layer 4 — Chrome
+        self._paint_chrome_layer(painter)
+
+        # Layer 5 — Badges
+        self._paint_badge_layer(painter, health)
+
+        # PR7 — Focus ring (drawn last so it sits on top of everything)
+        self._paint_focus_layer(painter)
+
+        painter.end()
+
+    # -----------------------------------------------------------------
+    # Paint layers
+    # -----------------------------------------------------------------
+
+    def _paint_border_layer(self, painter: QPainter, health: str) -> None:
+        """Draw accent identity border or threat-tint border.
+
+        When capture health is ERROR, DISCONNECTED, or STALE, the threat
+        border is suppressed so stale data cannot look alarming.
+        """
+        from argus_overview.ui.design_system import colors as ds, metrics as dm
+
+        # Determine if health should suppress the threat border
+        suppress_threat = health.startswith("STALE") or health in ("ERROR", "DISCONNECTED", "PAUSED")
+
+        # Threat border (only when healthy enough to trust the data)
+        if (
+            not suppress_threat
+            and self._threat_level is not None
+            and self._threat_alpha > 0.0
+            and self._flash_color is None
+        ):
             r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
             base_alpha = int(220 * self._threat_alpha)
-            # Pulse adds an extra alpha kick for the first ~600ms after upgrade
             pulse_boost = int(35 * self._pulse_phase)
             alpha = max(0, min(255, base_alpha + pulse_boost))
+            pen_width = 3 + int(2 * self._pulse_phase)
             border_color = QColor(r, g, b, alpha)
-            pen_width = 3 + int(2 * self._pulse_phase)  # 3px → 5px during pulse
             pen = QPen(border_color)
             pen.setWidth(pen_width)
             painter.setPen(pen)
@@ -1401,81 +1456,52 @@ class WindowPreviewWidget(QWidget):
                 inset,
                 self.width() - 2 * inset,
                 self.height() - 2 * inset,
-                4,
-                4,
+                dm.RADIUS_CARD,
+                dm.RADIUS_CARD,
             )
+            return
 
-            # PR2: system-name pill — shows the affected system and optional
-            # jump distance at the top-left so the operator never has to look
-            # away from the preview grid to know which system is hostile.
-            if self._threat_system:
-                from PySide6.QtGui import QFont
-
-                pill_parts = [self._threat_system]
-                if self._threat_distance and self._threat_distance > 0:
-                    pill_parts.append(f"+{self._threat_distance}j")
-                pill_text = " · ".join(pill_parts)
-
-                pill_font = QFont(painter.font())
-                pill_font.setPointSize(8)
-                pill_font.setBold(True)
-                painter.setFont(pill_font)
-                metrics = painter.fontMetrics()
-                text_w = metrics.horizontalAdvance(pill_text)
-                pad = 4
-                pill_w = text_w + pad * 2
-                pill_h = metrics.height() + pad
-                # Position at top-left, inset from the threat border
-                pill_x = 6
-                pill_y = 6
-                # Semi-transparent dark background so the pill is legible
-                # regardless of the underlying preview image
-                bg = QColor(10, 10, 15, max(160, alpha))
-                painter.setBrush(QBrush(bg))
-                painter.setPen(QPen(Qt.PenStyle.NoPen))
-                painter.drawRoundedRect(pill_x, pill_y, pill_w, pill_h, 3, 3)
-                # Foreground in threat color, opaque
-                text_color = QColor(r, g, b, max(220, alpha))
-                painter.setPen(QPen(text_color))
-                painter.drawText(
-                    pill_x + pad,
-                    pill_y + pad + metrics.ascent() - 2,
-                    pill_text,
+        # Accent identity border (when no threat or suppressed)
+        if self._flash_color is None:
+            if not self._intel_report_received:
+                # Unknown — dashed gray border with question mark
+                pen = QPen(QColor(ds.UNKNOWN))
+                pen.setWidth(2)
+                pen.setStyle(Qt.PenStyle.DashLine)
+                painter.setPen(pen)
+                painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+                painter.drawRoundedRect(
+                    2, 2, self.width() - 4, self.height() - 4,
+                    dm.RADIUS_CARD, dm.RADIUS_CARD,
+                )
+                painter.setPen(QPen(QColor(ds.TEXT_MUTED)))
+                painter.drawText(6, 14, "?")
+            else:
+                pen = QPen(self._accent_color)
+                pen.setWidth(2)
+                painter.setPen(pen)
+                painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+                painter.drawRoundedRect(
+                    2, 2, self.width() - 4, self.height() - 4,
+                    dm.RADIUS_CARD, dm.RADIUS_CARD,
                 )
 
-            # PR5: report age pill — semi-transparent rounded rect with text
-            # inside, drawn at bottom-center when the threat is decaying
-            # (alpha < 0.9) so the operator knows how old the alert is.
-            if self._threat_alpha < 0.9 and self._threat_set_at > 0.0:
-                age_secs = int(time.monotonic() - self._threat_set_at)
-                age_text = f"{age_secs}s ago"
-                from PySide6.QtGui import QFont
+    def _paint_health_overlay_layer(self, painter: QPainter, health: str) -> None:
+        """Dim the preview when capture is not live so the operator knows
+        the image is stale or failed."""
+        if health.startswith("STALE") or health == "PAUSED":
+            overlay = QColor(0, 0, 0, 60)
+            painter.setPen(QPen(Qt.PenStyle.NoPen))
+            painter.setBrush(QBrush(overlay))
+            painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
+        elif health in ("ERROR", "DISCONNECTED"):
+            overlay = QColor(0, 0, 0, 100)
+            painter.setPen(QPen(Qt.PenStyle.NoPen))
+            painter.setBrush(QBrush(overlay))
+            painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
 
-                age_font = QFont(painter.font())
-                age_font.setPointSize(8)
-                painter.setFont(age_font)
-                metrics = painter.fontMetrics()
-                text_w = metrics.horizontalAdvance(age_text)
-                pill_pad = 4
-                pill_w = text_w + pill_pad * 2
-                pill_h = metrics.height() + pill_pad
-                pill_x = (self.width() - pill_w) // 2
-                pill_y = self.height() - pill_h - 4
-                # Dark semi-transparent background pill
-                pill_bg = QColor(20, 20, 20, max(180, alpha))
-                painter.setPen(QPen(Qt.PenStyle.NoPen))
-                painter.setBrush(QBrush(pill_bg))
-                painter.drawRoundedRect(pill_x, pill_y, pill_w, pill_h, 4, 4)
-                # Foreground in threat color
-                age_color = QColor(r, g, b, max(220, alpha))
-                painter.setPen(QPen(age_color))
-                painter.drawText(
-                    pill_x + pill_pad,
-                    pill_y + pill_pad + metrics.ascent() - 2,
-                    age_text,
-                )
-
-        # 2. Legacy flash overlay (compat with border_flash_requested)
+    def _paint_flash_layer(self, painter: QPainter) -> None:
+        """Legacy border flash (border_flash_requested)."""
         if self._flash_color is not None:
             pen = QPen(self._flash_color)
             pen.setWidth(3)
@@ -1483,22 +1509,26 @@ class WindowPreviewWidget(QWidget):
             painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
             painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
 
-        # 3. Activity indicator (v2.2)
+    def _paint_chrome_layer(self, painter: QPainter) -> None:
+        """Activity dot, lock icon, focus affordance."""
+        from argus_overview.ui.design_system import colors as ds
+
+        # Activity indicator
         if self._show_activity_indicator:
             activity = self.get_activity_state()
             if activity == "focused":
-                indicator_color = QColor(0, 255, 0, 220)  # Green
+                indicator_color = QColor(ds.HEALTHY)
             elif activity == "recent":
-                indicator_color = QColor(255, 200, 0, 220)  # Yellow
+                indicator_color = QColor(ds.WARNING)
             else:
-                indicator_color = QColor(128, 128, 128, 180)  # Gray
+                indicator_color = QColor(ds.UNKNOWN)
+            indicator_color.setAlpha(220)
 
-            # Draw small dot in top-right corner
             painter.setBrush(QBrush(indicator_color))
             painter.setPen(QPen(Qt.PenStyle.NoPen))
             painter.drawEllipse(self.width() - 14, 6, 8, 8)
 
-            # PR4: text label next to dot for colorblind / low-brightness users
+            # Colorblind text label next to dot
             label_text = activity.capitalize()
             text_color = QColor(indicator_color)
             text_color.setAlpha(255)
@@ -1515,47 +1545,125 @@ class WindowPreviewWidget(QWidget):
             text_y = 6 + metrics.ascent()
             painter.drawText(text_x, text_y, label_text)
 
-        # 4. Lock icon if positions are locked
+        # Lock icon
         if self._positions_locked:
-            painter.setPen(QPen(QColor(200, 200, 200, 180)))
+            painter.setPen(QPen(QColor(ds.TEXT_SECONDARY)))
             painter.drawText(6, 14, "🔒")
 
-        # PR1: Focus-mode affordance — small crosshair icon visible on hover
-        # so users can discover the double-click spotlight feature.
+        # Focus-mode affordance on hover
         if self._is_hovered and self._spotlight_mode is None:
-            painter.setPen(QPen(QColor(200, 200, 200, 160)))
+            painter.setPen(QPen(QColor(ds.TEXT_MUTED)))
             painter.drawText(self.width() - 22, self.height() - 10, "🔍")
 
-        # PR1: Capture health badge — bottom-right, explicit text label so
-        # the operator can distinguish LIVE / STATIC / STALE / ERROR at a
-        # glance without inferring it from pixel motion.
-        health_text = self._capture_health_label()
-        if health_text:
-            from PySide6.QtGui import QFont
+    def _paint_badge_layer(self, painter: QPainter, health: str) -> None:
+        """System pill, age pill, capture health badge."""
+        from argus_overview.ui.design_system import colors as ds, metrics as dm
+        from argus_overview.ui.design_system.painting import draw_badge, draw_pill
 
-            badge_font = QFont(painter.font())
-            badge_font.setPointSize(9)
-            painter.setFont(badge_font)
-            metrics = painter.fontMetrics()
-            text_w = metrics.horizontalAdvance(health_text)
-            pad = 4
-            badge_w = text_w + pad * 2
-            badge_h = metrics.height() + pad
-            badge_x = self.width() - badge_w - 4
-            badge_y = self.height() - badge_h - 4
-            # Semi-transparent dark background so the badge is legible
-            # over any preview content.
-            painter.setPen(QPen(Qt.PenStyle.NoPen))
-            painter.setBrush(QBrush(QColor(0, 0, 0, 160)))
-            painter.drawRoundedRect(badge_x, badge_y, badge_w, badge_h, 3, 3)
-            painter.setPen(QPen(self._capture_health_color()))
-            painter.drawText(
-                badge_x + pad,
-                badge_y + metrics.ascent() + (badge_h - metrics.height()) // 2,
-                health_text,
+        # Threat system pill (top-left)
+        if (
+            self._threat_level is not None
+            and self._threat_alpha > 0.0
+            and self._threat_system
+            and not health.startswith("STALE")
+            and health not in ("ERROR", "DISCONNECTED")
+        ):
+            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            pill_parts = [self._threat_system]
+            if self._threat_distance and self._threat_distance > 0:
+                pill_parts.append(f"+{self._threat_distance}j")
+            pill_text = " · ".join(pill_parts)
+            alpha = max(0, min(255, int(220 * self._threat_alpha)))
+            draw_pill(
+                painter,
+                6,
+                6,
+                pill_text,
+                fg_color=(r, g, b),
+                bg_color=ds.CANVAS,
+                bg_alpha=max(160, alpha),
+                font_size_pt=8,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
             )
 
-        painter.end()
+        # Report age pill (bottom-center) when threat is decaying
+        if self._threat_alpha < 0.9 and self._threat_set_at > 0.0:
+            age_secs = int(time.monotonic() - self._threat_set_at)
+            age_text = f"{age_secs}s ago"
+            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            alpha = max(0, min(255, int(220 * self._threat_alpha)))
+            pill_rect = draw_pill(
+                painter,
+                0,
+                0,
+                age_text,
+                fg_color=(r, g, b),
+                bg_color=ds.CANVAS,
+                bg_alpha=max(180, alpha),
+                font_size_pt=8,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+            # Center horizontally at bottom
+            pill_rect.moveLeft((self.width() - pill_rect.width()) // 2)
+            pill_rect.moveTop(self.height() - pill_rect.height() - 4)
+            # Re-draw at correct position (inefficient but keeps helper reusable)
+            draw_pill(
+                painter,
+                pill_rect.x(),
+                pill_rect.y(),
+                age_text,
+                fg_color=(r, g, b),
+                bg_color=ds.CANVAS,
+                bg_alpha=max(180, alpha),
+                font_size_pt=8,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+
+        # Capture health badge (bottom-right)
+        if health:
+            health_color = self._capture_health_color()
+            badge_rect = draw_badge(
+                painter,
+                0,
+                0,
+                health,
+                fg_color=health_color,
+                bg_color=ds.CANVAS,
+                bg_alpha=180,
+                font_size_pt=9,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+            badge_rect.moveLeft(self.width() - badge_rect.width() - 4)
+            badge_rect.moveTop(self.height() - badge_rect.height() - 4)
+            draw_badge(
+                painter,
+                badge_rect.x(),
+                badge_rect.y(),
+                health,
+                fg_color=health_color,
+                bg_color=ds.CANVAS,
+                bg_alpha=180,
+                font_size_pt=9,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+
+    def _paint_focus_layer(self, painter: QPainter) -> None:
+        """PR7: draw a focus ring when this widget has keyboard focus."""
+        if not self.hasFocus():
+            return
+        from argus_overview.ui.design_system import colors as ds, metrics as dm
+
+        pen = QPen(QColor(ds.BORDER_FOCUS))
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        painter.drawRoundedRect(rect, dm.RADIUS_CARD, dm.RADIUS_CARD)
 
     def mousePressEvent(self, event):
         """Handle mouse click - start drag or activate"""
@@ -2106,7 +2214,6 @@ class MainTab(QWidget):
         sm = getattr(self, "settings_manager", None)
         show_dock = sm.get("thumbnails.show_status_dock", True) if sm else True
         self.status_dock.setVisible(show_dock)
-        layout.addWidget(self.status_dock)
 
         # Scroll area for preview frames
         scroll = QScrollArea()
@@ -2121,6 +2228,10 @@ class MainTab(QWidget):
 
         scroll.setWidget(self.preview_container)
         layout.addWidget(scroll)
+
+        # Fleet status rail — placed below the preview grid so the operational
+        # area retains maximum vertical space.
+        layout.addWidget(self.status_dock)
 
         # Status bar
         status_bar = self._create_status_bar()
@@ -2218,15 +2329,6 @@ class MainTab(QWidget):
 
         toolbar_layout.addStretch()
 
-        # Refresh Rate (not from registry - it's a widget, not an action)
-        toolbar_layout.addWidget(QLabel("FPS:"))
-        self.refresh_rate_spin = QSpinBox()
-        self.refresh_rate_spin.setRange(1, 60)
-        self.refresh_rate_spin.setValue(30)
-        self.refresh_rate_spin.setToolTip("Capture framerate (higher = smoother but more CPU)")
-        self.refresh_rate_spin.valueChanged.connect(self._on_refresh_rate_changed)
-        toolbar_layout.addWidget(self.refresh_rate_spin)
-
         # Search/filter field
         toolbar_layout.addSpacing(10)
         self.search_field = QLineEdit()
@@ -2241,7 +2343,24 @@ class MainTab(QWidget):
 
     def _create_layout_controls(self) -> QWidget:
         """Create comprehensive layout controls panel with arrangement grid"""
+        from argus_overview.ui.design_system import colors as ds, metrics as dm
+
         section = QGroupBox("Window Layouts")
+        section.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {ds.SURFACE};
+                border: 1px solid {ds.BORDER_SUBTLE};
+                border-radius: {dm.RADIUS_PANEL}px;
+                margin-top: 8px;
+                padding-top: 8px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px;
+                color: {ds.TEXT_SECONDARY};
+            }}
+        """)
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(5, 5, 5, 5)
         main_layout.setSpacing(5)
@@ -2335,14 +2454,16 @@ class MainTab(QWidget):
 
         apply_btn = QPushButton("Apply Layout")
         apply_btn.setToolTip("Arrange EVE windows on screen")
-        apply_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ff8c00;
+        accent = get_theme_manager().get_accent_color()
+        hover = QColor(accent).lighter(120).name()
+        apply_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {accent};
                 color: black;
                 font-weight: bold;
                 padding: 8px 15px;
-            }
-            QPushButton:hover { background-color: #ffa500; }
+            }}
+            QPushButton:hover {{ background-color: {hover}; }}
         """)
         apply_btn.clicked.connect(self._apply_layout_to_windows)
         buttons_col.addWidget(apply_btn)

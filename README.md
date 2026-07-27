@@ -49,6 +49,10 @@ Window preview management with grid layouts and auto-arrange.
 Character management with roles, status, and team organization.
 ![Roster](docs/screenshot-roster.png)
 
+### Intel Tab
+Intel channel monitoring with per-character location tracking and threat tinting.
+![Intel](docs/screenshots/tabs/intel_1440.png)
+
 ### Cycle Control Tab
 Cycling groups with hotkey recording.
 ![Cycle Control](docs/screenshot-cycle-control.png)

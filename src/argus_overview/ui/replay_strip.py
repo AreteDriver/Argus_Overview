@@ -45,12 +45,14 @@ class ReplayStrip(QWidget):
 
         self.setFixedHeight(self.STRIP_HEIGHT)
         self.setMouseTracking(True)
+        from argus_overview.ui.design_system import colors as ds
+
         self.setStyleSheet(
-            """
-            ReplayStrip {
-                background-color: rgba(20, 20, 20, 220);
-                border-top: 1px solid #3a3a3a;
-            }
+            f"""
+            ReplayStrip {{
+                background-color: {ds.SURFACE};
+                border-top: 1px solid {ds.BORDER_SUBTLE};
+            }}
             """
         )
 
@@ -94,6 +96,8 @@ class ReplayStrip(QWidget):
         if not self._frames:
             return
 
+        from argus_overview.ui.design_system import colors as ds
+
         painter = QPainter(self)
         try:
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
@@ -117,7 +121,7 @@ class ReplayStrip(QWidget):
                     cy = y + (inner_h - scaled.height()) // 2
                     painter.drawPixmap(cx, cy, scaled)
                 # Cell border
-                painter.setPen(QPen(QColor(60, 60, 60), 1))
+                painter.setPen(QPen(QColor(ds.BORDER_SUBTLE), 1))
                 painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
                 painter.drawRect(x, y, cell_w - 1, inner_h - 1)
 
@@ -125,7 +129,7 @@ class ReplayStrip(QWidget):
             if 0 <= self._hover_index < len(self._frames):
                 hx = self.CELL_PADDING + self._hover_index * cell_w
                 hy = self.CELL_PADDING
-                painter.setPen(QPen(QColor(120, 200, 255, 230), 2))
+                painter.setPen(QPen(QColor(ds.INFO), 2))
                 painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
                 painter.drawRect(hx, hy, cell_w - 1, inner_h - 1)
         finally:

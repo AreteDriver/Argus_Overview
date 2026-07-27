@@ -681,7 +681,7 @@ class TestIntelTabUI:
         tab._update_log_dir_label()
 
         assert tab.log_dir_label.text() == "Log Dir: Not found"
-        assert "F44336" in tab.log_dir_label.styleSheet()  # Red color
+        assert "F06464" in tab.log_dir_label.styleSheet()  # Critical red from design system
 
     def test_add_channel_with_dialog(self, qapp, mock_settings_manager):
         """Test adding channel via dialog (lines 528-539)."""

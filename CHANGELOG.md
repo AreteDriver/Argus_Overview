@@ -5,6 +5,46 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Operational Truth UI Polish
+
+Visual consistency pass across all tabs following the Operational Truth
+release theme. Every surface now derives from the design-system token set
+instead of hardcoded values.
+
+### Changed
+- **Design system tokens** — semantic colors, spacing, typography, metrics,
+  and states centralized under `ui/design_system/`.
+- **Settings tab navigation** — `QTreeWidget` category list now shows a clear
+  selection highlight (`SURFACE_HOVER` background + `INFO` left accent bar)
+  and defaults to "General" on first open.
+- **Settings panels** — all `QGroupBox` containers styled as cards with
+  `SURFACE_RAISED` background, `BORDER_SUBTLE` border, and rounded corners.
+- **Danger buttons** — `ToolbarBuilder` destructive actions (`delete_character`,
+  `delete_group`, etc.) switched from solid bright-red fill to an outline style
+  (red text + red border) that fills on hover. Reduces visual alarm in toolbars.
+- **Splitter handles** — `QSplitter::handle` styled as a 2px `BORDER_SUBTLE`
+  line, eliminating default Qt grip dots in the Sync and Settings tabs.
+- **Tab bar** — styled with `CANVAS` pane, `SURFACE` tabs, `SURFACE_RAISED`
+  selected state, and `SURFACE_HOVER` hover state.
+- **Screenshots** — all README and docs screenshots regenerated at 1440×900
+  reflecting the current UI state.
+- **Replay strip layout stability** — every `WindowPreviewWidget` now reserves a
+  fixed-height container for the replay strip in its internal layout. Toggling
+  the strip on/off no longer changes card height, preventing grid reflow shifts
+  in the `FlowLayout` preview area. The strip is parented inside the container
+  instead of being dynamically added/removed from the main card layout.
+- **Replay strip styling** — migrated hardcoded `rgba(20,20,20,220)` background
+  and `#3a3a3a` border to `SURFACE` + `BORDER_SUBTLE`. Cell borders and hover
+  highlight in the strip `paintEvent` now use design-system tokens
+  (`BORDER_SUBTLE`, `INFO`).
+- **Fleet rail positioning** — the character status dock (`StatusDock`) moved from
+  above the preview grid to below it. This prioritizes vertical space for the
+  live preview area, placing operational status in a bottom rail consistent with
+  the Operational Truth principle that the preview grid is the primary product.
+- **Capture health badge colors** — migrated `_capture_health_color` from
+  hardcoded RGB `QColor` objects to design-system semantic tokens
+  (`HEALTHY`, `TEXT_SECONDARY`, `WARNING`, `CRITICAL`, `TEXT_MUTED`).
+
 ## [3.2.0] - 2026-04-26 — Intel-Aware Edition
 
 This release ships a 10-PR arc that turns Argus's preview chrome into an

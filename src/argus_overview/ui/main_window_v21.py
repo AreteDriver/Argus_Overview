@@ -78,7 +78,7 @@ class MainWindowV21(QMainWindow):
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.setWindowTitle(f"Argus Overview v{__version__}")
-        self.setMinimumSize(1000, 700)
+        self.setMinimumSize(960, 600)
 
         # Set window icon
         self._set_window_icon()
@@ -132,6 +132,35 @@ class MainWindowV21(QMainWindow):
 
         # Tab widget
         self.tabs = QTabWidget()
+        from argus_overview.ui.design_system import colors as ds, metrics as dm
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: none;
+                background: {ds.CANVAS};
+            }}
+            QTabBar::tab {{
+                background: {ds.SURFACE};
+                color: {ds.TEXT_SECONDARY};
+                padding: 6px 14px;
+                border-top-left-radius: {dm.RADIUS_CONTROL}px;
+                border-top-right-radius: {dm.RADIUS_CONTROL}px;
+            }}
+            QTabBar::tab:selected {{
+                background: {ds.SURFACE_RAISED};
+                color: {ds.TEXT_PRIMARY};
+            }}
+            QTabBar::tab:hover {{
+                background: {ds.SURFACE_HOVER};
+            }}
+            QSplitter::handle:horizontal {{
+                background: {ds.BORDER_SUBTLE};
+                width: 2px;
+            }}
+            QSplitter::handle:vertical {{
+                background: {ds.BORDER_SUBTLE};
+                height: 2px;
+            }}
+        """)
         layout.addWidget(self.tabs)
 
         # Create tabs

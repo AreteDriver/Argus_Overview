@@ -29,15 +29,15 @@ from PySide6.QtWidgets import (
 )
 
 from argus_overview.intel.parser import ThreatLevel
+from argus_overview.ui.design_system.colors import ACCENT_POOL
 from argus_overview.ui.main_tab import (
-    CHARACTER_ACCENT_COLORS,
     THREAT_BORDER_COLORS,
     character_accent_color,
 )
 
 # Backward-compatible aliases — PR8 promoted these to main_tab.py so
 # frames + chips share one palette + helper. Public names preserved.
-CHIP_ACCENT_COLORS = CHARACTER_ACCENT_COLORS
+CHIP_ACCENT_COLORS = ACCENT_POOL
 accent_for = character_accent_color
 
 
@@ -147,17 +147,19 @@ class CharacterChip(QFrame):
 
     # ----- styling helpers --------------------------------------------------
     def _apply_base_style(self) -> None:
+        from argus_overview.ui.design_system import colors as ds
+
         self.setStyleSheet(
-            """
-            CharacterChip {
-                background-color: #2b2b2b;
-                border: 1px solid #444;
+            f"""
+            CharacterChip {{
+                background-color: {ds.SURFACE};
+                border: 1px solid {ds.BORDER_SUBTLE};
                 border-radius: 6px;
-            }
-            CharacterChip:hover {
-                background-color: #353535;
-                border-color: #6a6a6a;
-            }
+            }}
+            CharacterChip:hover {{
+                background-color: {ds.SURFACE_RAISED};
+                border-color: {ds.BORDER_STRONG};
+            }}
             """
         )
 
@@ -204,17 +206,19 @@ class CharacterChip(QFrame):
 
     # ----- public API -------------------------------------------------------
     def set_system(self, system: str | None) -> None:
+        from argus_overview.ui.design_system import colors as ds
+
         self._system = system
         if system:
             self._last_system = system
             self._last_system_at = time.monotonic()
             self._stale_timer.stop()
             self._stale_timer.start()
-            self._system_label.setStyleSheet("color: #aaa; font-size: 9pt;")
+            self._system_label.setStyleSheet(f"color: {ds.TEXT_SECONDARY}; font-size: 9pt;")
             self._system_label.setText(system)
         else:
             self._stale_timer.stop()
-            self._system_label.setStyleSheet("color: #aaa; font-size: 9pt;")
+            self._system_label.setStyleSheet(f"color: {ds.TEXT_SECONDARY}; font-size: 9pt;")
             self._system_label.setText("—")
         self.setToolTip(self._tooltip_text())
         self._update_accessible_name()
@@ -226,7 +230,9 @@ class CharacterChip(QFrame):
             self._system_label.setText(f"Unknown · last: {self._last_system}")
         else:
             self._system_label.setText("Unknown")
-        self._system_label.setStyleSheet("color: #777; font-size: 9pt; opacity: 0.7;")
+        from argus_overview.ui.design_system import colors as ds
+
+        self._system_label.setStyleSheet(f"color: {ds.TEXT_MUTED}; font-size: 9pt; opacity: 0.7;")
         self.setToolTip(self._tooltip_text())
         self._update_accessible_name()
 
@@ -300,12 +306,14 @@ class CharacterChip(QFrame):
         if self._threat_level is None or self._threat_alpha <= 0.0:
             return
 
+        from argus_overview.ui.design_system import colors as ds
+
         painter = QPainter(self)
         try:
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            rgb = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
             alpha = max(0, min(255, int(230 * self._threat_alpha)))
-            color = QColor(r, g, b, alpha)
+            color = QColor(*rgb, alpha)
             painter.setPen(QPen(color.darker(140), 1))
             painter.setBrush(QBrush(color))
             # Draw threat dot vertically centered, left of the right edge
@@ -325,8 +333,9 @@ class CharacterChip(QFrame):
                 dot_font.setBold(True)
                 painter.setFont(dot_font)
                 # Contrast: light text on dark/bright colored dot
-                dot_lum = (r * 299 + g * 587 + b * 114) / 1000
-                label_color = QColor(255, 255, 255, alpha) if dot_lum < 140 else QColor(0, 0, 0, alpha)
+                dot_lum = (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000
+                label_color = QColor(ds.TEXT_PRIMARY) if dot_lum < 140 else QColor(ds.CANVAS)
+                label_color.setAlpha(alpha)
                 painter.setPen(QPen(label_color))
                 fm = painter.fontMetrics()
                 tw = fm.horizontalAdvance(level_text)
@@ -347,7 +356,7 @@ class CharacterChip(QFrame):
                 painter.setFont(badge_font)
                 # Foreground stays in the threat color but bumped opaque so
                 # it stays legible even when the dot itself is dim.
-                text_color = QColor(r, g, b, max(180, alpha))
+                text_color = QColor(*rgb, max(180, alpha))
                 painter.setPen(QPen(text_color))
                 metrics = painter.fontMetrics()
                 text_w = metrics.horizontalAdvance(badge_text)
@@ -404,12 +413,14 @@ class StatusDock(QWidget):
         self._strip_layout.addStretch()  # push chips left, fill empty space right
         self._scroll.setWidget(self._strip)
 
+        from argus_overview.ui.design_system import colors as ds
+
         self.setStyleSheet(
-            """
-            StatusDock {
-                background-color: #1f1f1f;
-                border-bottom: 1px solid #3a3a3a;
-            }
+            f"""
+            StatusDock {{
+                background-color: {ds.CANVAS};
+                border-bottom: 1px solid {ds.BORDER_SUBTLE};
+            }}
             """
         )
         self._update_height()

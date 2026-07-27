@@ -10,6 +10,8 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal, Slot
 from PySide6.QtGui import QBrush, QColor, QFont
+
+from argus_overview.ui.design_system import colors as ds
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -308,7 +310,7 @@ class IntelTab(QWidget):
 
         # Status bar
         self.status_label = QLabel("Status: Stopped")
-        self.status_label.setStyleSheet("color: #888; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {ds.TEXT_MUTED}; padding: 5px;")
         layout.addWidget(self.status_label)
 
     def _create_toolbar(self) -> QWidget:
@@ -343,7 +345,7 @@ class IntelTab(QWidget):
 
         # Log directory indicator
         self.log_dir_label = QLabel("Log Dir: Not found")
-        self.log_dir_label.setStyleSheet("color: #888;")
+        self.log_dir_label.setStyleSheet(f"color: {ds.TEXT_MUTED};")
         layout.addWidget(self.log_dir_label)
 
         return toolbar
@@ -462,7 +464,7 @@ class IntelTab(QWidget):
         location_layout.addRow("Current System:", self.current_system_edit)
 
         location_note = QLabel("Set your current system to enable jump distance filtering")
-        location_note.setStyleSheet("color: #888; font-size: 10px;")
+        location_note.setStyleSheet(f"color: {ds.TEXT_MUTED}; font-size: 10px;")
         location_note.setWordWrap(True)
         location_layout.addRow(location_note)
 
@@ -504,10 +506,10 @@ class IntelTab(QWidget):
                 path_str = "..." + path_str[-37:]
             self.log_dir_label.setText(f"Log Dir: {path_str}")
             self.log_dir_label.setToolTip(str(log_dir))
-            self.log_dir_label.setStyleSheet("color: #4CAF50;")
+            self.log_dir_label.setStyleSheet(f"color: {ds.HEALTHY};")
         else:
             self.log_dir_label.setText("Log Dir: Not found")
-            self.log_dir_label.setStyleSheet("color: #F44336;")
+            self.log_dir_label.setStyleSheet(f"color: {ds.CRITICAL};")
 
     # -------------------------------------------------------------------------
     # Slots and handlers
@@ -527,7 +529,7 @@ class IntelTab(QWidget):
         self.start_stop_btn.setText("Stop Monitoring")
         self.start_stop_btn.setChecked(True)
         self.status_label.setText("Status: Monitoring...")
-        self.status_label.setStyleSheet("color: #4CAF50; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {ds.HEALTHY}; padding: 5px;")
         self._update_log_dir_label()
         self.logger.info("Intel monitoring started")
         self.pipeline_health_changed.emit("healthy", "monitoring active")
@@ -538,7 +540,7 @@ class IntelTab(QWidget):
         self.start_stop_btn.setText("Start Monitoring")
         self.start_stop_btn.setChecked(False)
         self.status_label.setText("Status: Stopped")
-        self.status_label.setStyleSheet("color: #888; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {ds.TEXT_MUTED}; padding: 5px;")
         self.logger.info("Intel monitoring stopped")
         self.pipeline_health_changed.emit("unavailable", "monitoring stopped")
 
@@ -613,7 +615,7 @@ class IntelTab(QWidget):
         """Handle watcher error."""
         self.logger.error(f"Log watcher error: {error}")
         self.status_label.setText(f"Error: {error}")
-        self.status_label.setStyleSheet("color: #F44336; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {ds.CRITICAL}; padding: 5px;")
         self.pipeline_health_changed.emit("degraded", error)
 
     @Slot(object)
