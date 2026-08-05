@@ -1194,8 +1194,8 @@ class TestSettingsTabSetupUI:
         self, mock_btn, mock_item, mock_tree, mock_font, mock_label, mock_layout, mock_qwidget
     ):
         """Test _create_category_tree applies design-system stylesheet and selects first item"""
-        from argus_overview.ui.settings_tab import SettingsTab
         from argus_overview.ui.design_system import colors as _ds
+        from argus_overview.ui.settings_tab import SettingsTab
 
         mock_settings = MagicMock()
         mock_settings.get.return_value = {}

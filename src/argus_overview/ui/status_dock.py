@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 import time
 
-from PySide6.QtCore import Qt, QPropertyAnimation, Signal, QTimer
+from PySide6.QtCore import QPropertyAnimation, Qt, QTimer, Signal
 from PySide6.QtGui import QBrush, QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QFrame,
@@ -285,7 +285,6 @@ class CharacterChip(QFrame):
 
     def keyPressEvent(self, event) -> None:
         """PR4: keyboard navigation — Enter/Space activate, arrows move focus."""
-        from PySide6.QtGui import QKeyEvent
 
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
             self.clicked.emit(self.window_id)

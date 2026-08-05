@@ -7,7 +7,7 @@ custom-painted widgets stay consistent without hardcoding geometry or
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QRect
+from PySide6.QtCore import QRect, Qt
 from PySide6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
@@ -162,6 +162,68 @@ def draw_status_dot(
     painter.setBrush(QBrush(_qcolor(color, alpha)))
     painter.setPen(QPen(Qt.PenStyle.NoPen))
     painter.drawEllipse(center_x - radius, center_y - radius, radius * 2, radius * 2)
+
+
+def draw_threat_accent(
+    painter: QPainter,
+    rect: QRect,
+    rgb: tuple[int, int, int],
+    alpha: float = 1.0,
+    *,
+    edge: str = "right",
+    ribbon_width: int = 2,
+    glow_height: int = 1,
+) -> None:
+    """Paint a threat-state accent ribbon + top glow on a widget rect.
+
+    Used by FleetCard and TacticalCard to keep threat visualization
+    consistent: a thin colored ribbon on one edge plus a 1px glow on
+    the top edge, both alpha-modulated by the live threat ``alpha``
+    (so threats fade as intel ages out).
+
+    Args:
+        painter: Active QPainter.
+        rect: Widget rectangle to paint within.
+        rgb: (R, G, B) tuple for the threat color.
+        alpha: 0.0–1.0 fade factor (1.0 = full saturation).
+        edge: Which edge carries the ribbon (``"right"``, ``"left"``,
+              ``"top"``, ``"bottom"``).
+        ribbon_width: Pixels wide for the ribbon.
+        glow_height: Pixels tall for the top glow.
+    """
+    a = max(0.0, min(1.0, alpha))
+    if a <= 0.0:
+        return
+    painter.setPen(Qt.PenStyle.NoPen)
+    painter.setRenderHint(QPainter.RenderHint.Antialiasing, False)
+    ribbon_color = QColor(*rgb, int(230 * a))
+    painter.setBrush(ribbon_color)
+    if edge == "right":
+        painter.drawRect(
+            rect.x() + rect.width() - ribbon_width,
+            rect.y() + 6,
+            ribbon_width,
+            rect.height() - 12,
+        )
+    elif edge == "left":
+        painter.drawRect(
+            rect.x(), rect.y() + 6, ribbon_width, rect.height() - 12,
+        )
+    elif edge == "top":
+        painter.drawRect(
+            rect.x() + 6, rect.y(), rect.width() - 12, ribbon_width,
+        )
+    elif edge == "bottom":
+        painter.drawRect(
+            rect.x() + 6,
+            rect.y() + rect.height() - ribbon_width,
+            rect.width() - 12,
+            ribbon_width,
+        )
+    # Subtle top-edge glow across the whole rect
+    glow_color = QColor(*rgb, int(110 * a))
+    painter.setBrush(glow_color)
+    painter.drawRect(rect.x(), rect.y(), rect.width(), glow_height)
 
 
 def widget_rect(widget: QWidget, margin: int = 0) -> QRect:

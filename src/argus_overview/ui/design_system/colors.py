@@ -10,7 +10,6 @@ to print the palette and compute WCAG-like contrast ratios.
 
 from __future__ import annotations
 
-
 # ---------------------------------------------------------------------------
 # Canvas / background
 # ---------------------------------------------------------------------------

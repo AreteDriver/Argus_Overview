@@ -1428,7 +1428,8 @@ class WindowPreviewWidget(QWidget):
         When capture health is ERROR, DISCONNECTED, or STALE, the threat
         border is suppressed so stale data cannot look alarming.
         """
-        from argus_overview.ui.design_system import colors as ds, metrics as dm
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
 
         # Determine if health should suppress the threat border
         suppress_threat = health.startswith("STALE") or health in ("ERROR", "DISCONNECTED", "PAUSED")
@@ -1557,7 +1558,8 @@ class WindowPreviewWidget(QWidget):
 
     def _paint_badge_layer(self, painter: QPainter, health: str) -> None:
         """System pill, age pill, capture health badge."""
-        from argus_overview.ui.design_system import colors as ds, metrics as dm
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
         from argus_overview.ui.design_system.painting import draw_badge, draw_pill
 
         # Threat system pill (top-left)
@@ -1656,7 +1658,8 @@ class WindowPreviewWidget(QWidget):
         """PR7: draw a focus ring when this widget has keyboard focus."""
         if not self.hasFocus():
             return
-        from argus_overview.ui.design_system import colors as ds, metrics as dm
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
 
         pen = QPen(QColor(ds.BORDER_FOCUS))
         pen.setWidth(2)
@@ -2349,7 +2352,8 @@ class MainTab(QWidget):
 
     def _create_layout_controls(self) -> QWidget:
         """Create comprehensive layout controls panel with arrangement grid"""
-        from argus_overview.ui.design_system import colors as ds, metrics as dm
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
 
         section = QGroupBox("Window Layouts")
         section.setStyleSheet(f"""

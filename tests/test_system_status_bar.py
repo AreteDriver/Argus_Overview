@@ -9,12 +9,9 @@ Covers:
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QPaintEvent, QPainter
-from PySide6.QtWidgets import QWidget
+from PySide6.QtGui import QPainter, QPaintEvent
 
 from argus_overview.ui.system_status_bar import SystemStatusBar
 

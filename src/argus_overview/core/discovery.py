@@ -274,6 +274,18 @@ class AutoDiscovery(QObject):
         self._scan_cycle()
         return len(self.active_window_ids)
 
+    def run_once(self) -> int:
+        """
+        Public alias for :meth:`force_scan` — one discovery cycle
+        without starting the background timer. This is the operator's
+        "Refresh window list" entry point: it scans once, emits the
+        usual signals, and returns.
+
+        Returns:
+            Number of EVE windows found
+        """
+        return self.force_scan()
+
     def clear_history(self):
         """Clear the known characters history"""
         self.known_characters.clear()

@@ -11,10 +11,7 @@ import time
 from unittest.mock import MagicMock
 
 import pytest
-
-from PySide6.QtCore import QEvent
 from PySide6.QtGui import QPaintEvent
-from PySide6.QtWidgets import QApplication
 
 from argus_overview.intel.parser import ThreatLevel
 from argus_overview.ui.main_tab import WindowPreviewWidget

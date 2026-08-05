@@ -7,12 +7,11 @@ draw_status_dot do not crash and produce reasonable geometry.
 from __future__ import annotations
 
 import pytest
-
 from PySide6.QtCore import QRect
 from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import QWidget
 
-from argus_overview.ui.design_system import colors, metrics
+from argus_overview.ui.design_system import colors
 from argus_overview.ui.design_system.painting import (
     draw_badge,
     draw_pill,
