@@ -265,7 +265,7 @@ class ActionRegistry:
         # TIER 2: TAB ACTIONS (Tab Toolbars)
         # =====================================================================
 
-        # --- Overview Tab (formerly Main) ---
+        # --- Overview Tab (formerly Main) — Phase 4 IA: COMMAND tab ---
         self.register(
             ActionSpec(
                 id="import_windows",
@@ -370,7 +370,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Roster Tab (Characters & Teams) ---
+        # --- Roster Tab (Characters & Teams) — Phase 4 IA: FLEET tab (left) ---
         self.register(
             ActionSpec(
                 id="add_character",
@@ -405,7 +405,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Layouts Tab ---
+        # --- Layouts Tab — Phase 4 IA: LAYOUTS container (left) ---
         self.register(
             ActionSpec(
                 id="apply_layout",
@@ -445,12 +445,12 @@ class ActionRegistry:
                 label="Refresh Groups",
                 scope=ActionScope.TAB,
                 primary_home=PrimaryHome.LAYOUTS_TOOLBAR,
-                tooltip="Reload cycling groups from Cycle Control tab",
+                tooltip="Reload cycling groups from the LAYOUTS tab (Cycle Control pane)",
                 handler_name="_refresh_groups",
             )
         )
 
-        # --- Cycle Control Tab (Hotkeys + Cycling) ---
+        # --- Cycle Control Tab (Hotkeys + Cycling) — Phase 4 IA: LAYOUTS (right) ---
         self.register(
             ActionSpec(
                 id="new_group",
@@ -484,7 +484,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Sync Tab ---
+        # --- Sync Tab — Phase 4 IA: SYSTEM container (right) ---
         self.register(
             ActionSpec(
                 id="scan_eve_settings",
@@ -518,7 +518,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Intel Tab ---
+        # --- Intel Tab — Phase 4 IA: FLEET container (right) ---
         self.register(
             ActionSpec(
                 id="start_intel_monitoring",
@@ -608,7 +608,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Settings Panel ---
+        # --- Settings Panel — Phase 4 IA: SYSTEM container (left) ---
         self.register(
             ActionSpec(
                 id="reset_all_settings",

@@ -87,6 +87,11 @@ def create_mock_window():
     window.capture_system = MagicMock()
     window.capture_system._window_mgr = mock_window_mgr
 
+    # Pin _TAB_LABELS to the real class constant so test_show_settings
+    # exercises the same lookup the production code uses (was 4; becomes
+    # the index of "Settings" in the v2.2 IA, currently 5).
+    window._TAB_LABELS = MainWindowV21._TAB_LABELS
+
     return window
 
 
@@ -408,6 +413,8 @@ class TestShowSettings:
 
     def test_show_settings_switches_to_tab(self):
         """Test that show_settings shows window and switches tab"""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
         window = create_mock_window()
         window.show = MagicMock()
         window.raise_ = MagicMock()
@@ -417,7 +424,90 @@ class TestShowSettings:
 
         window.show.assert_called_once()
         window.raise_.assert_called_once()
-        window.tabs.setCurrentIndex.assert_called_with(4)
+        # Phase 4 IA: Settings lives inside the SYSTEM container — the
+        # _show_settings entry point lands on SYSTEM (last of four tabs).
+        window.tabs.setCurrentIndex.assert_called_with(
+            MainWindowV21._TAB_LABELS.index("System")
+        )
+
+
+class TestPhase4InformationArchitecture:
+    """Pin the v3.3 OPS four-tab IA labels.
+
+    Any drift here (renaming "System", removing a tab, etc.) breaks
+    _show_settings and any code that reads _TAB_LABELS by name. Keep
+    this list in sync with the four IA-aligned tabs.
+    """
+
+    def test_four_tab_labels(self) -> None:
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        assert MainWindowV21._TAB_LABELS == ["Command", "Fleet", "Layouts", "System"]
+
+    def test_settings_routes_to_system(self) -> None:
+        """'_Settings' is no longer a top-level tab — it lives in SYSTEM."""
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        assert "Settings" not in MainWindowV21._TAB_LABELS
+        assert "System" in MainWindowV21._TAB_LABELS
+
+    def test_create_layouts_tab_passes_main_tab_to_main_slot(self) -> None:
+        """_create_layouts_tab must bind ``main_tab`` to LayoutsTab.main_tab.
+
+        Pinned because the LayoutsTab constructor is
+        ``(layout_manager, main_tab, settings_manager=None,
+        character_manager=None)`` — passing ``character_manager`` as the
+        second positional arg (which an earlier draft of this PR did)
+        crashed at runtime with "Main tab not initialized" the moment the
+        user hit Apply. Catching it at construction time is the whole
+        point of this test.
+
+        Post-Phase-4: the inner widget is exposed as
+        ``window.presets_panel`` (the container owns ``window.layouts_tab``).
+        """
+        from contextlib import ExitStack
+        from unittest.mock import MagicMock, patch
+
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        mod = "argus_overview.ui.main_window_v21"
+        with ExitStack() as stack:
+            stack.enter_context(patch("PySide6.QtWidgets.QMainWindow.__init__", return_value=None))
+            stack.enter_context(patch.object(MainWindowV21, "setWindowTitle"))
+            stack.enter_context(patch.object(MainWindowV21, "setMinimumSize"))
+            stack.enter_context(patch.object(MainWindowV21, "setCentralWidget"))
+            stack.enter_context(patch.object(MainWindowV21, "_set_window_icon"))
+            stack.enter_context(patch.object(MainWindowV21, "_apply_initial_settings"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_menu_bar"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_command_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_fleet_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_layouts_container"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_system_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_connect_signals"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_system_tray"))
+            stack.enter_context(patch.object(MainWindowV21, "_register_hotkeys"))
+            stack.enter_context(patch.object(MainWindowV21, "_init_location_tracker"))
+            stack.enter_context(patch(f"{mod}.QTabWidget"))
+            stack.enter_context(patch(f"{mod}.QVBoxLayout"))
+            stack.enter_context(patch(f"{mod}.QWidget"))
+            stack.enter_context(patch(f"{mod}.QTimer"))
+
+            window = MainWindowV21()
+
+            # Manually invoke the real factory now that the surrounding
+            # init dance is patched out — this is what crashed in v1.
+            window.main_tab = MagicMock(name="main_tab")
+            window.layout_manager = MagicMock(name="layout_manager")
+            window.settings_manager = MagicMock(name="settings_manager")
+            window.character_manager = MagicMock(name="character_manager")
+
+            window._create_layouts_tab()
+
+            # Contract: LayoutsTab.main_tab is the same object as
+            # MainWindowV21.main_tab, not the character_manager.
+            # Post-Phase-4: the inner widget is ``presets_panel``.
+            assert window.presets_panel.main_tab is window.main_tab
+            assert window.presets_panel.main_tab is not window.character_manager
 
 
 # Test reload config
@@ -2333,11 +2423,19 @@ class TestMainWindowV21InitPartial:
             stack.enter_context(patch.object(MainWindowV21, "_apply_initial_settings"))
             stack.enter_context(patch.object(MainWindowV21, "_create_menu_bar"))
             stack.enter_context(patch.object(MainWindowV21, "_create_main_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_layouts_tab"))
             stack.enter_context(patch.object(MainWindowV21, "_create_hotkeys_tab"))
             stack.enter_context(patch.object(MainWindowV21, "_create_characters_tab"))
             stack.enter_context(patch.object(MainWindowV21, "_create_intel_tab"))
             stack.enter_context(patch.object(MainWindowV21, "_create_settings_sync_tab"))
             stack.enter_context(patch.object(MainWindowV21, "_create_settings_tab"))
+            # Phase 4: IA container factories are also stubbed at this layer
+            # because they touch Qt widgets, but the helpers themselves are
+            # exercised by the new test_tab_containers suite.
+            stack.enter_context(patch.object(MainWindowV21, "_create_command_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_fleet_tab"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_layouts_container"))
+            stack.enter_context(patch.object(MainWindowV21, "_create_system_tab"))
             stack.enter_context(patch.object(MainWindowV21, "_connect_signals"))
             stack.enter_context(patch.object(MainWindowV21, "_create_system_tray"))
             stack.enter_context(patch.object(MainWindowV21, "_register_hotkeys"))

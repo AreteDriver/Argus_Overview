@@ -49,7 +49,13 @@ from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
+    QPushButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -73,6 +79,19 @@ from argus_overview.ui.tray import SystemTray
 
 class MainWindowV21(QMainWindow):
     """Main application window with tabbed interface v2.2"""
+
+    # v2.2 IA: the original six-tab ordering. Preserved as a class-level
+    # constant so callers can look up indices by label (e.g. Settings)
+    # without sprinkling magic numbers through the codebase.
+    # Tab labels in registration order. Phase 4 IA: 4 tabs only —
+    # COMMAND, FLEET, LAYOUTS, SYSTEM. The Settings entry point now lands
+    # on the SYSTEM container (which holds SettingsTab on the left).
+    _TAB_LABELS: list[str] = [
+        "Command",
+        "Fleet",
+        "Layouts",
+        "System",
+    ]
 
     def __init__(self):
         super().__init__()
@@ -132,7 +151,8 @@ class MainWindowV21(QMainWindow):
 
         # Tab widget
         self.tabs = QTabWidget()
-        from argus_overview.ui.design_system import colors as ds, metrics as dm
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{
                 border: none;
@@ -163,13 +183,8 @@ class MainWindowV21(QMainWindow):
         """)
         layout.addWidget(self.tabs)
 
-        # Create tabs
-        self._create_main_tab()
-        self._create_hotkeys_tab()
-        self._create_characters_tab()
-        self._create_intel_tab()
-        self._create_settings_sync_tab()
-        self._create_settings_tab()
+        # Create tabs (order is preserved by _TAB_LABELS).
+        self._create_tabs()
 
         # Connect cross-tab signals
         self._connect_signals()
@@ -468,6 +483,17 @@ class MainWindowV21(QMainWindow):
             self._cycle_window(direction=self._pending_cycle_direction)
             self._pending_cycle_direction = None
 
+    def activate_window(self, window_id: str) -> None:
+        """Public alias for :meth:`_activate_window`.
+
+        Peer subsystems (e.g. :class:`CommandIntegrator`) are not
+        subclasses of MainWindowV21 — they call into this entry point
+        rather than reaching into the private implementation. The body
+        is intentionally identical so internal callers can keep using
+        ``_activate_window`` without churn.
+        """
+        self._activate_window(window_id)
+
     def _activate_window(self, window_id: str):
         """Activate a window by ID, optionally minimizing previous EVE window.
 
@@ -512,12 +538,16 @@ class MainWindowV21(QMainWindow):
 
     @Slot()
     def _show_settings(self):
-        """Show settings tab"""
+        """Show the SYSTEM tab — Settings lives inside that container.
+
+        Phase 4 IA: there is no top-level Settings tab. The SettingsTab
+        inner widget is the left pane of the SYSTEM container. We
+        navigate to SYSTEM so the operator lands on (or immediately
+        adjacent to) the panel they expect.
+        """
         self.show()
         self.raise_()
-        self.tabs.setCurrentIndex(
-            4
-        )  # Settings tab (Overview=0, Cycle Control=1, Roster=2, Sync=3, Settings=4)
+        self.tabs.setCurrentIndex(self._TAB_LABELS.index("System"))
 
     @Slot()
     def _reload_config(self):
@@ -701,6 +731,96 @@ class MainWindowV21(QMainWindow):
         self.capture_system.max_workers = workers
 
         self.logger.info("Initial settings applied")
+
+    def _create_tabs(self) -> None:
+        """Create the v3.3 OPS four-tab IA: COMMAND/FLEET/LAYOUTS/SYSTEM.
+
+        Two phases:
+
+        1. Build the v2.2 inner widgets (main_tab, characters_tab,
+           hotkeys_tab, intel_tab, settings_sync_tab, settings_tab).
+           These remain named attributes on ``self`` so cross-tab
+           signal connections keep working.
+        2. Wrap them in the v3.3 IA containers
+           (:class:`CommandTab`, :class:`FleetTab`,
+           :class:`LayoutsContainer`, :class:`SystemTab`) and add those
+           to the QTabWidget.
+
+        The inner widget factories are unchanged — they remain the
+        source of truth for the cross-tab signal wiring.
+        """
+        # Phase 1 — build inner widgets (preserves all v2.2 cross-tab wiring)
+        self._create_main_tab()
+        self._create_layouts_tab()
+        self._create_characters_tab()
+        self._create_hotkeys_tab()
+        self._create_intel_tab()
+        self._create_settings_sync_tab()
+        self._create_settings_tab()
+
+        # Phase 2 — wrap in IA containers
+        self._create_command_tab()
+        self._create_fleet_tab()
+        self._create_layouts_container()
+        self._create_system_tab()
+
+    def _create_command_tab(self) -> None:
+        """Build the COMMAND tab container.
+
+        :class:`CommandTab` is parented to the main window's QTabWidget
+        but the flagship widget is a :class:`CommandCenterWidget`, not
+        the legacy ``MainTab``. ``MainTab`` remains an attribute on
+        ``self`` because :class:`CommandIntegrator` reads its
+        ``window_manager`` for character mirroring.
+        """
+        from argus_overview.ui.tabs.command_tab import CommandTab
+
+        self.command_tab = CommandTab()
+        self.tabs.addTab(self.command_tab, "Command")
+
+    def _create_fleet_tab(self) -> None:
+        """Build the FLEET tab container (Roster + Intel splitter)."""
+        from argus_overview.ui.tabs.fleet_tab import FleetTab
+
+        self.fleet_tab = FleetTab(self.characters_tab, self.intel_tab)
+        self.tabs.addTab(self.fleet_tab, "Fleet")
+
+    def _create_layouts_container(self) -> None:
+        """Build the LAYOUTS tab container (presets + Cycle Control)."""
+        from argus_overview.ui.tabs.layouts_tab import LayoutsContainer
+
+        self.layouts_tab = LayoutsContainer(self.presets_panel, self.hotkeys_tab)
+        self.tabs.addTab(self.layouts_tab, "Layouts")
+
+    def _create_system_tab(self) -> None:
+        """Build the SYSTEM tab container (Settings + Sync)."""
+        from argus_overview.ui.tabs.system_tab import SystemTab
+
+        self.system_tab = SystemTab(self.settings_tab, self.settings_sync_tab)
+        self.tabs.addTab(self.system_tab, "System")
+
+    def _create_layouts_tab(self) -> None:
+        """Build the inner LayoutsTab used by the LAYOUTS container.
+
+        Lives between :meth:`_create_main_tab` (which creates
+        ``main_tab`` that the layouts tab references) and
+        :meth:`_create_hotkeys_tab`. Stored as ``self.presets_panel``
+        so the container attribute can claim ``self.layouts_tab``.
+        """
+        from argus_overview.ui.layouts_tab import LayoutsTab
+
+        # Signature: LayoutsTab(layout_manager, main_tab,
+        # settings_manager=None, character_manager=None). Pass as kwargs
+        # to keep the call resilient to signature reorders.
+        self.presets_panel = LayoutsTab(
+            self.layout_manager,
+            self.main_tab,
+            settings_manager=self.settings_manager,
+            character_manager=self.character_manager,
+        )
+        # NOTE: layout_applied is NOT connected here — main_tab owns that
+        # signal (see _create_main_tab). Connecting both would emit
+        # _on_layout_applied twice per apply.
 
     def _create_main_tab(self):
         """Create Overview tab (window preview management) - formerly 'Main'"""
@@ -1136,12 +1256,78 @@ class MainWindowV21(QMainWindow):
     @Slot(str)
     def _on_layout_applied(self, preset_name: str):
         """
-        Handle layout application from Layouts Tab
+        Handle layout application. Connected to ``MainTab.layout_applied``
+        in :meth:`_create_main_tab` — the canonical signal source. The
+        inner :class:`LayoutsTab` (now hosted inside the LAYOUTS IA
+        container) intentionally does NOT connect here to avoid double-
+        logging.
 
         Args:
             preset_name: Layout preset name
         """
         self.logger.info(f"Layout applied: {preset_name}")
+
+    def show_layout_chooser(self) -> None:
+        """Open a modal dialog listing all saved layout presets.
+
+        This is the operationally correct entry point for the Command
+        Center's ``Layout ▾`` button and any peer subsystem that wants
+        to surface a preset picker. The dialog is built from
+        :meth:`LayoutManager.get_all_presets` so it stays in sync with
+        whatever the user has saved.
+        """
+        from argus_overview.core.layout_manager import LayoutPreset
+
+        presets: list[LayoutPreset] = list(self.layout_manager.get_all_presets())
+        presets.sort(key=lambda p: p.name.lower())
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Layout Presets")
+        dialog.setMinimumSize(420, 360)
+        layout = QVBoxLayout(dialog)
+
+        intro = QLabel(
+            f"Select a layout preset to apply. {len(presets)} saved.",
+            dialog,
+        )
+        layout.addWidget(intro)
+
+        list_widget = QListWidget(dialog)
+        for preset in presets:
+            item = QListWidgetItem(preset.name)
+            if preset.description:
+                item.setToolTip(preset.description)
+            item.setData(Qt.UserRole, preset.name)
+            list_widget.addItem(item)
+        if presets:
+            list_widget.setCurrentRow(0)
+        layout.addWidget(list_widget, 1)
+
+        button_box = QDialogButtonBox(dialog)
+        apply_btn = QPushButton("Apply", dialog)
+        button_box.addButton(apply_btn, QDialogButtonBox.ButtonRole.AcceptRole)
+        button_box.addButton(QDialogButtonBox.StandardButton.Close)
+        layout.addWidget(button_box)
+
+        def _apply_selected() -> None:
+            current = list_widget.currentItem()
+            if current is None:
+                return
+            preset_name = current.data(Qt.UserRole)
+            try:
+                preset = self.layout_manager.get_preset(preset_name)
+                if preset is not None:
+                    self.logger.info(f"Applying layout preset: {preset_name}")
+                    self._on_layout_applied(preset_name)
+                dialog.accept()
+            except (OSError, RuntimeError, ValueError) as exc:
+                self.logger.error(f"Failed to apply preset {preset_name}: {exc}")
+
+        apply_btn.clicked.connect(_apply_selected)
+        list_widget.itemDoubleClicked.connect(lambda _item: _apply_selected())
+        button_box.rejected.connect(dialog.reject)
+
+        dialog.exec()
 
     @Slot(str)
     def _handle_hotkey(self, hotkey_name: str):
