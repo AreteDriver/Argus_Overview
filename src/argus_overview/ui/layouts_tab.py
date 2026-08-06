@@ -326,7 +326,9 @@ class GridApplier:
 
             self.last_apply_results = results
             ok = all(results.values()) if results else True
-            self.logger.info(f"Applied arrangement to {len(window_map)} windows ({sum(results.values())}/{len(results)} succeeded)")
+            self.logger.info(
+                f"Applied arrangement to {len(window_map)} windows ({sum(results.values())}/{len(results)} succeeded)"
+            )
             return ok
 
         except (OSError, subprocess.SubprocessError, KeyError, ValueError) as e:
@@ -814,7 +816,9 @@ class LayoutsTab(QWidget):
                     active_count += 1
 
             if active_count == 0:
-                self.info_label.setText("No active windows — import EVE clients in the Overview tab first")
+                self.info_label.setText(
+                    "No active windows — import EVE clients in the Overview tab first"
+                )
             else:
                 self.info_label.setText(f"Showing all active windows ({active_count})")
         else:

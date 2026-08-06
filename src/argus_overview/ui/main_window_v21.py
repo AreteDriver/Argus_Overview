@@ -153,6 +153,7 @@ class MainWindowV21(QMainWindow):
         self.tabs = QTabWidget()
         from argus_overview.ui.design_system import colors as ds
         from argus_overview.ui.design_system import metrics as dm
+
         self.tabs.setStyleSheet(f"""
             QTabWidget::pane {{
                 border: none;
@@ -661,9 +662,7 @@ class MainWindowV21(QMainWindow):
         app_handlers = {
             "toggle_replay_strips_app": self._toggle_replay_strips_global,
         }
-        app_menu = menu_builder.build_menu(
-            PrimaryHome.APP_MENU, parent=self, handlers=app_handlers
-        )
+        app_menu = menu_builder.build_menu(PrimaryHome.APP_MENU, parent=self, handlers=app_handlers)
         menubar.addMenu(app_menu)
 
         # Build Help menu using MenuBuilder (actions from ActionRegistry)

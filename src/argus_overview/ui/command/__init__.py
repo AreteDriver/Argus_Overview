@@ -10,6 +10,7 @@ identity-defining Command tab:
 * :class:`CommandPalette` — ⌘K action gateway
 * :class:`CommandCenterWidget` — assembled flagship shell
 """
+
 from __future__ import annotations
 
 from argus_overview.ui.command.attention import (

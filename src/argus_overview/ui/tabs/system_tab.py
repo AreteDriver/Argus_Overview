@@ -4,6 +4,7 @@ The operator's mental model: "app + EVE folder configuration."
 SettingsTab (the application config panel) on the left; SettingsSyncTab
 (the EVE folder sync panel) on the right. Default split is 60/40.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt

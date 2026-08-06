@@ -10307,6 +10307,7 @@ class TestCharacterAccentColor:
         env_base["QT_QPA_PLATFORM"] = "offscreen"
         # Ensure the subprocess can find argus_overview when running via pytest
         import pathlib
+
         repo_root = str(pathlib.Path(__file__).resolve().parents[1] / "src")
         env_base["PYTHONPATH"] = repo_root + os.pathsep + env_base.get("PYTHONPATH", "")
 
@@ -11043,6 +11044,7 @@ class TestWindowPreviewWidgetFocus:
             widget.rect = MagicMock(return_value=QRect(0, 0, 200, 150))
 
             from PySide6.QtGui import QPainter
+
             mock_painter = MagicMock(spec=QPainter)
             widget._paint_focus_layer(mock_painter)
 
@@ -11063,6 +11065,7 @@ class TestWindowPreviewWidgetFocus:
             widget.hasFocus = MagicMock(return_value=False)
 
             from PySide6.QtGui import QPainter
+
             mock_painter = MagicMock(spec=QPainter)
             widget._paint_focus_layer(mock_painter)
 

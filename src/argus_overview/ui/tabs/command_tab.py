@@ -9,6 +9,7 @@ The container exposes the CommandCenterWidget directly so the
 :mod:`argus_overview.ui.command.integration` module can wire its
 signals and slots without knowing about the IA layer.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
@@ -41,9 +42,7 @@ class CommandTab(QWidget):
 
         self.command_center = CommandCenterWidget(self)
         self.command_center.palette_requested.connect(self.palette_requested.emit)
-        self.command_center.layout_chooser_requested.connect(
-            self.layout_chooser_requested.emit
-        )
+        self.command_center.layout_chooser_requested.connect(self.layout_chooser_requested.emit)
         self.command_center.pilot_focus_requested.connect(self.pilot_focus_requested.emit)
         self.command_center.pilot_context_requested.connect(self.pilot_context_requested.emit)
 

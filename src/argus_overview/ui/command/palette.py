@@ -10,6 +10,7 @@ Press ⌘K (Ctrl+K on Linux/Windows) to open. Type to filter across:
 The palette is the operator's muscle-memory gateway — every action is
 reachable in two keystrokes from anywhere in Argus.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -47,6 +48,7 @@ from argus_overview.ui.design_system import spacing as sp
 @dataclass
 class PaletteEntry:
     """One entry in the palette — display + filter + handler."""
+
     id: str
     title: str
     subtitle: str = ""
@@ -161,7 +163,9 @@ class CommandPalette(QDialog):
             ("ACTION", ds.CRITICAL),
         ):
             chip = QLabel(f"● {label}")
-            chip.setStyleSheet(f"color: {color}; font-size: 8pt; font-weight: 700; letter-spacing: 140%;")
+            chip.setStyleSheet(
+                f"color: {color}; font-size: 8pt; font-weight: 700; letter-spacing: 140%;"
+            )
             l_layout.addWidget(chip)
         l_layout.addStretch(1)
         body_layout.addWidget(legend)
@@ -184,8 +188,10 @@ class CommandPalette(QDialog):
             ("↑↓  NAVIGATE", "ARROWS"),
             ("ESC  CLOSE", "ESC"),
         ):
-            cell = QLabel(f"<b style='color:{ds.TEXT_SECONDARY}'>{label}</b>"
-                          f"  <span style='color:{ds.TEXT_MUTED}'>{key}</span>")
+            cell = QLabel(
+                f"<b style='color:{ds.TEXT_SECONDARY}'>{label}</b>"
+                f"  <span style='color:{ds.TEXT_MUTED}'>{key}</span>"
+            )
             cell.setTextFormat(Qt.TextFormat.RichText)
             f_layout.addWidget(cell)
         f_layout.addStretch(1)
@@ -286,8 +292,9 @@ class CommandPalette(QDialog):
     def _score(self, entry: PaletteEntry, q: str) -> int:
         if not q:
             return 1  # show everything in declared order
-        haystack = " ".join([entry.title.lower(), entry.subtitle.lower(),
-                             entry.category.lower(), *entry.keywords]).strip()
+        haystack = " ".join(
+            [entry.title.lower(), entry.subtitle.lower(), entry.category.lower(), *entry.keywords]
+        ).strip()
         if entry.title.lower().startswith(q):
             return 100
         if q in haystack:

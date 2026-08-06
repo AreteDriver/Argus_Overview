@@ -13,6 +13,7 @@ integration via:
 Where ``window`` is any object that exposes the same signals and
 properties as MainWindowV21.
 """
+
 from __future__ import annotations
 
 import logging
@@ -87,9 +88,7 @@ class CommandIntegrator(QObject):
                 getattr(self._window, attr)()
                 self._record_ops("layout", "Layout chooser opened")
                 return
-        self._logger.info(
-            "Layout chooser requested but MainWindow has no show_layout_chooser"
-        )
+        self._logger.info("Layout chooser requested but MainWindow has no show_layout_chooser")
 
     @Slot()
     def _open_palette(self) -> None:
@@ -121,6 +120,7 @@ class CommandIntegrator(QObject):
                 elif hasattr(self._window, "focus_window"):
                     self._window.focus_window(wid)
                 self._open_palette()  # ensure palette close; entry already close on accept
+
             return PaletteEntry(
                 id=f"focus::{wid}",
                 title=f"Focus {name}",
@@ -209,12 +209,8 @@ class CommandIntegrator(QObject):
             return
         self._command.pilot_focus_requested.connect(self._on_pilot_focus)
         self._command.pilot_context_requested.connect(self._on_pilot_context)
-        self._command.grid_holder().pilot_focus_requested.connect(
-            self._on_pilot_focus
-        )
-        self._command.grid_holder().pilot_context_requested.connect(
-            self._on_pilot_context
-        )
+        self._command.grid_holder().pilot_focus_requested.connect(self._on_pilot_focus)
+        self._command.grid_holder().pilot_context_requested.connect(self._on_pilot_context)
         # Mirror existing main tab characters into the rail on demand
         self._mirror_main_tab_characters()
 
@@ -230,6 +226,7 @@ class CommandIntegrator(QObject):
             # Pre-existing helpers vary across versions. Defensive walk.
             if wm and hasattr(wm, "known_windows"):
                 from argus_overview.ui.main_tab import character_accent_color
+
                 for wid, display_name in wm.known_windows().items():
                     accent_color = character_accent_color(display_name)
                     accent = (
@@ -312,38 +309,48 @@ class CommandIntegrator(QObject):
 
         fleet_count = rail.card_count()
         active_threats = sum(
-            1 for wid in rail.card_order()
+            1
+            for wid in rail.card_order()
             if getattr(rail.card_for(wid), "_threat_level", None)
             and getattr(rail.card_for(wid), "_threat_alpha", 0.0) > 0.0
         )
         self._alert_count = active_threats
-        header.update_state(fleet_count=fleet_count, alert_count=active_threats,
-                            intel_health="live")
+        header.update_state(
+            fleet_count=fleet_count, alert_count=active_threats, intel_health="live"
+        )
         truth.set_alert_count(active_threats)
         # Refresh age labels on TacticalCards so the operator sees
         # freshness at a glance during long sessions.
         grid.tick_all()
 
     # ---- ops timeline ----------------------------------------------------
-    def _record_ops(self, category: str, label: str, detail: str = "",
-                    pilot: str | None = None) -> None:
+    def _record_ops(
+        self, category: str, label: str, detail: str = "", pilot: str | None = None
+    ) -> None:
         if not self._command:
             return
-        entry = OpsEntry(timestamp=time.time(), label=label,
-                         detail=detail, pilot=pilot, category=category)
+        entry = OpsEntry(
+            timestamp=time.time(), label=label, detail=detail, pilot=pilot, category=category
+        )
         self._command.ops_timeline().add_entry(entry)
 
-    def record_ops(self, category: str, label: str, detail: str = "",
-                   pilot: str | None = None) -> None:
+    def record_ops(
+        self, category: str, label: str, detail: str = "", pilot: str | None = None
+    ) -> None:
         """Public method for callers to log operational events."""
         self._record_ops(category, label, detail=detail, pilot=pilot)
 
     # ---- attention queue --------------------------------------------------
-    def surface_attention(self, category: str, title: str, *,
-                          detail: str = "",
-                          pilot: str | None = None,
-                          system: str | None = None,
-                          severity: str = "info") -> None:
+    def surface_attention(
+        self,
+        category: str,
+        title: str,
+        *,
+        detail: str = "",
+        pilot: str | None = None,
+        system: str | None = None,
+        severity: str = "info",
+    ) -> None:
         if not self._command:
             return
         item = AttentionItem(

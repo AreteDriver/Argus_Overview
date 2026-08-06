@@ -549,7 +549,9 @@ class GridApplier:
 
                 for _char_name, window_id in window_map.items():
                     if stacked_use_grid_size:
-                        results[window_id] = self._move_window(window_id, x, y, cell_width, cell_height)
+                        results[window_id] = self._move_window(
+                            window_id, x, y, cell_width, cell_height
+                        )
                     else:
                         results[window_id] = self._move_window_position_only(window_id, x, y)
             else:
@@ -564,7 +566,9 @@ class GridApplier:
 
             self.last_apply_results = results
             ok = all(results.values()) if results else True
-            self.logger.info(f"Applied arrangement to {len(window_map)} windows ({sum(results.values())}/{len(results)} succeeded)")
+            self.logger.info(
+                f"Applied arrangement to {len(window_map)} windows ({sum(results.values())}/{len(results)} succeeded)"
+            )
             return ok
 
         except (AttributeError, OSError, RuntimeError, ValueError) as e:
@@ -1432,7 +1436,11 @@ class WindowPreviewWidget(QWidget):
         from argus_overview.ui.design_system import metrics as dm
 
         # Determine if health should suppress the threat border
-        suppress_threat = health.startswith("STALE") or health in ("ERROR", "DISCONNECTED", "PAUSED")
+        suppress_threat = health.startswith("STALE") or health in (
+            "ERROR",
+            "DISCONNECTED",
+            "PAUSED",
+        )
 
         # Threat border (only when healthy enough to trust the data)
         if (
@@ -1472,8 +1480,12 @@ class WindowPreviewWidget(QWidget):
                 painter.setPen(pen)
                 painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
                 painter.drawRoundedRect(
-                    2, 2, self.width() - 4, self.height() - 4,
-                    dm.RADIUS_CARD, dm.RADIUS_CARD,
+                    2,
+                    2,
+                    self.width() - 4,
+                    self.height() - 4,
+                    dm.RADIUS_CARD,
+                    dm.RADIUS_CARD,
                 )
                 painter.setPen(QPen(QColor(ds.TEXT_MUTED)))
                 painter.drawText(6, 14, "?")
@@ -1483,8 +1495,12 @@ class WindowPreviewWidget(QWidget):
                 painter.setPen(pen)
                 painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
                 painter.drawRoundedRect(
-                    2, 2, self.width() - 4, self.height() - 4,
-                    dm.RADIUS_CARD, dm.RADIUS_CARD,
+                    2,
+                    2,
+                    self.width() - 4,
+                    self.height() - 4,
+                    dm.RADIUS_CARD,
+                    dm.RADIUS_CARD,
                 )
 
     def _paint_health_overlay_layer(self, painter: QPainter, health: str) -> None:
@@ -2787,7 +2803,16 @@ class MainTab(QWidget):
 
         pattern = preset.grid_pattern or "custom"
         # Normalise pattern name to the display form used by get_pattern_positions
-        display_pattern = pattern.replace("_", " ").replace("2x2", "2x2 Grid").replace("3x1", "3x1 Row").replace("1x3", "1x3 Column").replace("4x1", "4x1 Row").replace("main+sides", "Main + Sides").replace("cascade", "Cascade").replace("custom", "Custom")
+        display_pattern = (
+            pattern.replace("_", " ")
+            .replace("2x2", "2x2 Grid")
+            .replace("3x1", "3x1 Row")
+            .replace("1x3", "1x3 Column")
+            .replace("4x1", "4x1 Row")
+            .replace("main+sides", "Main + Sides")
+            .replace("cascade", "Cascade")
+            .replace("custom", "Custom")
+        )
         # Fallback: if the normalised name isn't in our map, try title-casing
         if display_pattern not in get_all_layout_patterns() and display_pattern != "Custom":
             display_pattern = "Custom"

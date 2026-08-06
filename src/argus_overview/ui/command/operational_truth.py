@@ -7,6 +7,7 @@ labeled strip. Carries:
   * Layout applied + last applied timestamp
   * Theme + version pinned right
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Property, QPropertyAnimation, Qt, Signal
@@ -141,8 +142,7 @@ class OperationalTruthBar(QWidget):
         # Version cell
         self._version_cell = QLabel("ARGUS // v3.3 OPS", self)
         self._version_cell.setStyleSheet(
-            f"color: {ds.TEXT_MUTED}; font-size: 8pt;"
-            f" letter-spacing: 180%; font-weight: 600;"
+            f"color: {ds.TEXT_MUTED}; font-size: 8pt; letter-spacing: 180%; font-weight: 600;"
         )
         layout.addWidget(self._version_cell)
 
@@ -153,10 +153,12 @@ class OperationalTruthBar(QWidget):
         self._pulse_anim.setStartValue(1.0)
         self._pulse_anim.setEndValue(0.35)
         from PySide6.QtCore import QEasingCurve
+
         self._pulse_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
         # Top hairline
         original = self.paintEvent
+
         def _paint(ev):  # noqa: ARG001
             original(ev)
             pp = QPainter(self)
@@ -164,6 +166,7 @@ class OperationalTruthBar(QWidget):
                 pp.fillRect(0, 0, self.width(), 1, QColor(ds.BORDER_SUBTLE))
             finally:
                 pp.end()
+
         self.paintEvent = _paint
 
     # ---- properties --------------------------------------------------------
@@ -202,6 +205,7 @@ class OperationalTruthBar(QWidget):
             self._layout_cell.setText("·")
             return
         import datetime
+
         suffix = ""
         if applied_at:
             suffix = f"  @ {datetime.datetime.fromtimestamp(applied_at).strftime('%H:%M:%S')}"

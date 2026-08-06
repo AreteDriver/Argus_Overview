@@ -17,6 +17,7 @@ Overview tab's ``WindowPreviewWidget``. The grid answers the
 complementary question: **"which windows are connected, where are
 they, and which are flagged?"**
 """
+
 from __future__ import annotations
 
 import time
@@ -169,9 +170,7 @@ class TacticalCard(QFrame):
         meta_layout.addWidget(self._health_label)
         self._age_label = QLabel("now")
         self._age_label.setObjectName("TacticalAge")
-        self._age_label.setAlignment(
-            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
-        )
+        self._age_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         meta_layout.addWidget(self._age_label)
         body_layout.addWidget(meta_block)
         layout.addWidget(body, 1)
@@ -279,8 +278,7 @@ class TacticalCard(QFrame):
         d_name = darker.name()
         text_color = (
             "#0f0f0f"
-            if (accent.redF() * 0.299 + accent.greenF() * 0.587 + accent.blueF() * 0.114)
-            > 0.55
+            if (accent.redF() * 0.299 + accent.greenF() * 0.587 + accent.blueF() * 0.114) > 0.55
             else "#f5f5f5"
         )
 
@@ -363,9 +361,7 @@ class TacticalCard(QFrame):
             event.accept()
             return
         if event.button() == Qt.MouseButton.RightButton:
-            self.context_requested.emit(
-                self._window_id, event.globalPosition().toPoint()
-            )
+            self.context_requested.emit(self._window_id, event.globalPosition().toPoint())
             event.accept()
             return
         super().mousePressEvent(event)
@@ -481,8 +477,7 @@ class TacticalGrid(QWidget):
         for window_id in list(self._cards.keys()):
             self.remove_card(window_id)
 
-    def set_pilot_system(self, window_id: str, system: str | None, *,
-                         stale: bool = False) -> bool:
+    def set_pilot_system(self, window_id: str, system: str | None, *, stale: bool = False) -> bool:
         card = self._cards.get(window_id)
         if card is None:
             return False
@@ -500,9 +495,15 @@ class TacticalGrid(QWidget):
         for wid, card in self._cards.items():
             card.set_focused(wid == window_id and focused)
 
-    def set_pilot_threat(self, window_id: str, level: ThreatLevel | None, *,
-                         system: str | None = None, alpha: float = 1.0,
-                         distance: int | None = None) -> bool:
+    def set_pilot_threat(
+        self,
+        window_id: str,
+        level: ThreatLevel | None,
+        *,
+        system: str | None = None,
+        alpha: float = 1.0,
+        distance: int | None = None,
+    ) -> bool:
         card = self._cards.get(window_id)
         if card is None:
             return False

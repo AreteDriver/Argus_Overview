@@ -207,11 +207,17 @@ def draw_threat_accent(
         )
     elif edge == "left":
         painter.drawRect(
-            rect.x(), rect.y() + 6, ribbon_width, rect.height() - 12,
+            rect.x(),
+            rect.y() + 6,
+            ribbon_width,
+            rect.height() - 12,
         )
     elif edge == "top":
         painter.drawRect(
-            rect.x() + 6, rect.y(), rect.width() - 12, ribbon_width,
+            rect.x() + 6,
+            rect.y(),
+            rect.width() - 12,
+            ribbon_width,
         )
     elif edge == "bottom":
         painter.drawRect(

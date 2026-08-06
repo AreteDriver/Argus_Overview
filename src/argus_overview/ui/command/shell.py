@@ -22,6 +22,7 @@ This module exposes one QWidget: ``CommandCenterWidget``. It is built
 to slot into an existing QTabWidget as a top-level tab without
 disrupting the other tabs.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Signal
@@ -77,6 +78,7 @@ class CommandCenterWidget(QWidget):
 
         # ROW 2 COL 2 — Attention Queue + Ops Timeline
         from PySide6.QtWidgets import QVBoxLayout
+
         right_panel = QWidget(self)
         right_panel.setObjectName("CommandRightPanel")
         right_layout = QVBoxLayout(right_panel)

@@ -118,6 +118,7 @@ class LayoutManager:
         """
         if self._position is None:
             from argus_overview.core.position import Position
+
             self._position = Position()
         return self._position
 

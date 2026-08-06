@@ -231,7 +231,9 @@ class PerformancePanel(QWidget):
             "• Reduces CPU/GPU load significantly\n\n"
             "Use when running multiple EVE clients."
         )
-        self.low_power_check.setStyleSheet(f"QCheckBox {{ font-weight: bold; color: {_ds.WARNING}; }}")
+        self.low_power_check.setStyleSheet(
+            f"QCheckBox {{ font-weight: bold; color: {_ds.WARNING}; }}"
+        )
         form.addRow("⚡ Low Power Mode:", self.low_power_check)
 
         # Disable previews (GPU/CPU saver)

@@ -15,6 +15,7 @@ expand smoothly when items arrive.
 The visual is deliberate: small, dense, monospace-aligned times, color
 dots not icons. Information first.
 """
+
 from __future__ import annotations
 
 import time
@@ -119,21 +120,22 @@ class AttentionItemRow(QFrame):
         text_layout.setContentsMargins(0, 0, 0, 0)
         text_layout.setSpacing(0)
         title = QLabel(item.title)
-        title.setStyleSheet(
-            f"color: {ds.TEXT_PRIMARY}; font-weight: 700; font-size: 10pt;"
-        )
+        title.setStyleSheet(f"color: {ds.TEXT_PRIMARY}; font-weight: 700; font-size: 10pt;")
         title.setWordWrap(False)
         text_layout.addWidget(title)
-        sub_text = " · ".join(filter(None, [
-            f"[{item.category.upper()}]",
-            item.pilot,
-            item.system,
-        ])) + ("  " + item.detail if item.detail else "")
+        sub_text = " · ".join(
+            filter(
+                None,
+                [
+                    f"[{item.category.upper()}]",
+                    item.pilot,
+                    item.system,
+                ],
+            )
+        ) + ("  " + item.detail if item.detail else "")
         if sub_text.strip():
             sub = QLabel(sub_text.strip())
-            sub.setStyleSheet(
-                f"color: {ds.TEXT_MUTED}; font-size: 9pt;"
-            )
+            sub.setStyleSheet(f"color: {ds.TEXT_MUTED}; font-size: 9pt;")
             sub.setWordWrap(True)
             text_layout.addWidget(sub)
         layout.addWidget(text_block, 1)
@@ -364,9 +366,7 @@ class OpsTimeline(QWidget):
                 w.deleteLater()
         empty = QLabel("Awaiting first operator input…", self)
         empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        empty.setStyleSheet(
-            f"color: {ds.TEXT_MUTED}; font-style: italic; padding: {sp.SPACE_5}px;"
-        )
+        empty.setStyleSheet(f"color: {ds.TEXT_MUTED}; font-style: italic; padding: {sp.SPACE_5}px;")
         self._body_layout.insertWidget(0, empty)
 
     def add_entry(self, entry: OpsEntry) -> None:
@@ -412,22 +412,19 @@ class _OpsRow(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         from PySide6.QtWidgets import QHBoxLayout
+
         layout = QHBoxLayout(self)
         layout.setContentsMargins(sp.SPACE_2, 0, sp.SPACE_2, 0)
         layout.setSpacing(sp.SPACE_2)
 
         self._time = QLabel(self._format_time(entry.timestamp))
         self._time.setObjectName("OpsRowTime")
-        self._time.setStyleSheet(
-            f"color: {ds.TEXT_MUTED}; font-family: monospace; font-size: 9pt;"
-        )
+        self._time.setStyleSheet(f"color: {ds.TEXT_MUTED}; font-family: monospace; font-size: 9pt;")
         self._time.setMinimumWidth(56)
         layout.addWidget(self._time)
 
         self._dot = QLabel("●", self)
-        self._dot.setStyleSheet(
-            f"color: {entry.category_color()}; font-size: 8pt;"
-        )
+        self._dot.setStyleSheet(f"color: {entry.category_color()}; font-size: 8pt;")
         self._dot.setFixedWidth(10)
         layout.addWidget(self._dot)
 
@@ -437,9 +434,7 @@ class _OpsRow(QWidget):
         if entry.detail:
             text += f" — {entry.detail}"
         self._text = QLabel(text, self)
-        self._text.setStyleSheet(
-            f"color: {ds.TEXT_SECONDARY}; font-size: 9pt;"
-        )
+        self._text.setStyleSheet(f"color: {ds.TEXT_SECONDARY}; font-size: 9pt;")
         layout.addWidget(self._text, 1)
 
     def _format_time(self, ts: float) -> str:

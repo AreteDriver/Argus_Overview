@@ -6,6 +6,7 @@ Layout presets (the existing :class:`LayoutsTab` from
 (:class:`HotkeysTab`) on the right. Default split is 70/30 so the
 visual arrangement grid gets the room it needs.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt

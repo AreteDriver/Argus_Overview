@@ -12,6 +12,7 @@ Design intent:
   * Right-side cluster: command palette hint and global action buttons.
   * Bottom 1px focus line in BORDER_FOCUS to anchor the eye.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Property, QEasingCurve, QPropertyAnimation, Qt, QTimer, Signal
@@ -39,6 +40,7 @@ class BrandMark(QWidget):
 
     def sizeHint(self):  # noqa: D401
         from PySide6.QtCore import QSize
+
         return QSize(180, 48)
 
     def paintEvent(self, event) -> None:  # noqa: ARG002
@@ -146,8 +148,11 @@ class OperationalStatusLine(QWidget):
         try:
             p.setRenderHint(QPainter.RenderHint.TextAntialiasing)
             r = self.rect()
-            y = (r.height() + QFontMetrics(self.font()).ascent()
-                 - QFontMetrics(self.font()).descent()) // 2
+            y = (
+                r.height()
+                + QFontMetrics(self.font()).ascent()
+                - QFontMetrics(self.font()).descent()
+            ) // 2
 
             segments = []
             # Fleet count — word-bound pluralization
@@ -156,7 +161,9 @@ class OperationalStatusLine(QWidget):
             segments.append((ds.TEXT_MUTED, "·"))
             # Intel health
             intel_color = {
-                "live": ds.HEALTHY, "idle": ds.UNKNOWN, "degraded": ds.WARNING,
+                "live": ds.HEALTHY,
+                "idle": ds.UNKNOWN,
+                "degraded": ds.WARNING,
                 "offline": ds.CRITICAL,
             }.get(self._intel_health, ds.UNKNOWN)
             intel_label = self._intel_health.upper()
@@ -311,6 +318,7 @@ class CommandCenterHeader(QWidget):
     def _paint_focus_line(self) -> None:
         """1px focus line at the very bottom to anchor the header."""
         original = self.paintEvent
+
         def paintEvent(event):  # noqa: ARG001
             original(event)
             p = QPainter(self)
@@ -318,6 +326,7 @@ class CommandCenterHeader(QWidget):
                 p.fillRect(0, self.height() - 1, self.width(), 1, QColor(ds.BORDER_FOCUS))
             finally:
                 p.end()
+
         self.paintEvent = paintEvent
 
     def update_state(

@@ -426,9 +426,7 @@ class TestShowSettings:
         window.raise_.assert_called_once()
         # Phase 4 IA: Settings lives inside the SYSTEM container — the
         # _show_settings entry point lands on SYSTEM (last of four tabs).
-        window.tabs.setCurrentIndex.assert_called_with(
-            MainWindowV21._TAB_LABELS.index("System")
-        )
+        window.tabs.setCurrentIndex.assert_called_with(MainWindowV21._TAB_LABELS.index("System"))
 
 
 class TestPhase4InformationArchitecture:

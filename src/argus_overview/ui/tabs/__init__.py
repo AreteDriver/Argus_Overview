@@ -19,6 +19,7 @@ Construction signatures:
 The containers don't reach into the MainWindowV21 init dance; they
 take already-built inner widgets and stitch them together.
 """
+
 from __future__ import annotations
 
 from argus_overview.ui.tabs.command_tab import CommandTab

@@ -5,6 +5,7 @@ v2.2 tabs into a single top-level tab. Tests pin the splitter
 structure so the IA contract is enforced: every container exposes
 both inner widgets and the splitter that joins them.
 """
+
 from __future__ import annotations
 
 import pytest

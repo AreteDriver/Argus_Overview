@@ -17,6 +17,7 @@ with full context: capture health, last report, distance from threat.
 The Fleet Rail replaces the floating StatusDock as the primary identity
 read — it is always visible, always ordered, and never collapses.
 """
+
 from __future__ import annotations
 
 import time
@@ -95,6 +96,7 @@ class FleetCard(QFrame):
         # Top row — avatar + name + focus dot
         top = QWidget(self)
         from PySide6.QtWidgets import QHBoxLayout
+
         top_layout = QHBoxLayout(top)
         top_layout.setContentsMargins(0, 0, 0, 0)
         top_layout.setSpacing(sp.SPACE_2)
@@ -206,7 +208,11 @@ class FleetCard(QFrame):
         darker = accent.darker(160)
         a_name = accent.name()
         d_name = darker.name()
-        text_color = "#0f0f0f" if (accent.redF() * 0.299 + accent.greenF() * 0.587 + accent.blueF() * 0.114) > 0.55 else "#f5f5f5"
+        text_color = (
+            "#0f0f0f"
+            if (accent.redF() * 0.299 + accent.greenF() * 0.587 + accent.blueF() * 0.114) > 0.55
+            else "#f5f5f5"
+        )
 
         focus_border = ds.BORDER_FOCUS if self._has_focus else ds.BORDER_SUBTLE
         focus_bg = ds.SURFACE if not self._has_focus else ds.SURFACE_RAISED
@@ -255,6 +261,7 @@ class FleetCard(QFrame):
         )
         # Focus dot: visible only when character has window focus
         from PySide6.QtGui import QPixmap
+
         pix = QPixmap(self._focus_dot.size())
         pix.fill(Qt.GlobalColor.transparent)
         p = QPainter(pix)
@@ -296,8 +303,11 @@ class FleetCard(QFrame):
 
     def _update_accessible(self) -> None:
         parts = [f"Pilot {self._character_name}"]
-        sys = self._system if self._system and not self._stale else (
-            f"unknown last {self._last_system}" if self._last_system else "unknown")
+        sys = (
+            self._system
+            if self._system and not self._stale
+            else (f"unknown last {self._last_system}" if self._last_system else "unknown")
+        )
         parts.append(f"system {sys}")
         parts.append(f"capture {self._capture_health}")
         if self._threat_level and self._threat_alpha > 0.0:
@@ -339,6 +349,7 @@ class FleetCard(QFrame):
         # reading identity + state from a glance.
         if self._threat_level and self._threat_alpha > 0.0:
             from argus_overview.ui.main_tab import THREAT_BORDER_COLORS
+
             rgb = THREAT_BORDER_COLORS.get(self._threat_level, (255, 0, 0))
             p = QPainter(self)
             try:
@@ -416,7 +427,9 @@ class FleetRail(QWidget):
     def card_for(self, window_id: str) -> FleetCard | None:
         return self._cards.get(window_id)
 
-    def upsert_card(self, window_id: str, character_name: str, accent: tuple[int, int, int]) -> FleetCard:
+    def upsert_card(
+        self, window_id: str, character_name: str, accent: tuple[int, int, int]
+    ) -> FleetCard:
         if window_id in self._cards:
             return self._cards[window_id]
         card = FleetCard(window_id, character_name, accent, parent=self._cards_holder)

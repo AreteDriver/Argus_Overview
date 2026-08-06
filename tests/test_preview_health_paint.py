@@ -31,15 +31,18 @@ def _make_widget(qapp):
     return widget
 
 
-@pytest.mark.parametrize("health_label", [
-    "INITIALIZING",
-    "LIVE",
-    "STATIC",
-    "STALE · 5s",
-    "PAUSED",
-    "ERROR",
-    "DISCONNECTED",
-])
+@pytest.mark.parametrize(
+    "health_label",
+    [
+        "INITIALIZING",
+        "LIVE",
+        "STATIC",
+        "STALE · 5s",
+        "PAUSED",
+        "ERROR",
+        "DISCONNECTED",
+    ],
+)
 def test_paint_event_for_health_label(qapp, health_label):
     """paintEvent must not crash for any capture health label."""
     widget = _make_widget(qapp)

@@ -9,6 +9,7 @@ Covers:
   * Command palette (entry filtering, ranking)
   * Command Center shell assembly
 """
+
 from __future__ import annotations
 
 import time
@@ -91,8 +92,7 @@ class TestFleetCard:
 
     def test_distance_badge_appears(self, app):
         card = FleetCard("w1", "Test", accent=(100, 200, 100))
-        card.set_threat_state(ThreatLevel.DANGER, system="Jita",
-                              alpha=0.6, distance=3)
+        card.set_threat_state(ThreatLevel.DANGER, system="Jita", alpha=0.6, distance=3)
         app.processEvents()
         assert "+3j" in card._threat_badge.text()
 
@@ -143,8 +143,7 @@ class TestFleetRail:
     def test_clear(self, app):
         rail = FleetRail()
         for i in range(3):
-            rail.upsert_card(f"w{i}", f"Pilot {i}",
-                              accent=(100, 200, 100))
+            rail.upsert_card(f"w{i}", f"Pilot {i}", accent=(100, 200, 100))
         assert rail.card_count() == 3
         rail.clear()
         assert rail.card_count() == 0
@@ -166,8 +165,11 @@ class TestAttentionQueue:
     def test_add_item_inserts_row(self, app):
         q = AttentionQueue()
         item = AttentionItem(
-            id="t1", category="threat", title="Hostile in Jita",
-            detail="5 Sabres", severity="critical"
+            id="t1",
+            category="threat",
+            title="Hostile in Jita",
+            detail="5 Sabres",
+            severity="critical",
         )
         q.add_item(item)
         app.processEvents()
@@ -175,9 +177,7 @@ class TestAttentionQueue:
 
     def test_acknowledge_removes_active(self, app):
         q = AttentionQueue()
-        item = AttentionItem(
-            id="t1", category="threat", title="x", severity="warning"
-        )
+        item = AttentionItem(id="t1", category="threat", title="x", severity="warning")
         q.add_item(item)
         q._on_ack("t1")
         app.processEvents()
@@ -194,9 +194,7 @@ class TestOpsTimeline:
         t = OpsTimeline()
         t.ENTRIES_MAX = 3
         for i in range(5):
-            t.add_entry(OpsEntry(timestamp=time.time(),
-                                  label=f"Event {i}",
-                                  category="layout"))
+            t.add_entry(OpsEntry(timestamp=time.time(), label=f"Event {i}", category="layout"))
         app.processEvents()
         assert len(t._entries) <= t.ENTRIES_MAX
 
@@ -263,8 +261,7 @@ class TestCommandPalette:
 
     def test_no_matches_shows_placeholder(self, app):
         pal = self._make_palette()
-        pal.set_entries([PaletteEntry(id="a", title="X",
-                                       category="system")])
+        pal.set_entries([PaletteEntry(id="a", title="X", category="system")])
         pal._refresh_list("zzzzznotfound")
         first = pal._list.item(0)
         assert "No matches" in first.text()
@@ -382,8 +379,6 @@ class TestCommandCenterGridIntegration:
 
     def test_shell_upsert_into_grid(self, app):
         cc = CommandCenterWidget()
-        card = cc.grid_holder().upsert_card(
-            "w1", "Pilot A", accent=(180, 100, 220)
-        )
+        card = cc.grid_holder().upsert_card("w1", "Pilot A", accent=(180, 100, 220))
         assert cc.grid_holder().card_count() == 1
         assert card.character_name() == "Pilot A"

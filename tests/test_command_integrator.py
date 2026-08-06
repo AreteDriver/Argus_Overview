@@ -11,6 +11,7 @@ If the integrator ever falls back to ``hasattr`` probing for a method
 that does not exist on the real MainWindow, the corresponding test
 will fail — by design. That is the whole point of this file.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -276,6 +277,7 @@ class TestPaletteEntries:
         assert name == "dark"
         # Second argument must be the QApplication instance, not None.
         from PySide6.QtWidgets import QApplication
+
         assert isinstance(app, QApplication)
 
 

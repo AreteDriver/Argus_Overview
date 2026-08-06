@@ -8,6 +8,7 @@ This is a thin container — both inner widgets keep their existing
 dependencies and signal surface. The split state is persisted only in
 memory; future work could write it to settings.
 """
+
 from __future__ import annotations
 
 from PySide6.QtCore import Qt

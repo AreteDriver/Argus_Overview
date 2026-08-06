@@ -410,6 +410,7 @@ class ToolbarBuilder:
     def _get_success_style(self) -> str:
         """Return stylesheet for success actions using design-system healthy green."""
         from argus_overview.ui.design_system import colors as ds
+
         return f"""
             QPushButton {{
                 background-color: {ds.HEALTHY};
@@ -426,6 +427,7 @@ class ToolbarBuilder:
         filling on hover for clear affordance.
         """
         from argus_overview.ui.design_system import colors as ds
+
         return f"""
             QPushButton {{
                 background-color: transparent;

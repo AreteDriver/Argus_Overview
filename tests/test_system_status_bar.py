@@ -20,7 +20,13 @@ class TestSystemStatusBarInit:
     def test_five_indicators_created(self, qapp):
         bar = SystemStatusBar()
         assert len(bar._indicators) == 5
-        assert set(bar._indicators.keys()) == {"capture", "hotkeys", "discovery", "intel", "location"}
+        assert set(bar._indicators.keys()) == {
+            "capture",
+            "hotkeys",
+            "discovery",
+            "intel",
+            "location",
+        }
 
     def test_all_unknown_on_init(self, qapp):
         bar = SystemStatusBar()
@@ -84,8 +90,9 @@ class TestSystemStatusBarPaint:
         bar = SystemStatusBar()
         indicator = bar._indicators["capture"]
 
-        with patch.object(QPainter, "drawText") as mock_draw_text, \
-             patch.object(QPainter, "drawEllipse") as mock_draw_ellipse:
+        with patch.object(QPainter, "drawText") as mock_draw_text, patch.object(
+            QPainter, "drawEllipse"
+        ) as mock_draw_ellipse:
             # Fake a paint event
             event = QPaintEvent(indicator.rect())
             indicator.paintEvent(event)
