@@ -822,7 +822,14 @@ class MainWindowV21(QMainWindow):
         # _on_layout_applied twice per apply.
 
     def _create_main_tab(self):
-        """Create Overview tab (window preview management) - formerly 'Main'"""
+        """Create the inner MainTab used by the COMMAND container.
+
+        The MainTab is *not* added to the QTabWidget directly. The v3.3
+        IA container (:class:`CommandTab`) wraps it inside CommandCenter
+        via :class:`CommandIntegrator` which reads MainTab's
+        ``window_manager`` for character mirroring. We keep MainTab as
+        ``self.main_tab`` so cross-tab signal connections remain stable.
+        """
         from argus_overview.ui.main_tab import MainTab
 
         self.main_tab = MainTab(
@@ -831,14 +838,20 @@ class MainWindowV21(QMainWindow):
             settings_manager=self.settings_manager,
             layout_manager=self.layout_manager,
         )
-        self.tabs.addTab(self.main_tab, "Overview")
 
         # Connect signals
         self.main_tab.character_detected.connect(self._on_character_detected)
         self.main_tab.layout_applied.connect(self._on_layout_applied)
 
     def _create_characters_tab(self):
-        """Create Roster tab (character & team management) - formerly 'Characters & Teams'"""
+        """Create the inner CharactersTeamsTab used by the FLEET container.
+
+        The Roster widget is *not* added to the QTabWidget directly. The
+        v3.3 IA container :class:`FleetTab` wraps it inside a 60/40
+        splitter beside :class:`IntelTab`. We keep it as
+        ``self.characters_tab`` so cross-tab signal connections remain
+        stable.
+        """
         from argus_overview.ui.characters_teams_tab import CharactersTeamsTab
 
         self.characters_tab = CharactersTeamsTab(
@@ -846,19 +859,24 @@ class MainWindowV21(QMainWindow):
             self.layout_manager,
             settings_sync=self.settings_sync,  # v2.2: Enable EVE folder scanning
         )
-        self.tabs.addTab(self.characters_tab, "Roster")
 
         # Connect signals
         self.characters_tab.team_selected.connect(self._on_team_selected)
 
     def _create_hotkeys_tab(self):
-        """Create Cycle Control tab (hotkeys, cycling, alerts)"""
+        """Create the inner HotkeysTab used by the LAYOUTS container.
+
+        The Cycle Control widget is *not* added to the QTabWidget
+        directly. The v3.3 IA container :class:`LayoutsContainer` wraps
+        it inside a 70/30 splitter beside :class:`LayoutsTab`. We keep
+        it as ``self.hotkeys_tab`` so cross-tab signal connections
+        remain stable.
+        """
         from argus_overview.ui.hotkeys_tab import HotkeysTab
 
         self.hotkeys_tab = HotkeysTab(
             self.character_manager, self.settings_manager, main_tab=self.main_tab
         )
-        self.tabs.addTab(self.hotkeys_tab, "Cycle Control")
 
         # Connect group changes to refresh layout sources in overview tab
         self.hotkeys_tab.group_changed.connect(self.main_tab.refresh_layout_groups)
@@ -873,11 +891,17 @@ class MainWindowV21(QMainWindow):
         self.hotkeys_tab.cycle_backward_edit.recordingStopped.connect(self.hotkey_manager.resume)
 
     def _create_intel_tab(self):
-        """Create Intel tab (chat log monitoring and alerts)"""
+        """Create the inner IntelTab used by the FLEET container.
+
+        The Intel widget is *not* added to the QTabWidget directly. The
+        v3.3 IA container :class:`FleetTab` wraps it inside a 60/40
+        splitter beside :class:`CharactersTeamsTab`. We keep it as
+        ``self.intel_tab`` so cross-tab signal connections remain
+        stable.
+        """
         from argus_overview.ui.intel_tab import IntelTab
 
         self.intel_tab = IntelTab(self.settings_manager)
-        self.tabs.addTab(self.intel_tab, "Intel")
 
         # Connect alert signals to main window for visual feedback
         self.intel_tab.alert_triggered.connect(self._on_intel_alert)
@@ -967,18 +991,30 @@ class MainWindowV21(QMainWindow):
         pass
 
     def _create_settings_sync_tab(self):
-        """Create Sync tab (EVE settings sync) - formerly 'Settings Sync'"""
+        """Create the inner SettingsSyncTab used by the SYSTEM container.
+
+        The Sync widget is *not* added to the QTabWidget directly. The
+        v3.3 IA container :class:`SystemTab` wraps it inside a 60/40
+        splitter beside :class:`SettingsTab`. We keep it as
+        ``self.settings_sync_tab`` so cross-tab signal connections
+        remain stable.
+        """
         from argus_overview.ui.settings_sync_tab import SettingsSyncTab
 
         self.settings_sync_tab = SettingsSyncTab(self.settings_sync, self.character_manager)
-        self.tabs.addTab(self.settings_sync_tab, "Sync")
 
     def _create_settings_tab(self):
-        """Create Settings tab (application settings)"""
+        """Create the inner SettingsTab used by the SYSTEM container.
+
+        The Settings widget is *not* added to the QTabWidget directly.
+        The v3.3 IA container :class:`SystemTab` wraps it inside a 60/40
+        splitter beside :class:`SettingsSyncTab`. We keep it as
+        ``self.settings_tab`` so cross-tab signal connections remain
+        stable.
+        """
         from argus_overview.ui.settings_tab import SettingsTab
 
         self.settings_tab = SettingsTab(self.settings_manager, self.hotkey_manager)
-        self.tabs.addTab(self.settings_tab, "Settings")
 
         # Connect signals
         self.settings_tab.settings_changed.connect(self._apply_setting)

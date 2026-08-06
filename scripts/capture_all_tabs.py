@@ -38,13 +38,13 @@ def main():
     window.resize(1440, 900)
     window.show()
 
+    # v3.3 OPS Phase 4 IA: COMMAND / FLEET / LAYOUTS / SYSTEM. Index 3 is
+    # the trailing tab "System" (last in registration order).
     tabs = [
-        (0, "overview"),
-        (1, "cycle_control"),
-        (2, "roster"),
-        (3, "intel"),
-        (4, "sync"),
-        (5, "settings"),
+        (0, "command"),
+        (1, "fleet"),
+        (2, "layouts"),
+        (3, "system"),
     ]
 
     idx = 0

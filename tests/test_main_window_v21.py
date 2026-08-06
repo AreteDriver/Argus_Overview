@@ -449,6 +449,69 @@ class TestPhase4InformationArchitecture:
         assert "Settings" not in MainWindowV21._TAB_LABELS
         assert "System" in MainWindowV21._TAB_LABELS
 
+    def test_no_legacy_tab_labels_in_ia(self) -> None:
+        """Pin the legacy v2.2 labels out of the IA.
+
+        Inner-widget factories (_create_main_tab, _create_characters_tab,
+        _create_hotkeys_tab, _create_intel_tab, _create_settings_tab,
+        _create_settings_sync_tab) MUST NOT register as top-level tabs —
+        they're consumed by the IA containers. If a regression re-adds an
+        addTab() to one of those factories, this test surfaces the drift
+        with a focused failure pointing at the offending label.
+        """
+        forbidden = {
+            "Overview",
+            "Roster",
+            "Cycle Control",
+            "Intel",
+            "Sync",
+            "Settings",
+        }
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        assert forbidden.isdisjoint(MainWindowV21._TAB_LABELS), (
+            f"Legacy labels leaking into IA: {forbidden & set(MainWindowV21._TAB_LABELS)}"
+        )
+
+    def test_four_ia_containers_register_tabs(self) -> None:
+        """Each IA container registers exactly one top-level tab.
+
+        Catches the duplicate-tab regression: when an inner-widget
+        factory retains its legacy `self.tabs.addTab(...)` call, the
+        QTabWidget receives both the wrapper container and the inner
+        widget for the same surface, doubling the tab count. Pin the
+        container-side addTab count to 4 (one per IA container:
+        Command, Fleet, Layouts, System).
+
+        The IA container classes are patched because their real
+        constructors call ``addWidget(MagicMock)`` on a QSplitter, which
+        Qt rejects at runtime. This test cares about the addTab call
+        surface, not the container internals (those are covered by
+        ``test_tab_containers.py``).
+        """
+        from unittest.mock import MagicMock, patch
+
+        from argus_overview.ui.main_window_v21 import MainWindowV21
+
+        window = MagicMock()
+        window.tabs = MagicMock()
+
+        with patch("argus_overview.ui.tabs.command_tab.CommandTab"), patch(
+            "argus_overview.ui.tabs.fleet_tab.FleetTab"
+        ), patch("argus_overview.ui.tabs.layouts_tab.LayoutsContainer"), patch(
+            "argus_overview.ui.tabs.system_tab.SystemTab"
+        ):
+            MainWindowV21._create_command_tab(window)
+            MainWindowV21._create_fleet_tab(window)
+            MainWindowV21._create_layouts_container(window)
+            MainWindowV21._create_system_tab(window)
+
+        assert window.tabs.addTab.call_count == 4, (
+            f"Expected 4 addTab calls (one per IA container), got {window.tabs.addTab.call_count}"
+        )
+        labels = [call.args[1] for call in window.tabs.addTab.call_args_list]
+        assert labels == ["Command", "Fleet", "Layouts", "System"]
+
     def test_create_layouts_tab_passes_main_tab_to_main_slot(self) -> None:
         """_create_layouts_tab must bind ``main_tab`` to LayoutsTab.main_tab.
 
@@ -1630,7 +1693,15 @@ class TestCreateMainTab:
 
         # Should create tab with correct arguments
         mock_tab_class.assert_called_once()
-        window.tabs.addTab.assert_called_once()
+
+        # The inner factory must NOT addTab — the IA container (CommandTab)
+        # owns the QTabWidget slot. Registering here would double-register
+        # MainTab and the wrapper, producing duplicate tabs in the IA.
+        window.tabs.addTab.assert_not_called()
+
+        # Inner widget still lives on the window as `main_tab` so cross-tab
+        # signals (character_detected, layout_applied) keep firing.
+        assert window.main_tab is mock_tab
 
         # Should connect signals
         assert mock_tab.character_detected.connect.called
@@ -1660,7 +1731,11 @@ class TestCreateCharactersTab:
 
         # Should create tab
         mock_tab_class.assert_called_once()
-        window.tabs.addTab.assert_called_once()
+        # Inner factory must NOT addTab — the IA container (FleetTab) owns
+        # the QTabWidget slot. Registering here would double-register the
+        # Roster widget.
+        window.tabs.addTab.assert_not_called()
+        assert window.characters_tab is mock_tab
 
         # Should connect team_selected signal
         assert mock_tab.team_selected.connect.called
@@ -1690,7 +1765,10 @@ class TestCreateHotkeysTab:
 
         # Should create tab
         mock_tab_class.assert_called_once()
-        window.tabs.addTab.assert_called_once()
+        # Inner factory must NOT addTab — the IA container (LayoutsContainer)
+        # owns the QTabWidget slot.
+        window.tabs.addTab.assert_not_called()
+        assert window.hotkeys_tab is mock_tab
 
         # Should connect group_changed signal
         assert mock_tab.group_changed.connect.called
@@ -1722,7 +1800,10 @@ class TestCreateSettingsSyncTab:
 
         # Should create tab
         mock_tab_class.assert_called_once()
-        window.tabs.addTab.assert_called_once()
+        # Inner factory must NOT addTab — the IA container (SystemTab) owns
+        # the QTabWidget slot.
+        window.tabs.addTab.assert_not_called()
+        assert window.settings_sync_tab is mock_tab
 
 
 # Test _create_settings_tab
@@ -1747,7 +1828,10 @@ class TestCreateSettingsTab:
 
         # Should create tab
         mock_tab_class.assert_called_once()
-        window.tabs.addTab.assert_called_once()
+        # Inner factory must NOT addTab — the IA container (SystemTab) owns
+        # the QTabWidget slot.
+        window.tabs.addTab.assert_not_called()
+        assert window.settings_tab is mock_tab
 
         # Should connect settings_changed signal
         assert mock_tab.settings_changed.connect.called
@@ -1921,7 +2005,10 @@ class TestCreateIntelTab:
 
         # Should create tab
         mock_tab_class.assert_called_once_with(window.settings_manager)
-        window.tabs.addTab.assert_called_once()
+        # Inner factory must NOT addTab — the IA container (FleetTab) owns
+        # the QTabWidget slot.
+        window.tabs.addTab.assert_not_called()
+        assert window.intel_tab is mock_tab
 
         # Should connect signals
         assert mock_tab.alert_triggered.connect.called
