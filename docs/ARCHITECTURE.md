@@ -495,7 +495,8 @@ All subprocess calls validate window IDs to prevent command injection:
 
 ```python
 # Window ID validation regex
-WINDOW_ID_PATTERN = re.compile(r'^0x[0-9a-fA-F]+$')
+WINDOW_ID_PATTERN = re.compile(r"^0x[0-9a-fA-F]+$")
+
 
 def validate_window_id(window_id: str) -> bool:
     """Validate window ID format before subprocess calls."""

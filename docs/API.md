@@ -68,9 +68,9 @@ Information about a window.
 ```python
 @dataclass
 class WindowInfo:
-    window_id: str    # Platform-specific window identifier
-    title: str        # Window title
-    class_name: str   # Window class (default: "")
+    window_id: str  # Platform-specific window identifier
+    title: str  # Window title
+    class_name: str  # Window class (default: "")
 ```
 
 #### `ScreenGeometry`
@@ -79,11 +79,11 @@ Screen/monitor geometry information.
 ```python
 @dataclass
 class ScreenGeometry:
-    x: int           # X position
-    y: int           # Y position
-    width: int       # Screen width in pixels
-    height: int      # Screen height in pixels
-    is_primary: bool # True if primary display (default: False)
+    x: int  # X position
+    y: int  # Y position
+    width: int  # Screen width in pixels
+    height: int  # Screen height in pixels
+    is_primary: bool  # True if primary display (default: False)
 ```
 
 ---
@@ -309,11 +309,11 @@ Threat level classification for intel reports.
 
 ```python
 class ThreatLevel(Enum):
-    CLEAR = "clear"       # System reported clear
-    INFO = "info"         # General intel, not immediate threat
-    WARNING = "warning"   # Hostiles nearby (2+ jumps)
-    DANGER = "danger"     # Hostiles close (1 jump) or small gang
-    CRITICAL = "critical" # Hostiles in system or capital ships
+    CLEAR = "clear"  # System reported clear
+    INFO = "info"  # General intel, not immediate threat
+    WARNING = "warning"  # Hostiles nearby (2+ jumps)
+    DANGER = "danger"  # Hostiles close (1 jump) or small gang
+    CRITICAL = "critical"  # Hostiles in system or capital ships
 ```
 
 ---
@@ -325,15 +325,15 @@ Represents parsed intel from a chat message.
 ```python
 @dataclass
 class IntelReport:
-    system: Optional[str]           # EVE system name (e.g., "HED-GP")
-    threat_level: ThreatLevel       # Assessed threat level
-    hostile_count: Optional[int]    # Number of hostiles if known
-    ship_types: List[str]           # Detected ship types
-    player_names: List[str]         # Detected player names
-    raw_message: str                # Original message text
-    timestamp: datetime             # Message timestamp
-    channel: str                    # Source channel name
-    reporter: str                   # Player who sent the message
+    system: Optional[str]  # EVE system name (e.g., "HED-GP")
+    threat_level: ThreatLevel  # Assessed threat level
+    hostile_count: Optional[int]  # Number of hostiles if known
+    ship_types: List[str]  # Detected ship types
+    player_names: List[str]  # Detected player names
+    raw_message: str  # Original message text
+    timestamp: datetime  # Message timestamp
+    channel: str  # Source channel name
+    reporter: str  # Player who sent the message
     jumps_from_current: Optional[int]  # Distance from current system
 ```
 
@@ -381,9 +381,9 @@ Types of alerts that can be triggered.
 
 ```python
 class AlertType(Enum):
-    VISUAL_BORDER = "border"        # Flash window border
-    VISUAL_OVERLAY = "overlay"      # Show overlay on preview
-    AUDIO = "audio"                 # Play sound
+    VISUAL_BORDER = "border"  # Flash window border
+    VISUAL_OVERLAY = "overlay"  # Show overlay on preview
+    AUDIO = "audio"  # Play sound
     SYSTEM_NOTIFICATION = "notification"  # Desktop notification
 ```
 
@@ -405,7 +405,7 @@ class AlertConfig:
 
     # Thresholds
     min_threat_level: str = "warning"  # Minimum level to alert on
-    jumps_threshold: int = 5           # Only alert if within N jumps
+    jumps_threshold: int = 5  # Only alert if within N jumps
 
     # Visual settings
     border_color: str = "#FF0000"
@@ -438,9 +438,9 @@ dispatcher.alert_triggered.connect(my_handler)
 #### Signals
 
 ```python
-border_flash_requested = Signal(str, int)   # (color, duration_ms)
-overlay_requested = Signal(object)           # (IntelReport)
-alert_triggered = Signal(object, object)     # (IntelReport, AlertType)
+border_flash_requested = Signal(str, int)  # (color, duration_ms)
+overlay_requested = Signal(object)  # (IntelReport)
+alert_triggered = Signal(object, object)  # (IntelReport, AlertType)
 ```
 
 #### `__init__(config: Optional[AlertConfig] = None, parent: Optional[QObject] = None)`
