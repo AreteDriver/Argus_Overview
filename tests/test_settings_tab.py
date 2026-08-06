@@ -195,6 +195,129 @@ class TestAppearancePanel:
         assert hasattr(AppearancePanel, "setting_changed")
 
 
+class TestIntelPanel:
+    """Tests for IntelPanel (v3.2.0 chrome controls)."""
+
+    def _settings_mock(self, overrides=None):
+        """Per-key settings mock so unrelated lookups return their defaults."""
+        store = {
+            "intel.preview_chrome_enabled": True,
+            "intel.track_character_locations": True,
+            "intel.threat_jumps_threshold": 1,
+            "replay_strip_enabled": {},
+        }
+        if overrides:
+            store.update(overrides)
+        sm = MagicMock()
+        sm.get.side_effect = lambda key, default=None: store.get(key, default)
+        return sm
+
+    def test_signal_exists(self):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        assert hasattr(IntelPanel, "setting_changed")
+
+    def test_init_reads_defaults(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        try:
+            assert panel.track_locations_check.isChecked() is True
+            assert panel.jumps_threshold_spin.value() == 1
+        finally:
+            panel.deleteLater()
+
+    def test_init_reads_overridden_values(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock(
+            {
+                "intel.track_character_locations": False,
+                "intel.threat_jumps_threshold": 3,
+            }
+        )
+        panel = IntelPanel(sm)
+        try:
+            assert panel.track_locations_check.isChecked() is False
+            assert panel.jumps_threshold_spin.value() == 3
+        finally:
+            panel.deleteLater()
+
+    def test_track_locations_emits_signal(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        received: list[tuple[str, object]] = []
+        panel.setting_changed.connect(lambda k, v: received.append((k, v)))
+        try:
+            panel.track_locations_check.setChecked(False)
+            assert (
+                "intel.track_character_locations",
+                False,
+            ) in received
+        finally:
+            panel.deleteLater()
+
+    def test_jumps_threshold_emits_signal(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        received: list[tuple[str, object]] = []
+        panel.setting_changed.connect(lambda k, v: received.append((k, v)))
+        try:
+            panel.jumps_threshold_spin.setValue(2)
+            assert ("intel.threat_jumps_threshold", 2) in received
+        finally:
+            panel.deleteLater()
+
+    def test_jumps_threshold_clamped_to_range(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock({"intel.threat_jumps_threshold": 99})
+        panel = IntelPanel(sm)
+        try:
+            # Spinbox max is 5 — value should clamp on init.
+            assert panel.jumps_threshold_spin.value() == 5
+        finally:
+            panel.deleteLater()
+
+    def test_chrome_toggle_default_on(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        try:
+            assert panel.chrome_enabled_check.isChecked() is True
+        finally:
+            panel.deleteLater()
+
+    def test_chrome_toggle_init_off(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock({"intel.preview_chrome_enabled": False})
+        panel = IntelPanel(sm)
+        try:
+            assert panel.chrome_enabled_check.isChecked() is False
+        finally:
+            panel.deleteLater()
+
+    def test_chrome_toggle_emits_setting_changed(self, qapp):
+        from argus_overview.ui.settings_tab import IntelPanel
+
+        sm = self._settings_mock()
+        panel = IntelPanel(sm)
+        received: list[tuple[str, object]] = []
+        panel.setting_changed.connect(lambda k, v: received.append((k, v)))
+        try:
+            panel.chrome_enabled_check.setChecked(False)
+            assert ("intel.preview_chrome_enabled", False) in received
+        finally:
+            panel.deleteLater()
+
+
 # Test AdvancedPanel
 class TestAdvancedPanel:
     """Tests for AdvancedPanel"""
@@ -994,12 +1117,14 @@ class TestSettingsTabSetupUI:
     @patch("argus_overview.ui.settings_tab.GeneralPanel")
     @patch("argus_overview.ui.settings_tab.PerformancePanel")
     @patch("argus_overview.ui.settings_tab.HotkeysPanel")
+    @patch("argus_overview.ui.settings_tab.IntelPanel")
     @patch("argus_overview.ui.settings_tab.AppearancePanel")
     @patch("argus_overview.ui.settings_tab.AdvancedPanel")
     def test_setup_ui_creates_all_panels(
         self,
         mock_adv,
         mock_app,
+        mock_intel,
         mock_hk,
         mock_perf,
         mock_gen,
@@ -1019,14 +1144,16 @@ class TestSettingsTabSetupUI:
 
         with patch.object(SettingsTab, "_create_category_tree", return_value=MagicMock()):
             with patch.object(SettingsTab, "setLayout"):
-                with patch.object(SettingsTab, "_load_settings"):
-                    SettingsTab(mock_settings, mock_hotkey_mgr)
+                with patch.object(SettingsTab, "setStyleSheet"):
+                    with patch.object(SettingsTab, "_load_settings"):
+                        SettingsTab(mock_settings, mock_hotkey_mgr)
 
-                    assert mock_gen.called
-                    assert mock_perf.called
-                    assert mock_hk.called
-                    assert mock_app.called
-                    assert mock_adv.called
+                        assert mock_gen.called
+                        assert mock_perf.called
+                        assert mock_hk.called
+                        assert mock_intel.called
+                        assert mock_app.called
+                        assert mock_adv.called
 
     @patch("argus_overview.ui.settings_tab.QWidget")
     @patch("argus_overview.ui.settings_tab.QVBoxLayout")
@@ -1055,6 +1182,54 @@ class TestSettingsTabSetupUI:
             # Should create 5 tree items (General, Performance, Hotkeys, Appearance, Advanced)
             # Note: Alerts panel was removed for CCP EULA compliance
             assert mock_item.call_count >= 5
+
+    @patch("argus_overview.ui.settings_tab.QWidget")
+    @patch("argus_overview.ui.settings_tab.QVBoxLayout")
+    @patch("argus_overview.ui.settings_tab.QLabel")
+    @patch("argus_overview.ui.settings_tab.QFont")
+    @patch("argus_overview.ui.settings_tab.QTreeWidget")
+    @patch("argus_overview.ui.settings_tab.QTreeWidgetItem")
+    @patch("argus_overview.ui.settings_tab.QPushButton")
+    def test_create_category_tree_stylesheet_and_default_selection(
+        self, mock_btn, mock_item, mock_tree, mock_font, mock_label, mock_layout, mock_qwidget
+    ):
+        """Test _create_category_tree applies design-system stylesheet and selects first item"""
+        from argus_overview.ui.design_system import colors as _ds
+        from argus_overview.ui.settings_tab import SettingsTab
+
+        mock_settings = MagicMock()
+        mock_settings.get.return_value = {}
+        mock_hotkey_mgr = MagicMock()
+
+        # Capture the tree widget instance returned by QTreeWidget()
+        mock_tree_instance = MagicMock()
+        mock_tree.return_value = mock_tree_instance
+        # Mock topLevelItem so setCurrentItem works
+        mock_first_item = MagicMock()
+        mock_tree_instance.topLevelItem.return_value = mock_first_item
+
+        with patch.object(SettingsTab, "__init__", return_value=None):
+            tab = SettingsTab.__new__(SettingsTab)
+            tab.settings_manager = mock_settings
+            tab.hotkey_manager = mock_hotkey_mgr
+
+            tab._create_category_tree()
+
+            # Should select first category by default
+            mock_tree_instance.setCurrentItem.assert_called_once_with(mock_first_item)
+
+            # Should apply stylesheet with design-system tokens
+            mock_tree_instance.setStyleSheet.assert_called_once()
+            stylesheet = mock_tree_instance.setStyleSheet.call_args[0][0]
+            assert _ds.SURFACE in stylesheet
+            assert _ds.SURFACE_HOVER in stylesheet
+            assert _ds.SURFACE_RAISED in stylesheet
+            assert _ds.TEXT_PRIMARY in stylesheet
+            assert _ds.BORDER_SUBTLE in stylesheet
+            assert _ds.INFO in stylesheet
+            assert "::item:selected" in stylesheet
+            assert "::item:hover" in stylesheet
+            assert "border-left: 2px solid" in stylesheet
 
     @patch("argus_overview.ui.settings_tab.QWidget.__init__")
     def test_on_category_changed_none(self, mock_widget):

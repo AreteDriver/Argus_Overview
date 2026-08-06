@@ -202,6 +202,19 @@ class ActionRegistry:
             )
         )
 
+        # App Menu Actions
+        self.register(
+            ActionSpec(
+                id="toggle_replay_strips_app",
+                label="Replay Strips",
+                scope=ActionScope.GLOBAL,
+                primary_home=PrimaryHome.APP_MENU,
+                tooltip="Toggle replay strips for all preview windows",
+                handler_name="_toggle_replay_strips_global",
+                checkable=True,
+            )
+        )
+
         # App Menu / Help Menu Actions
         self.register(
             ActionSpec(
@@ -252,7 +265,7 @@ class ActionRegistry:
         # TIER 2: TAB ACTIONS (Tab Toolbars)
         # =====================================================================
 
-        # --- Overview Tab (formerly Main) ---
+        # --- Overview Tab (formerly Main) — Phase 4 IA: COMMAND tab ---
         self.register(
             ActionSpec(
                 id="import_windows",
@@ -323,6 +336,18 @@ class ActionRegistry:
 
         self.register(
             ActionSpec(
+                id="toggle_replay_strips",
+                label="Replay Strips",
+                scope=ActionScope.TAB,
+                primary_home=PrimaryHome.OVERVIEW_TOOLBAR,
+                tooltip="Toggle replay strips for all preview windows",
+                handler_name="_toggle_replay_strips_global",
+                checkable=True,
+            )
+        )
+
+        self.register(
+            ActionSpec(
                 id="minimize_all",
                 label="Minimize All",
                 scope=ActionScope.GLOBAL,
@@ -345,7 +370,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Roster Tab (Characters & Teams) ---
+        # --- Roster Tab (Characters & Teams) — Phase 4 IA: FLEET tab (left) ---
         self.register(
             ActionSpec(
                 id="add_character",
@@ -380,7 +405,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Layouts Tab ---
+        # --- Layouts Tab — Phase 4 IA: LAYOUTS container (left) ---
         self.register(
             ActionSpec(
                 id="apply_layout",
@@ -420,12 +445,12 @@ class ActionRegistry:
                 label="Refresh Groups",
                 scope=ActionScope.TAB,
                 primary_home=PrimaryHome.LAYOUTS_TOOLBAR,
-                tooltip="Reload cycling groups from Cycle Control tab",
+                tooltip="Reload cycling groups from the LAYOUTS tab (Cycle Control pane)",
                 handler_name="_refresh_groups",
             )
         )
 
-        # --- Cycle Control Tab (Hotkeys + Cycling) ---
+        # --- Cycle Control Tab (Hotkeys + Cycling) — Phase 4 IA: LAYOUTS (right) ---
         self.register(
             ActionSpec(
                 id="new_group",
@@ -459,7 +484,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Sync Tab ---
+        # --- Sync Tab — Phase 4 IA: SYSTEM container (right) ---
         self.register(
             ActionSpec(
                 id="scan_eve_settings",
@@ -493,7 +518,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Intel Tab ---
+        # --- Intel Tab — Phase 4 IA: FLEET container (right) ---
         self.register(
             ActionSpec(
                 id="start_intel_monitoring",
@@ -583,7 +608,7 @@ class ActionRegistry:
             )
         )
 
-        # --- Settings Panel ---
+        # --- Settings Panel — Phase 4 IA: SYSTEM container (left) ---
         self.register(
             ActionSpec(
                 id="reset_all_settings",
@@ -674,6 +699,32 @@ class ActionRegistry:
                 primary_home=PrimaryHome.WINDOW_CONTEXT,
                 tooltip="Remove from preview (keeps window open)",
                 handler_name="_remove_from_preview",
+            )
+        )
+
+        # PR10 follow-up: replay-strip toggle. The label stays static
+        # ("Toggle replay strip") because ActionSpec doesn't model
+        # state-dependent labels — the dynamic label was the reason this
+        # action lived inline in contextMenuEvent before this PR.
+        self.register(
+            ActionSpec(
+                id="toggle_replay_strip",
+                label="Toggle Replay Strip",
+                scope=ActionScope.OBJECT,
+                primary_home=PrimaryHome.WINDOW_CONTEXT,
+                tooltip="Show/hide a strip of recent capture frames at the bottom of this preview",
+                handler_name="_toggle_replay_strip",
+            )
+        )
+
+        self.register(
+            ActionSpec(
+                id="retry_capture",
+                label="Retry Capture",
+                scope=ActionScope.OBJECT,
+                primary_home=PrimaryHome.WINDOW_CONTEXT,
+                tooltip="Attempt to restart capture for this window",
+                handler_name="_retry_capture",
             )
         )
 

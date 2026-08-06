@@ -9,7 +9,7 @@ source of truth.
 import logging
 from collections.abc import Callable
 
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QColor
 from PySide6.QtWidgets import QMenu, QPushButton
 
 from argus_overview.ui.action_registry import (
@@ -17,6 +17,7 @@ from argus_overview.ui.action_registry import (
     ActionSpec,
     PrimaryHome,
 )
+from argus_overview.ui.themes import get_theme_manager
 
 
 def format_tooltip_with_shortcut(spec: ActionSpec) -> str:
@@ -349,6 +350,8 @@ class ContextMenuBuilder:
             None,
             "zoom",
             None,
+            "toggle_replay_strip",
+            None,
             "remove_from_preview",
         ]
 
@@ -371,34 +374,6 @@ class ToolbarBuilder:
     more control over styling and layout.
     """
 
-    # Styling for specific action types
-    PRIMARY_STYLE = """
-        QPushButton {
-            background-color: #ff8c00;
-            color: black;
-            font-weight: bold;
-            padding: 5px 10px;
-        }
-        QPushButton:hover { background-color: #ffa500; }
-    """
-
-    SUCCESS_STYLE = """
-        QPushButton {
-            background-color: #2d5a27;
-            color: white;
-            padding: 5px 10px;
-        }
-        QPushButton:hover { background-color: #3d7a37; }
-    """
-
-    DANGER_STYLE = """
-        QPushButton {
-            background-color: #8b0000;
-            color: white;
-        }
-        QPushButton:hover { background-color: #a50000; }
-    """
-
     # Actions that get special styling
     PRIMARY_ACTIONS = {
         "import_windows",
@@ -417,6 +392,54 @@ class ToolbarBuilder:
     def __init__(self, registry: ActionRegistry | None = None):
         self.logger = logging.getLogger(__name__)
         self.registry = registry or ActionRegistry.get_instance()
+
+    def _get_primary_style(self) -> str:
+        """Return stylesheet for primary CTAs using the current theme accent."""
+        accent = get_theme_manager().get_accent_color()
+        hover = QColor(accent).lighter(120).name()
+        return f"""
+            QPushButton {{
+                background-color: {accent};
+                color: black;
+                font-weight: bold;
+                padding: 5px 10px;
+            }}
+            QPushButton:hover {{ background-color: {hover}; }}
+        """
+
+    def _get_success_style(self) -> str:
+        """Return stylesheet for success actions using design-system healthy green."""
+        from argus_overview.ui.design_system import colors as ds
+
+        return f"""
+            QPushButton {{
+                background-color: {ds.HEALTHY};
+                color: black;
+                padding: 5px 10px;
+            }}
+            QPushButton:hover {{ background-color: {QColor(ds.HEALTHY).lighter(120).name()}; }}
+        """
+
+    def _get_danger_style(self) -> str:
+        """Return stylesheet for destructive actions using design-system critical red.
+
+        Uses an outline style at rest to reduce visual alarm in toolbars,
+        filling on hover for clear affordance.
+        """
+        from argus_overview.ui.design_system import colors as ds
+
+        return f"""
+            QPushButton {{
+                background-color: transparent;
+                color: {ds.CRITICAL};
+                border: 1px solid {ds.CRITICAL};
+                padding: 5px 10px;
+            }}
+            QPushButton:hover {{
+                background-color: {ds.CRITICAL};
+                color: black;
+            }}
+        """
 
     def build_toolbar_buttons(
         self,
@@ -460,11 +483,11 @@ class ToolbarBuilder:
 
             # Apply styling based on action type
             if spec.id in self.PRIMARY_ACTIONS:
-                btn.setStyleSheet(self.PRIMARY_STYLE)
+                btn.setStyleSheet(self._get_primary_style())
             elif spec.id in self.SUCCESS_ACTIONS:
-                btn.setStyleSheet(self.SUCCESS_STYLE)
+                btn.setStyleSheet(self._get_success_style())
             elif spec.id in self.DANGER_ACTIONS:
-                btn.setStyleSheet(self.DANGER_STYLE)
+                btn.setStyleSheet(self._get_danger_style())
 
             # Connect handler
             handler = handlers.get(spec.id)
@@ -511,11 +534,11 @@ class ToolbarBuilder:
 
         # Apply styling
         if spec.id in self.PRIMARY_ACTIONS:
-            btn.setStyleSheet(self.PRIMARY_STYLE)
+            btn.setStyleSheet(self._get_primary_style())
         elif spec.id in self.SUCCESS_ACTIONS:
-            btn.setStyleSheet(self.SUCCESS_STYLE)
+            btn.setStyleSheet(self._get_success_style())
         elif spec.id in self.DANGER_ACTIONS:
-            btn.setStyleSheet(self.DANGER_STYLE)
+            btn.setStyleSheet(self._get_danger_style())
 
         if handler:
             btn.clicked.connect(handler)

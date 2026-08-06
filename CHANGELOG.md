@@ -5,6 +5,196 @@ All notable changes to Argus Overview will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] — Operational Truth UI Polish
+
+Visual consistency pass across all tabs following the Operational Truth
+release theme. Every surface now derives from the design-system token set
+instead of hardcoded values.
+
+### Changed
+- **Design system tokens** — semantic colors, spacing, typography, metrics,
+  and states centralized under `ui/design_system/`.
+- **Settings tab navigation** — `QTreeWidget` category list now shows a clear
+  selection highlight (`SURFACE_HOVER` background + `INFO` left accent bar)
+  and defaults to "General" on first open.
+- **Settings panels** — all `QGroupBox` containers styled as cards with
+  `SURFACE_RAISED` background, `BORDER_SUBTLE` border, and rounded corners.
+- **Danger buttons** — `ToolbarBuilder` destructive actions (`delete_character`,
+  `delete_group`, etc.) switched from solid bright-red fill to an outline style
+  (red text + red border) that fills on hover. Reduces visual alarm in toolbars.
+- **Splitter handles** — `QSplitter::handle` styled as a 2px `BORDER_SUBTLE`
+  line, eliminating default Qt grip dots in the Sync and Settings tabs.
+- **Tab bar** — styled with `CANVAS` pane, `SURFACE` tabs, `SURFACE_RAISED`
+  selected state, and `SURFACE_HOVER` hover state.
+- **Screenshots** — all README and docs screenshots regenerated at 1440×900
+  reflecting the current UI state.
+- **Replay strip layout stability** — every `WindowPreviewWidget` now reserves a
+  fixed-height container for the replay strip in its internal layout. Toggling
+  the strip on/off no longer changes card height, preventing grid reflow shifts
+  in the `FlowLayout` preview area. The strip is parented inside the container
+  instead of being dynamically added/removed from the main card layout.
+- **Replay strip styling** — migrated hardcoded `rgba(20,20,20,220)` background
+  and `#3a3a3a` border to `SURFACE` + `BORDER_SUBTLE`. Cell borders and hover
+  highlight in the strip `paintEvent` now use design-system tokens
+  (`BORDER_SUBTLE`, `INFO`).
+- **Fleet rail positioning** — the character status dock (`StatusDock`) moved from
+  above the preview grid to below it. This prioritizes vertical space for the
+  live preview area, placing operational status in a bottom rail consistent with
+  the Operational Truth principle that the preview grid is the primary product.
+- **Capture health badge colors** — migrated `_capture_health_color` from
+  hardcoded RGB `QColor` objects to design-system semantic tokens
+  (`HEALTHY`, `TEXT_SECONDARY`, `WARNING`, `CRITICAL`, `TEXT_MUTED`).
+
+## [Unreleased] — IA Overhaul: COMMAND / FLEET / LAYOUTS / SYSTEM
+
+Six v2.2 tabs collapsed to four IA-aligned tabs that match the operator's
+mental model. The Command Center (v3.3 OPS flagship surface) is now the
+default home tab, with all live fleet operations under one roof.
+
+### Added
+- **Tab containers** under `src/argus_overview/ui/tabs/`:
+  - `CommandTab` — hosts the flagship `CommandCenterWidget`.
+  - `FleetTab` — Roster + Intel side-by-side via `QSplitter` (60/40).
+  - `LayoutsContainer` — Layout presets + Cycle Control via `QSplitter` (70/30).
+  - `SystemTab` — Settings + Sync via `QSplitter` (60/40).
+- **`MainWindowV21._create_tabs()`** — single entry point that builds the
+  inner widgets, then wraps them in IA containers. The legacy six factory
+  methods (`_create_main_tab`, `_create_characters_tab`, etc.) remain the
+  source of truth for cross-tab signal wiring.
+- **`MainWindowV21._create_layouts_tab()`** — builds the inner `LayoutsTab`
+  consumed by the LAYOUTS container, stored as `self.presets_panel`. The
+  container occupies `self.layouts_tab`.
+- **`TestPhase4InformationArchitecture`** + **`tests/test_tab_containers.py`**
+  — 24 new tests pin the four IA labels, container wiring, and splitter
+  orientations.
+- **IA contract pin** — `_TAB_LABELS` is now `["Command", "Fleet", "Layouts",
+  "System"]`. `_show_settings` lands on SYSTEM.
+
+### Changed
+- **`_show_settings`** — points at the SYSTEM container (which holds
+  SettingsTab on the left), since "Settings" is no longer a top-level tab.
+- **ActionRegistry section comments** — section headers now note the
+  Phase 4 IA mapping (`OVERVIEW_TOOLBAR → COMMAND`, `ROSTER_TOOLBAR` /
+  `INTEL_TOOLBAR → FLEET`, `LAYOUTS_TOOLBAR` / `CYCLE_CONTROL_TOOLBAR →
+  LAYOUTS`, `SYNC_TOOLBAR` / `SETTINGS_PANEL → SYSTEM`). The `PrimaryHome`
+  enum values are unchanged — actions still bind to the same inner widget.
+- **Refresh Layout Groups tooltip** — now says "from the LAYOUTS tab
+  (Cycle Control pane)" instead of "from Cycle Control tab".
+
+### Tests
+- 24 new tests across `tests/test_tab_containers.py` and the new
+  `TestPhase4InformationArchitecture` class in `tests/test_main_window_v21.py`.
+- Full suite: 2,580 passed, 5 skipped.
+
+### Senior review fixes
+Addressed 11 findings from the Phase 4 senior review (1 critical):
+- **Critical**: `_create_layouts_tab` passed `character_manager` as the
+  second positional arg to `LayoutsTab` — the actual signature is
+  `(layout_manager, main_tab, settings_manager=None, character_manager=None)`.
+  Switched to kwargs, pinned by `test_create_layouts_tab_passes_main_tab_to_main_slot`.
+- **Naming symmetry**: inner widget renamed `self.layouts_tab` →
+  `self.presets_panel` so `self.layouts_tab` consistently denotes the
+  IA container (matches `command_tab` / `fleet_tab` / `system_tab`).
+- **Duplicate signal**: dropped redundant `layouts_tab.layout_applied`
+  connection; `main_tab.layout_applied` remains the single canonical
+  source for `_on_layout_applied` and the `CommandIntegrator`.
+- **Tautological alias**: removed the `LayoutPresetsPanel` re-export
+  from `tabs/layouts_tab.py` (and its pinning test). The inner widget
+  is accessed via `window.presets_panel`; the alias was unconsumed
+  after the rename.
+
+## [3.2.0] - 2026-04-26 — Intel-Aware Edition
+
+This release ships a 10-PR arc that turns Argus's preview chrome into an
+intel-aware UI. Frame borders and chip dots now carry threat state from
+the chat-log parser; per-character system tracking unlocks smart fan-out;
+adjacent-system alerts tint at reduced intensity with a "+Nj" badge.
+EVE-O Preview cannot match any tier of this — it has no access to
+the parser running inside the same process.
+
+### Added
+- **Intel-aware preview borders** — frames tint by IntelReport threat level
+  (clear / info / warning / danger / critical) with 30s linear alpha
+  decay and a 600ms pulse on upgrade into danger or critical.
+- **Character status dock** — horizontal chip strip above the preview
+  grid. Each chip shows a colored-initials avatar (deterministic
+  per-character accent), name, current system, and a threat-tint dot.
+  Click a chip to focus the matching window.
+- **Preview focus mode** — double-click any thumbnail to spotlight it
+  (scales up, others fade to 25% opacity). Press Escape or
+  double-click again to exit.
+- **Per-character system tracking** — new `intel/character_location.py`
+  polls EVE Local channel logs (UTF-16-LE), parses each file's
+  `Listener:` header, and tails for "Channel changed to Local : X" so
+  every character has an independent current-system map.
+- **Smart per-character threat fan-out** — alerts only tint frames + chips
+  for characters in the affected system. Unknown locations fall through
+  to full intensity (graceful upgrade).
+- **Jumps-from threat fan-out** — adjacent-system alerts also tint, with
+  per-jump alpha falloff (`0.5 ^ distance`, floor 0.4). Configurable via
+  `intel.threat_jumps_threshold` (default 1, set 0 to disable).
+- **"+Nj" distance badge** on chips and frames during adjacent-system
+  alerts. Tooltip explicitly shows `Threat: warning (1j away)`.
+- **Per-character accent border** on preview frames during clear state.
+  Same color as the chip avatar — instant visual identity at small
+  grid sizes.
+- **Replay strip** — toggleable horizontal strip below each preview that
+  holds the last ~5 seconds of capture as 6 thumbnails. Hover a cell to
+  swap the main image to that buffered frame; mouse leave restores live.
+  Toggle via right-click → "Show replay strip"; persists per-character
+  via `replay_strip_enabled` setting.
+
+### Internals
+- **`intel/threat_filter.resolve_tint`** — single-source-of-truth filter
+  used by both `WindowManager` and `StatusDock` so per-character tinting
+  rules stay symmetric across grid + dock.
+- **Promoted accent palette** to `main_tab.py` (`CHARACTER_ACCENT_COLORS`,
+  `character_accent_color`) so frame border + chip avatar + future
+  surfaces all draw the same color for the same character.
+- **`WindowPreviewWidget.set_threat_state`** gained `initial_alpha` and
+  `distance` kwargs. Pulse animation gates on `initial_alpha >= 0.9` so
+  distant adjacent alerts glow but don't pulse.
+
+### Settings (new)
+- `intel.threat_jumps_threshold` — int, default 1. Max jumps to consider
+  for adjacent-system tinting; 0 disables.
+- `intel.track_character_locations` — bool, default true. Toggles the
+  Local-log location tracker.
+- `replay_strip_enabled` — `dict[character_name, bool]`. Per-character
+  replay-strip visibility, persisted across sessions.
+
+### Tests
+- **+212 new tests**, full suite at 2391 passed / 5 skipped.
+- New test files: `test_character_location.py`, `test_threat_filter.py`,
+  `test_status_dock.py`, `test_replay_strip.py`.
+
+### CI
+- Ignored `CVE-2026-3219` (pip itself, no upstream patch yet) in
+  `pip-audit` so PRs aren't blocked by a vulnerability we can't fix.
+
+## [3.1.2] - 2026-04-15
+
+### Security
+- **Pillow 12.2.0** — bump from 12.1.1 to patch FITS GZIP decompression bomb (GHSA high severity, CVE in Pillow < 12.2.0)
+
+## [3.1.1] - 2026-04-15
+
+### Fixed
+- **Signal lifecycle leaks** - Disconnect dynamic `frame.signal` connections in `closeEvent()` across all preview frames and cross-tab signals to prevent leaks after widget deletion
+- **Capture pipeline stability** - Snapshot `preview_frames.items()` via `list()` to prevent crashes from concurrent window removal; timestamped `pending_requests`; orphan image cleanup
+- **Frame dedup performance** - Crop-based fingerprinting (top 32 rows) is ~22× cheaper than full `tobytes()` on unchanged frames; only compute full hash after dedup confirms change
+- **Preview frame hang on client close** - Remove preview frame on client disconnect to prevent capture loop hang
+- **Wayland import guard** - Guard `pynput` import for Wayland-only environments (#55)
+
+### Security
+- Scrub local filesystem paths from recording script
+
+### Other
+- Bump `codecov/codecov-action` from 5 to 6
+- Format codebase with CI-matching black version (#58)
+- Docs: add CI/CD and testing sections to CLAUDE.md
+- 100% coverage milestone, Flatpak PyPI URL, Wayland hardware test report
+
 ## [3.1.0] - 2026-03-13
 
 ### Added

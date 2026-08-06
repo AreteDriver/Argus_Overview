@@ -8,7 +8,7 @@ Technical architecture documentation for developers and contributors.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           Argus Overview                                 │
+│                         Argus Overview v3.2                               │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                        UI Layer (PySide6/Qt)                     │   │
@@ -32,17 +32,17 @@ Technical architecture documentation for developers and contributors.
 │  │  │  Config    │  │   Hotkey        │  │   EVE Settings    │    │   │
 │  │  │  Detector  │  │   Manager       │  │      Sync         │    │   │
 │  │  └────────────┘  └─────────────────┘  └───────────────────┘    │   │
-│  │  ┌────────────┐  ┌─────────────────┐                           │   │
-│  │  │ Discovery  │  │  Config         │                           │   │
-│  │  │  Service   │  │  Watcher        │                           │   │
-│  │  └────────────┘  └─────────────────┘                           │   │
+│  │  ┌────────────┐  ┌─────────────────┐  ┌───────────────────┐    │   │
+│  │  │ Discovery  │  │  Config         │  │   Intel / Threat  │    │   │
+│  │  │  Service   │  │  Watcher        │  │   Detection       │    │   │
+│  │  └────────────┘  └─────────────────┘  └───────────────────┘    │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 │                                │                                        │
 │  ┌─────────────────────────────┼───────────────────────────────────┐   │
 │  │                      Platform Layer                              │   │
 │  │  ┌─────────────────┐  ┌─────────────────┐  ┌────────────────┐  │   │
-│  │  │  X11 / XWayland │  │    wmctrl       │  │    xdotool     │  │   │
-│  │  │  (python-xlib)  │  │  (subprocess)   │  │  (subprocess)  │  │   │
+│  │  │  X11 / XWayland │  │    Wayland      │  │    Windows     │  │   │
+│  │  │  (python-xlib)  │  │  (wlroots)      │  │  (Win32 API)   │  │   │
 │  │  └─────────────────┘  └─────────────────┘  └────────────────┘  │   │
 │  └──────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
@@ -55,7 +55,7 @@ Technical architecture documentation for developers and contributors.
 ```
 src/
 ├── main.py                          # Application entry point
-└── eve_overview_pro/
+└── argus_overview/
     ├── __init__.py
     ├── core/                        # Business logic (no Qt dependencies)
     │   ├── position.py              # Window position utilities
@@ -68,21 +68,48 @@ src/
     │   ├── position.py              # Window positioning utilities
     │   └── window_capture_threaded.py # Threaded screen capture
     │
+    ├── intel/                       # Chat-log parsing & threat detection
+    │   ├── log_watcher.py           # EVE log file watcher
+    │   ├── parser.py                # Chat message parser
+    │   ├── alerts.py                # Threat alert engine
+    │   ├── threat_filter.py         # Threat filtering rules
+    │   ├── character_location.py    # Character location tracking
+    │   ├── jumps.py                 # Jump bridge / gate tracking
+    │   ├── systems.py               # EVE system database
+    │   └── data/                    # Intel data assets
+    │
     ├── ui/                          # PySide6 widgets and windows
+    │   ├── design_system/           # Token-based colors, metrics, typography
+    │   │   ├── colors.py            # Color tokens (threat, focus, accent)
+    │   │   ├── metrics.py           # Spacing and radius tokens
+    │   │   ├── typography.py        # Font tokens
+    │   │   ├── states.py            # UI state tokens
+    │   │   └── painting.py          # Shared paint helpers
     │   ├── action_registry.py       # Single source of truth for actions
     │   ├── main_window_v21.py       # Main application window
     │   ├── main_tab.py              # Overview/preview tab
     │   ├── characters_teams_tab.py  # Roster management tab
     │   ├── layouts_tab.py           # Layout presets tab
+    │   ├── layout_widgets.py        # Pattern thumbnails, monitor cards
     │   ├── hotkeys_tab.py           # Cycle Control tab
+    │   ├── intel_tab.py             # Intel log viewer & threat table
     │   ├── settings_sync_tab.py     # EVE sync tab
     │   ├── settings_tab.py          # Application settings tab
     │   ├── menu_builder.py          # Menu construction
     │   ├── tray.py                  # System tray integration
     │   ├── themes.py                # Theme definitions
     │   ├── settings_manager.py      # Settings persistence
+    │   ├── status_dock.py           # Per-character status chip strip
+    │   ├── system_status_bar.py     # Subsystem health indicators
+    │   ├── replay_strip.py          # 5-second capture timeline
     │   ├── hotkey_edit.py           # Hotkey recording widget
     │   └── about_dialog.py          # About dialog
+    │
+    ├── platform/                    # Platform abstraction
+    │   ├── base.py                  # Platform interface base
+    │   ├── linux.py                 # X11 implementation
+    │   ├── wayland.py               # Wayland implementation
+    │   └── windows.py               # Windows implementation
     │
     └── utils/                       # Shared utilities
         ├── constants.py             # Application constants
@@ -412,13 +439,64 @@ User clicks preview
 └───────────────────────────────────────────────────────────────────┘
 ```
 
+### Wayland Window Management
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                       Wayland Integration                          │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  WINDOW DISCOVERY (wlr-screenshot / wlroots protocols)           │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Uses wlroots-compatible screenshot protocols                  ││
+│  │ Falls back to XWayland when native protocol unavailable       ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+│  WINDOW CAPTURE (grim + slurp / wlr-screenshot)                  │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Screenshots via Wayland compositor protocol                 ││
+│  │ Converted to PIL Image for processing                         ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Windows Window Management
+
+```
+┌───────────────────────────────────────────────────────────────────┐
+│                       Windows Integration                          │
+├───────────────────────────────────────────────────────────────────┤
+│                                                                    │
+│  WINDOW DISCOVERY (EnumWindows + GetWindowText)                  │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Iterates top-level windows via Win32 API                      ││
+│  │ Filters by process name (exefile.exe)                         ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+│  WINDOW ACTIVATION (SetForegroundWindow + ShowWindow)            │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Raises and focuses the specified window                       ││
+│  │ Result caching: 1 second TTL                                  ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+│  WINDOW CAPTURE (PrintWindow / BitBlt)                           │
+│  ┌──────────────────────────────────────────────────────────────┐│
+│  │ Screenshots via GDI/Win32 API                                  ││
+│  │ Converted to PIL Image for processing                         ││
+│  └──────────────────────────────────────────────────────────────┘│
+│                                                                    │
+└───────────────────────────────────────────────────────────────────┘
+```
+
 ### Security Considerations
 
 All subprocess calls validate window IDs to prevent command injection:
 
 ```python
 # Window ID validation regex
-WINDOW_ID_PATTERN = re.compile(r'^0x[0-9a-fA-F]+$')
+WINDOW_ID_PATTERN = re.compile(r"^0x[0-9a-fA-F]+$")
+
 
 def validate_window_id(window_id: str) -> bool:
     """Validate window ID format before subprocess calls."""
@@ -445,16 +523,67 @@ def validate_window_id(window_id: str) -> bool:
 
 ```json
 {
-  "preview_fps": 30,
-  "low_power_fps": 5,
-  "theme": "dark",
-  "auto_discovery": true,
-  "discovery_interval": 5,
-  "auto_minimize_inactive": false,
-  "minimize_to_tray": true,
-  "show_session_timers": false,
-  "hover_opacity": 0.3,
-  "alert_sensitivity": 50
+  "version": "2.3",
+  "general": {
+    "start_with_system": false,
+    "minimize_to_tray": true,
+    "show_notifications": true,
+    "auto_save_interval": 5,
+    "auto_discovery": true,
+    "auto_discovery_interval": 5,
+    "hot_reload": true
+  },
+  "performance": {
+    "low_power_mode": false,
+    "auto_minimize_inactive": false,
+    "disable_previews": false,
+    "default_refresh_rate": 1,
+    "capture_workers": 1,
+    "enable_caching": true,
+    "cache_size_mb": 50,
+    "capture_quality": "low"
+  },
+  "thumbnails": {
+    "opacity_on_hover": 0.85,
+    "zoom_on_hover": 1.5,
+    "lock_positions": false,
+    "show_labels": true,
+    "show_session_timer": false,
+    "show_activity_indicator": true,
+    "default_width": 280,
+    "default_height": 200
+  },
+  "hotkeys": {
+    "activate_window_1": "<ctrl>+<alt>+1",
+    "...": "..."
+  },
+  "character_hotkeys": {},
+  "character_labels": {},
+  "appearance": {
+    "theme": "dark",
+    "font_size": 10,
+    "compact_mode": false,
+    "accent_color": "#4287f5"
+  },
+  "advanced": {
+    "log_level": "INFO",
+    "config_directory": "~/.config/argus-overview",
+    "enable_debug": false
+  },
+  "intel": {
+    "channels": ["Alliance", "Intel"],
+    "alerts_enabled": true,
+    "visual_border": true,
+    "visual_overlay": true,
+    "audio_enabled": true,
+    "system_notification": false,
+    "min_threat_level": "warning",
+    "jumps_threshold": 5,
+    "cooldown_seconds": 5,
+    "current_system": "",
+    "custom_log_path": "",
+    "master_toggle": true
+  }
 }
 ```
 
@@ -481,7 +610,7 @@ ruff check src/
 ruff format src/
 
 # Audit actions
-python -m eve_overview_pro.ui.action_registry
+python -m argus_overview.ui.action_registry
 ```
 
 ### Adding New Features
@@ -496,7 +625,7 @@ python -m eve_overview_pro.ui.action_registry
 
 ## See Also
 
-- [USER_GUIDE.md](USER_GUIDE.md) - End-user documentation
-- [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
-- [DEV_NOTES.md](../DEV_NOTES.md) - Action Registry details
-- [CHANGELOG.md](../CHANGELOG.md) - Version history
+- [USER_GUIDE.md](USER_GUIDE.md) — End-user documentation
+- [API.md](API.md) — Action Registry audit details
+- [CHANGELOG.md](../CHANGELOG.md) — Version history
+- [SMOKE_TEST_v3.2.0.md](SMOKE_TEST_v3.2.0.md) — Release validation checklist

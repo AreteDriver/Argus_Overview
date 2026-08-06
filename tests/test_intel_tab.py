@@ -241,8 +241,8 @@ class TestIntelLogTableEdgeCases:
 
         table.add_report(report)
 
-        # Ships column is index 4
-        ships_item = table.item(0, 4)
+        # Ships column is index 5 (PR2 reordered: Message first)
+        ships_item = table.item(0, 5)
         ships_text = ships_item.text()
         # Should show "Sabre, Loki, Muninn +2"
         assert "+2" in ships_text
@@ -267,8 +267,8 @@ class TestIntelLogTableEdgeCases:
 
         table.add_report(report)
 
-        # Message column is index 5
-        msg_item = table.item(0, 5)
+        # Message column is index 0 (PR2 reordered: Message first)
+        msg_item = table.item(0, 0)
         msg_text = msg_item.text()
         assert msg_text.endswith("...")
         assert len(msg_text) == 103  # 100 chars + "..."
@@ -681,7 +681,7 @@ class TestIntelTabUI:
         tab._update_log_dir_label()
 
         assert tab.log_dir_label.text() == "Log Dir: Not found"
-        assert "F44336" in tab.log_dir_label.styleSheet()  # Red color
+        assert "F06464" in tab.log_dir_label.styleSheet()  # Critical red from design system
 
     def test_add_channel_with_dialog(self, qapp, mock_settings_manager):
         """Test adding channel via dialog (lines 528-539)."""

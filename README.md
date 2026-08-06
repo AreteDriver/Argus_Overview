@@ -1,4 +1,11 @@
-# Argus Overview v3.0
+> **STATUS: FROZEN as of 2026-06-22**  
+> This repository is no longer actively developed. See [AreteDriver/notes/decisions/2026-04-21-portfolio-triage.md](https://github.com/AreteDriver/notes/blob/main/decisions/2026-04-21-portfolio-triage.md) for context.  
+> Archived for reference. No new deploys or feature work.
+>
+> ---
+>
+
+# Argus Overview v3.3.0
 
 **The Complete Professional Multi-Boxing Solution for EVE Online**
 
@@ -51,6 +58,10 @@ Window preview management with grid layouts and auto-arrange.
 ### Roster Tab
 Character management with roles, status, and team organization.
 ![Roster](docs/screenshot-roster.png)
+
+### Intel Tab
+Intel channel monitoring with per-character location tracking and threat tinting.
+![Intel](docs/screenshots/tabs/intel_1440.png)
 
 ### Cycle Control Tab
 Cycling groups with hotkey recording.

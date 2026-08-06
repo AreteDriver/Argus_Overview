@@ -41,7 +41,7 @@ class SettingsManager:
             "capture_quality": "low",  # low, medium, high
         },
         "thumbnails": {
-            "opacity_on_hover": 0.3,
+            "opacity_on_hover": 0.85,  # PR4: default raised from 0.3 so previews remain readable on hover
             "zoom_on_hover": 1.5,
             "lock_positions": False,
             "show_labels": True,
@@ -96,6 +96,16 @@ class SettingsManager:
             "cooldown_seconds": 5,  # Minimum time between alerts for same system
             "current_system": "",  # Player's current system for jump calculations
             "custom_log_path": "",  # Custom path to EVE chat logs
+            # v3.2.0 intel-aware preview chrome — master toggle. When False,
+            # parser/alerts still run but threat tints + dots + badges are
+            # suppressed on previews and chips.
+            "preview_chrome_enabled": True,
+            # v3.2.0 — read each EVE client's Local channel log to track
+            # which system that character is in.
+            "track_character_locations": True,
+            # v3.2.0 — max jumps from an alert system that a character can
+            # be and still see threat tinting. 0 disables adjacent tinting.
+            "threat_jumps_threshold": 1,
         },
     }
 

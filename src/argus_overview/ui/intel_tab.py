@@ -38,6 +38,7 @@ from PySide6.QtWidgets import (
 from argus_overview.intel.alerts import AlertConfig, AlertDispatcher, AlertType
 from argus_overview.intel.log_watcher import ChatLogWatcher, ChatMessage
 from argus_overview.intel.parser import IntelParser, IntelReport, ThreatLevel
+from argus_overview.ui.design_system import colors as ds
 
 
 class IntelLogTable(QTableWidget):
@@ -62,8 +63,12 @@ class IntelLogTable(QTableWidget):
         self._setup_table()
 
     def _setup_table(self):
-        """Setup table columns and appearance."""
-        columns = ["Time", "Threat", "System", "Count", "Ships", "Message"]
+        """Setup table columns and appearance.
+
+        PR2: Message is the primary signal, so it is placed first with Stretch
+        resize mode so it remains readable at smaller window widths.
+        """
+        columns = ["Message", "Time", "Threat", "System", "Count", "Ships"]
         self.setColumnCount(len(columns))
         self.setHorizontalHeaderLabels(columns)
 
@@ -75,14 +80,14 @@ class IntelLogTable(QTableWidget):
         self.verticalHeader().setVisible(False)
         self.setShowGrid(False)
 
-        # Column sizing
+        # Column sizing — Message first, stretched; metadata compact
         header = self.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # Time
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Threat
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # System
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # Count
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Interactive)  # Ships
-        header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)  # Message
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)  # Message
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # Time
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # Threat
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # System
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)  # Count
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # Ships
 
         # Selection signal
         self.itemSelectionChanged.connect(self._on_selection_changed)
@@ -94,42 +99,50 @@ class IntelLogTable(QTableWidget):
         # Insert at top
         self.insertRow(0)
 
+        # Message (primary column, first)
+        msg_text = report.raw_message[:100]
+        if len(report.raw_message) > 100:
+            msg_text += "..."
+        msg_item = QTableWidgetItem(msg_text)
+        msg_item.setToolTip(report.raw_message)
+        msg_item.setData(Qt.ItemDataRole.UserRole, report)
+        self.setItem(0, 0, msg_item)
+
         # Time
         time_str = report.timestamp.strftime("%H:%M:%S")
         time_item = QTableWidgetItem(time_str)
-        time_item.setData(Qt.ItemDataRole.UserRole, report)
-        self.setItem(0, 0, time_item)
+        self.setItem(0, 1, time_item)
 
-        # Threat level
-        threat_item = QTableWidgetItem(report.threat_level.value.upper())
+        # Threat level (PR4: shield icon prefix for icon+text redundancy)
+        shield_icons = {
+            ThreatLevel.CLEAR: "🛡",
+            ThreatLevel.INFO: "🛡",
+            ThreatLevel.WARNING: "⚠",
+            ThreatLevel.DANGER: "⚠",
+            ThreatLevel.CRITICAL: "☠",
+        }
+        icon = shield_icons.get(report.threat_level, "")
+        threat_item = QTableWidgetItem(f"{icon} {report.threat_level.value.upper()}")
         threat_color = self.THREAT_COLORS.get(report.threat_level, QColor("#888"))
         threat_item.setForeground(QBrush(threat_color))
         threat_item.setFont(QFont("", -1, QFont.Weight.Bold))
-        self.setItem(0, 1, threat_item)
+        self.setItem(0, 2, threat_item)
 
         # System
         system_item = QTableWidgetItem(report.system or "Unknown")
-        self.setItem(0, 2, system_item)
+        self.setItem(0, 3, system_item)
 
         # Count
         count_str = str(report.hostile_count) if report.hostile_count else "-"
         count_item = QTableWidgetItem(count_str)
-        self.setItem(0, 3, count_item)
+        self.setItem(0, 4, count_item)
 
         # Ships
         ships_str = ", ".join(report.ship_types[:3]) if report.ship_types else "-"
         if len(report.ship_types) > 3:
             ships_str += f" +{len(report.ship_types) - 3}"
         ships_item = QTableWidgetItem(ships_str)
-        self.setItem(0, 4, ships_item)
-
-        # Message (truncated)
-        msg_text = report.raw_message[:100]
-        if len(report.raw_message) > 100:
-            msg_text += "..."
-        msg_item = QTableWidgetItem(msg_text)
-        msg_item.setToolTip(report.raw_message)
-        self.setItem(0, 5, msg_item)
+        self.setItem(0, 5, ships_item)
 
         # Apply row background color based on threat
         for col in range(self.columnCount()):
@@ -177,6 +190,7 @@ class IntelTab(QWidget):
     # Signals
     intel_received = Signal(object)  # IntelReport
     alert_triggered = Signal(object, object)  # IntelReport, AlertType
+    pipeline_health_changed = Signal(str, str)  # status, detail
 
     def __init__(self, settings_manager, parent=None):
         super().__init__(parent)
@@ -295,7 +309,7 @@ class IntelTab(QWidget):
 
         # Status bar
         self.status_label = QLabel("Status: Stopped")
-        self.status_label.setStyleSheet("color: #888; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {ds.TEXT_MUTED}; padding: 5px;")
         layout.addWidget(self.status_label)
 
     def _create_toolbar(self) -> QWidget:
@@ -330,7 +344,7 @@ class IntelTab(QWidget):
 
         # Log directory indicator
         self.log_dir_label = QLabel("Log Dir: Not found")
-        self.log_dir_label.setStyleSheet("color: #888;")
+        self.log_dir_label.setStyleSheet(f"color: {ds.TEXT_MUTED};")
         layout.addWidget(self.log_dir_label)
 
         return toolbar
@@ -449,7 +463,7 @@ class IntelTab(QWidget):
         location_layout.addRow("Current System:", self.current_system_edit)
 
         location_note = QLabel("Set your current system to enable jump distance filtering")
-        location_note.setStyleSheet("color: #888; font-size: 10px;")
+        location_note.setStyleSheet(f"color: {ds.TEXT_MUTED}; font-size: 10px;")
         location_note.setWordWrap(True)
         location_layout.addRow(location_note)
 
@@ -491,10 +505,10 @@ class IntelTab(QWidget):
                 path_str = "..." + path_str[-37:]
             self.log_dir_label.setText(f"Log Dir: {path_str}")
             self.log_dir_label.setToolTip(str(log_dir))
-            self.log_dir_label.setStyleSheet("color: #4CAF50;")
+            self.log_dir_label.setStyleSheet(f"color: {ds.HEALTHY};")
         else:
             self.log_dir_label.setText("Log Dir: Not found")
-            self.log_dir_label.setStyleSheet("color: #F44336;")
+            self.log_dir_label.setStyleSheet(f"color: {ds.CRITICAL};")
 
     # -------------------------------------------------------------------------
     # Slots and handlers
@@ -514,9 +528,10 @@ class IntelTab(QWidget):
         self.start_stop_btn.setText("Stop Monitoring")
         self.start_stop_btn.setChecked(True)
         self.status_label.setText("Status: Monitoring...")
-        self.status_label.setStyleSheet("color: #4CAF50; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {ds.HEALTHY}; padding: 5px;")
         self._update_log_dir_label()
         self.logger.info("Intel monitoring started")
+        self.pipeline_health_changed.emit("healthy", "monitoring active")
 
     def _stop_monitoring(self):
         """Stop intel monitoring."""
@@ -524,8 +539,9 @@ class IntelTab(QWidget):
         self.start_stop_btn.setText("Start Monitoring")
         self.start_stop_btn.setChecked(False)
         self.status_label.setText("Status: Stopped")
-        self.status_label.setStyleSheet("color: #888; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {ds.TEXT_MUTED}; padding: 5px;")
         self.logger.info("Intel monitoring stopped")
+        self.pipeline_health_changed.emit("unavailable", "monitoring stopped")
 
     @Slot()
     def _add_channel(self):
@@ -598,7 +614,8 @@ class IntelTab(QWidget):
         """Handle watcher error."""
         self.logger.error(f"Log watcher error: {error}")
         self.status_label.setText(f"Error: {error}")
-        self.status_label.setStyleSheet("color: #F44336; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: {ds.CRITICAL}; padding: 5px;")
+        self.pipeline_health_changed.emit("degraded", error)
 
     @Slot(object)
     def _on_entry_selected(self, report: IntelReport):

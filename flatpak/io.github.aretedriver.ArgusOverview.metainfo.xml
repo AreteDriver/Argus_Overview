@@ -54,6 +54,41 @@
   </branding>
 
   <releases>
+    <release version="3.2.0" date="2026-04-26">
+      <description>
+        <p>Intel-Aware Edition — preview chrome now carries threat state from the chat-log parser.</p>
+        <ul>
+          <li>Threat-tint borders on previews with 30s decay and pulse on danger</li>
+          <li>Character status dock — chip strip with avatar, system, and threat dot</li>
+          <li>Preview focus mode — double-click to spotlight, Esc to exit</li>
+          <li>Per-character system tracking from EVE Local channel logs</li>
+          <li>Smart per-character + jumps-from threat fan-out</li>
+          <li>"+Nj" distance badges on chips and frames</li>
+          <li>Toggleable replay strip for combat scrubbing</li>
+          <li>Master toggle for users who prefer plain previews</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.1.2" date="2026-04-15">
+      <description>
+        <p>Security patch</p>
+        <ul>
+          <li>Bump Pillow to 12.2.0 to patch FITS GZIP decompression bomb</li>
+        </ul>
+      </description>
+    </release>
+    <release version="3.1.1" date="2026-04-15">
+      <description>
+        <p>Stability and performance fixes</p>
+        <ul>
+          <li>Signal lifecycle leak fixes in preview frame cleanup</li>
+          <li>Capture pipeline stability: snapshot iteration, orphan image cleanup</li>
+          <li>Crop-based frame dedup (~22x cheaper on unchanged frames)</li>
+          <li>Wayland-only pynput import guard</li>
+          <li>Security: scrub filesystem paths from recording script</li>
+        </ul>
+      </description>
+    </release>
     <release version="3.1.0" date="2026-03-13">
       <description>
         <p>Wayland POC, Intel SDE, Windows parity, coverage 99%</p>

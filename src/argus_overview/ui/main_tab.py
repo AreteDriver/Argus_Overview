@@ -48,9 +48,72 @@ from PySide6.QtWidgets import (
 )
 
 from argus_overview.core.discovery import scan_eve_windows
+from argus_overview.intel.parser import ThreatLevel
 from argus_overview.ui.action_registry import PrimaryHome
 from argus_overview.ui.menu_builder import ContextMenuBuilder, ToolbarBuilder
+from argus_overview.ui.replay_strip import ReplayStrip
+from argus_overview.ui.themes import get_theme_manager
 from argus_overview.utils.screen import ScreenGeometry, get_screen_geometry
+
+# Threat-tint config — tuned for a glanceable but non-distracting frame
+THREAT_BORDER_COLORS: dict[ThreatLevel, tuple[int, int, int]] = {
+    ThreatLevel.CLEAR: (0, 200, 100),
+    ThreatLevel.INFO: (0, 180, 230),
+    ThreatLevel.WARNING: (255, 170, 0),
+    ThreatLevel.DANGER: (255, 90, 30),
+    ThreatLevel.CRITICAL: (255, 40, 40),
+}
+THREAT_LEVEL_RANK: dict[ThreatLevel, int] = {
+    ThreatLevel.CLEAR: 0,
+    ThreatLevel.INFO: 1,
+    ThreatLevel.WARNING: 2,
+    ThreatLevel.DANGER: 3,
+    ThreatLevel.CRITICAL: 4,
+}
+THREAT_DECAY_TICK_MS = 100  # decay tick rate
+THREAT_DECAY_DURATION_MS = 30_000  # full fade time after last alert
+THREAT_PULSE_TICK_MS = 33  # ~30 fps pulse
+THREAT_PULSE_DURATION_MS = 600  # one pulse cycle
+
+# Replay strip (PR10) — small ring buffer of recent capture pixmaps.
+# 6 cells × 800ms throttle = ~5s of recent history.
+REPLAY_BUFFER_SIZE = 6
+REPLAY_THROTTLE_MS = 800
+
+# Per-character accent palette (PR8). Shared by both frames + chips so
+# the same character renders in the same color across the preview grid
+# and the status dock. Palette is fixed-length; deterministic hash maps
+# names to indices.
+CHARACTER_ACCENT_COLORS: list[tuple[int, int, int]] = [
+    (255, 100, 100),
+    (100, 255, 100),
+    (100, 150, 255),
+    (255, 200, 80),
+    (220, 120, 220),
+    (100, 220, 220),
+    (255, 165, 60),
+    (170, 130, 255),
+]
+
+
+def character_accent_color(name: str) -> QColor:
+    """Deterministic accent color for a character name.
+
+    Used by both WindowPreviewWidget (frame border) and CharacterChip
+    (avatar fill) so visual identity is consistent across surfaces.
+
+    Uses MD5 (not Python's built-in hash()) for cross-process determinism:
+    PYTHONHASHSEED is randomized by default, so hash() varies between
+    app launches, which would make the same character render in a
+    different color every session. MD5 is content-addressed and stable.
+    """
+    import hashlib
+
+    digest = hashlib.md5(name.encode("utf-8"), usedforsecurity=False).digest()
+    index = digest[0] % len(CHARACTER_ACCENT_COLORS)
+    r, g, b = CHARACTER_ACCENT_COLORS[index]
+    return QColor(r, g, b)
+
 
 # Module-level constant: avoids re-creating the dict on every pil_to_qimage call
 _FORMAT_MAP = {
@@ -456,6 +519,7 @@ class GridApplier:
 
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.last_apply_results: dict[str, bool] = {}
 
     def get_screen_geometry(self, monitor: int = 0) -> ScreenGeometry:
         """Get screen geometry for a monitor (delegates to shared utility)"""
@@ -472,6 +536,7 @@ class GridApplier:
         stacked: bool = False,
         stacked_use_grid_size: bool = True,
     ) -> bool:
+        results: dict[str, bool] = {}
         try:
             # Calculate grid cell size (used for both grid and optionally stacked)
             cell_width = (screen.width - spacing * (grid_cols + 1)) // grid_cols
@@ -484,11 +549,11 @@ class GridApplier:
 
                 for _char_name, window_id in window_map.items():
                     if stacked_use_grid_size:
-                        # Use grid cell size for stacked windows
-                        self._move_window(window_id, x, y, cell_width, cell_height)
+                        results[window_id] = self._move_window(
+                            window_id, x, y, cell_width, cell_height
+                        )
                     else:
-                        # Keep current size, just move to stack position
-                        self._move_window_position_only(window_id, x, y)
+                        results[window_id] = self._move_window_position_only(window_id, x, y)
             else:
                 for char_name, (row, col) in arrangement.items():
                     if char_name not in window_map:
@@ -497,28 +562,43 @@ class GridApplier:
                     window_id = window_map[char_name]
                     x = screen.x + spacing + col * (cell_width + spacing)
                     y = screen.y + spacing + row * (cell_height + spacing)
-                    self._move_window(window_id, x, y, cell_width, cell_height)
+                    results[window_id] = self._move_window(window_id, x, y, cell_width, cell_height)
 
-            self.logger.info(f"Applied arrangement to {len(window_map)} windows")
-            return True
+            self.last_apply_results = results
+            ok = all(results.values()) if results else True
+            self.logger.info(
+                f"Applied arrangement to {len(window_map)} windows ({sum(results.values())}/{len(results)} succeeded)"
+            )
+            return ok
 
         except (AttributeError, OSError, RuntimeError, ValueError) as e:
             self.logger.error(f"Failed to apply arrangement: {e}")
+            self.last_apply_results = results
             return False
 
-    def _move_window(self, window_id: str, x: int, y: int, w: int, h: int):
+    def _move_window(self, window_id: str, x: int, y: int, w: int, h: int) -> bool:
         """Move and resize a window via platform abstraction layer."""
         from argus_overview.platform import get_window_manager
 
-        wm = get_window_manager()
-        wm.move_window(window_id, x, y, w, h)
+        try:
+            wm = get_window_manager()
+            wm.move_window(window_id, x, y, w, h)
+            return True
+        except (OSError, RuntimeError) as e:
+            self.logger.warning(f"Failed to move window {window_id}: {e}")
+            return False
 
-    def _move_window_position_only(self, window_id: str, x: int, y: int):
+    def _move_window_position_only(self, window_id: str, x: int, y: int) -> bool:
         """Move a window without resizing (w=0, h=0 convention)."""
         from argus_overview.platform import get_window_manager
 
-        wm = get_window_manager()
-        wm.move_window(window_id, x, y, 0, 0)
+        try:
+            wm = get_window_manager()
+            wm.move_window(window_id, x, y, 0, 0)
+            return True
+        except (OSError, RuntimeError) as e:
+            self.logger.warning(f"Failed to move window {window_id}: {e}")
+            return False
 
 
 def pil_to_qimage(pil_image: Image.Image, raw_data: bytes | None = None) -> QImage:
@@ -568,6 +648,8 @@ class WindowPreviewWidget(QWidget):
     window_activated = Signal(str)  # window_id
     window_removed = Signal(str)  # window_id
     label_changed = Signal(str, str)  # window_id, new_label
+    focus_requested = Signal(str)  # window_id — PR3 spotlight toggle
+    retry_requested = Signal(str)  # window_id — PR2 retry capture
 
     def __init__(
         self,
@@ -578,6 +660,9 @@ class WindowPreviewWidget(QWidget):
         parent=None,
     ):
         super().__init__(parent)
+        # PR4: accept focus for keyboard navigation (Tab into grid, arrows
+        # between frames, Enter/Space to activate, Esc to exit spotlight).
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.logger = logging.getLogger(__name__)
         self.window_id = window_id
         self.character_name = character_name
@@ -599,6 +684,13 @@ class WindowPreviewWidget(QWidget):
         # Frame fingerprint cache — skip identical frames
         self._last_frame_hash: int | None = None
 
+        # PR1: Capture health state — tracks when we last received a frame and
+        # whether it was deduplicated, so the UI can show LIVE / STATIC /
+        # STALE / ERROR explicitly rather than leaving the operator to guess.
+        self._last_frame_received_at: float = 0.0
+        self._last_frame_was_dedup: bool = False
+        self._capture_error_count: int = 0
+
         # v2.2 Settings (from settings_manager or defaults)
         self._opacity_on_hover = 0.3
         self._zoom_on_hover = 1.5
@@ -606,10 +698,72 @@ class WindowPreviewWidget(QWidget):
         self._show_session_timer = False
         self._load_settings()
 
+        # PR4/PR5: known current system for this frame's character.
+        # Pushed by WindowManager.set_character_system; consumed by
+        # WindowManager.apply_threat_state for smart fan-out.
+        self._character_system: str | None = None
+
+        # PR8: per-character accent color, shared with the chip.
+        self._accent_color: QColor = character_accent_color(character_name)
+
+        # Intel threat state (PR1: intel-aware preview borders)
+        self._threat_level: ThreatLevel | None = None
+        self._threat_system: str | None = None
+        # PR9: jumps from this character to the alert system. None for
+        # same-system / unknown; positive int renders as "+Nj" near the
+        # top-left of the threat border.
+        self._threat_distance: int | None = None
+        # Decay alpha drives the inset border; ranges 0.0 (off) to 1.0 (full)
+        self._threat_alpha: float = 0.0
+        self._threat_decay_steps: int = max(1, THREAT_DECAY_DURATION_MS // THREAT_DECAY_TICK_MS)
+        self._threat_decay_timer = QTimer(self)
+        self._threat_decay_timer.timeout.connect(self._tick_threat_decay)
+
+        # PR1: timestamp when the current threat state was set, so paintEvent
+        # can render report age and the tooltip can show exact observation time.
+        self._threat_set_at: float = 0.0
+        # PR1: has ANY intel report ever been received for this character?
+        # False until the first set_threat_state call with a non-None level.
+        # When False and threat_level is None, the frame shows Unknown instead
+        # of the accent "clear" border.
+        self._intel_report_received: bool = False
+
+        # Pulse animation (oneshot on transition into danger/critical)
+        self._pulse_phase: float = 0.0  # 1.0 -> 0.0 over PULSE_DURATION
+        self._pulse_steps: int = max(1, THREAT_PULSE_DURATION_MS // THREAT_PULSE_TICK_MS)
+        self._pulse_timer = QTimer(self)
+        self._pulse_timer.timeout.connect(self._tick_pulse)
+
+        # Legacy flash_border state (retains existing border_flash_requested wiring)
+        self._flash_color: QColor | None = None
+        self._flash_timer = QTimer(self)
+        self._flash_timer.setSingleShot(True)
+        self._flash_timer.timeout.connect(self._clear_flash)
+
+        # PR1: periodic timer to evaluate capture health and repaint the badge.
+        # Fires every 500 ms so the STALE age text updates smoothly without
+        # burning CPU on the UI thread.
+        self._capture_health_timer = QTimer(self)
+        self._capture_health_timer.timeout.connect(self._tick_capture_health)
+        self._capture_health_timer.start(500)
+
+        # PR10: replay strip — bounded ring buffer of recent frame pixmaps,
+        # sampled at most once per REPLAY_THROTTLE_MS so the buffer covers
+        # ~5 seconds of capture even at high refresh rates.
+        from collections import deque
+
+        self._replay_buffer: deque = deque(maxlen=REPLAY_BUFFER_SIZE)
+        self._replay_last_sample_ms: int = 0
+        self._replay_strip = None  # type: ignore[var-annotated]
+        self._replay_view_index: int | None = None  # None = live; int = buffered
+
+        from argus_overview.ui.design_system import metrics as dm
+
         # Setup UI
-        self.setMinimumSize(200, 150)
-        self.setMaximumSize(600, 450)
+        self.setMinimumSize(dm.PREVIEW_MIN_WIDTH, dm.PREVIEW_MIN_HEIGHT)
+        self.setMaximumSize(dm.PREVIEW_MAX_WIDTH, dm.PREVIEW_MAX_HEIGHT)
         self._update_tooltip()
+        self._update_accessible_name()
 
         # Enable mouse tracking for hover effects
         self.setMouseTracking(True)
@@ -631,12 +785,19 @@ class WindowPreviewWidget(QWidget):
         self.info_label.setStyleSheet("font-weight: bold; padding: 2px;")
         layout.addWidget(self.info_label)
 
-        # Session timer label (v2.2)
-        self.timer_label = QLabel("")
-        self.timer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.timer_label.setStyleSheet("color: #888; font-size: 9px;")
+        # PR10: replay strip container — always present so cards keep uniform
+        # height in the flow layout even when the strip is disabled.
+        self._replay_container = QWidget()
+        self._replay_container.setFixedHeight(ReplayStrip.STRIP_HEIGHT)
+        QVBoxLayout(self._replay_container)
+        layout.addWidget(self._replay_container)
+
+        # Session timer label (v2.2) — PR4: floating child so it does not
+        # push the preview image up. Positioned at bottom-left in resizeEvent.
+        self.timer_label = QLabel("", self)
+        self.timer_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.timer_label.setStyleSheet("color: #888; font-size: 9px; background: transparent;")
         self.timer_label.setVisible(self._show_session_timer)
-        layout.addWidget(self.timer_label)
 
         # Session timer update (every minute)
         self.session_timer = QTimer()
@@ -644,10 +805,40 @@ class WindowPreviewWidget(QWidget):
         if self._show_session_timer:
             self.session_timer.start(60000)  # Update every minute
 
-        # Opacity effect for hover
+        # Opacity effect for hover (and PR3 spotlight dim state)
         self.opacity_effect = QGraphicsOpacityEffect(self)
         self.opacity_effect.setOpacity(1.0)
         self.setGraphicsEffect(self.opacity_effect)
+
+        # PR3 — focus/spotlight mode state.
+        # mode is one of: None (normal), "focused" (this widget is the
+        # spotlight target), "dimmed" (another widget has spotlight).
+        self._spotlight_mode: str | None = None
+        # Cached size constraints so we can restore them when leaving focus.
+        self._normal_min_size: QSize = self.minimumSize()
+        self._normal_max_size: QSize = self.maximumSize()
+
+        # PR10: restore the replay-strip toggle from settings if it was
+        # previously enabled for this character.
+        if self.settings_manager is not None:
+            try:
+                store = self.settings_manager.get("replay_strip_enabled", {}) or {}
+                if isinstance(store, dict) and store.get(self.character_name):
+                    self.enable_replay_strip(True)
+            except (AttributeError, TypeError):
+                pass
+
+        # PR2: retry button overlay — visible when capture is ERROR or STALE.
+        # Created as a floating child widget (not in the layout) so it can be
+        # positioned in the top-right corner without affecting flow layout.
+        self._retry_button = QPushButton("↻", self)
+        self._retry_button.setFixedSize(28, 28)
+        self._retry_button.setToolTip("Retry capture")
+        self._retry_button.setVisible(False)
+        try:
+            self._retry_button.clicked.connect(self._on_retry_clicked)
+        except RuntimeError:
+            pass
 
     def _load_settings(self):
         """Load settings from settings_manager"""
@@ -673,13 +864,52 @@ class WindowPreviewWidget(QWidget):
         return self.character_name
 
     def _update_tooltip(self):
-        """Update tooltip text"""
-        tooltip = f"{self.character_name}"
-        if self.custom_label:
-            tooltip = f"{self.custom_label}\n{self.character_name}"
-        tooltip += f"\nWindow ID: {self.window_id}"
-        tooltip += "\nClick to activate | Right-click for menu"
-        self.setToolTip(tooltip)
+        """Update tooltip text (PR1: enriched with state, age, and actions)."""
+        char_name = getattr(self, "character_name", "")
+        tooltip = f"{char_name}"
+        custom_label = getattr(self, "custom_label", None)
+        if custom_label:
+            tooltip = f"{custom_label}\n{char_name}"
+
+        # PR1: system and capture health (use getattr for test resilience)
+        system = getattr(self, "_character_system", None)
+        if system:
+            tooltip += f"\nSystem: {system}"
+        health = self._capture_health_label()
+        if health:
+            tooltip += f"\nCapture: {health}"
+
+        # PR1: threat state with age and source
+        threat_level = getattr(self, "_threat_level", None)
+        threat_alpha = getattr(self, "_threat_alpha", 0.0)
+        if threat_level is not None and threat_alpha > 0.0:
+            age = ""
+            threat_set_at = getattr(self, "_threat_set_at", 0.0)
+            if threat_set_at > 0.0:
+                secs = int(time.monotonic() - threat_set_at)
+                age = f" · {secs}s ago"
+            src = getattr(self, "_threat_system", None) or "unknown"
+            tooltip += f"\nThreat: {threat_level.value}{age} · source: {src}"
+        elif not getattr(self, "_intel_report_received", False):
+            tooltip += "\nThreat: Unknown (no intel data received)"
+
+        # PR4: session timer in tooltip when enabled
+        if getattr(self, "_show_session_timer", False):
+            elapsed = datetime.now() - self.session_start
+            hours = int(elapsed.total_seconds() // 3600)
+            minutes = int((elapsed.total_seconds() % 3600) // 60)
+            timer_text = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
+            tooltip += f"\nSession: {timer_text}"
+
+        window_id = getattr(self, "window_id", "")
+        tooltip += f"\nWindow ID: {window_id}"
+        # PR1: focus-mode affordance
+        tooltip += "\nDouble-click to spotlight · Esc to exit"
+        tooltip += "\nClick to activate · Right-click for menu"
+        try:
+            self.setToolTip(tooltip)
+        except RuntimeError:
+            pass
 
     def update_frame(self, image: Image.Image):
         """
@@ -688,6 +918,8 @@ class WindowPreviewWidget(QWidget):
         Args:
             image: PIL Image
         """
+        # PR1: record frame arrival time for capture-health badge.
+        self._last_frame_received_at = time.monotonic()
         try:
             # Frame fingerprint — sample a small crop to detect duplicates
             # without copying the full image. Only call tobytes() on the full
@@ -696,8 +928,11 @@ class WindowPreviewWidget(QWidget):
             sample_data = image.crop((0, 0, image.width, sample_h)).tobytes()
             frame_hash = hash(sample_data)
             if frame_hash == self._last_frame_hash:
+                self._last_frame_was_dedup = True
                 image.close()
                 return  # Frame unchanged, skip conversion pipeline
+            self._last_frame_was_dedup = False
+            self._capture_error_count = 0  # PR1: reset error streak on success
             self._last_frame_hash = frame_hash
 
             # Full tobytes() only for frames that actually changed
@@ -710,6 +945,17 @@ class WindowPreviewWidget(QWidget):
             # Convert to pixmap — release the previous one first
             self.current_pixmap = QPixmap.fromImage(qimage)
             del qimage  # Release intermediate QImage memory
+
+            # PR10: sample into the replay ring buffer at most once per
+            # REPLAY_THROTTLE_MS so the buffer covers ~5s regardless of
+            # capture rate. Only sample the unscaled pixmap; the strip
+            # rescales itself for display.
+            self._sample_replay_buffer(self.current_pixmap)
+
+            # If the user is currently scrubbing through the strip, hold
+            # the buffered view — don't overwrite it with the live frame.
+            if self._replay_view_index is not None:
+                return
 
             # Scale to fit widget while maintaining aspect ratio
             scaled_pixmap = self.current_pixmap.scaled(
@@ -747,6 +993,7 @@ class WindowPreviewWidget(QWidget):
         self.custom_label = label
         self.info_label.setText(self._get_display_name())
         self._update_tooltip()
+        self._update_accessible_name()
         self.label_changed.emit(self.window_id, label or "")
 
         # Save to settings if available
@@ -803,34 +1050,639 @@ class WindowPreviewWidget(QWidget):
 
         super().leaveEvent(event)
 
+    def focusInEvent(self, event):
+        """PR7: trigger repaint so the focus ring is drawn."""
+        super().focusInEvent(event)
+        self.update()
+
+    def focusOutEvent(self, event):
+        """PR7: trigger repaint so the focus ring is cleared."""
+        super().focusOutEvent(event)
+        self.update()
+
+    def set_character_system(self, system: str | None) -> None:
+        """Record the current system for this frame's character (PR5)."""
+        self._character_system = system
+        self._update_tooltip()
+        self._update_accessible_name()
+
+    def get_character_system(self) -> str | None:
+        return self._character_system
+
+    def _update_accessible_name(self) -> None:
+        """PR1: expose character, system, threat, and capture health to assistive tech."""
+        char_name = getattr(self, "character_name", "")
+        parts = [f"Preview of {char_name}"]
+        system = getattr(self, "_character_system", None)
+        if system:
+            parts.append(f"system {system}")
+        # Capture health
+        health = self._capture_health_label()
+        if health:
+            parts.append(f"capture {health.lower()}")
+        # Threat state
+        threat_level = getattr(self, "_threat_level", None)
+        threat_alpha = getattr(self, "_threat_alpha", 0.0)
+        if threat_level is not None and threat_alpha > 0.0:
+            parts.append(f"threat {threat_level.value}")
+        elif not getattr(self, "_intel_report_received", False):
+            parts.append("threat unknown")
+        else:
+            parts.append("no active threat")
+        try:
+            self.setAccessibleName(". ".join(parts))
+        except RuntimeError:
+            # Defensive: tests that bypass __init__ create half-initialised
+            # Qt objects; accessible name is non-critical, so swallow.
+            pass
+
+    def set_threat_state(
+        self,
+        level: ThreatLevel | None,
+        system: str | None = None,
+        initial_alpha: float = 1.0,
+        distance: int | None = None,
+    ) -> None:
+        """
+        Update the intel threat state for this preview frame.
+
+        Args:
+            level: Threat level. None or CLEAR clears the border.
+            system: System name the threat refers to (kept for tooltip + dock).
+            initial_alpha: Starting alpha [0.0, 1.0] for the border. Defaults
+                to 1.0 (full intensity for same-system alerts). Lower values
+                are used by WindowManager when fanning to characters in
+                adjacent systems via the jumps-from filter (PR6).
+            distance: Jumps from this character to the alert system.
+                None for same-system / unknown. Positive ints render as a
+                "+Nj" badge near the top-left of the frame (PR9).
+        """
+        prev_level = self._threat_level
+
+        # PR1: any non-None report (including CLEAR) proves the intel pipeline
+        # has delivered data for this character. Once set, the frame is no longer
+        # in the "Unknown" state.
+        if level is not None:
+            self._intel_report_received = True
+
+        if level is None or level == ThreatLevel.CLEAR:
+            self._threat_level = None
+            self._threat_system = None
+            self._threat_alpha = 0.0
+            self._threat_distance = None
+            self._threat_decay_timer.stop()
+            self._update_tooltip()
+            self.update()
+            return
+
+        # PR1: record when this report was observed so the UI can show age.
+        self._threat_set_at = time.monotonic()
+        self._threat_level = level
+        self._threat_system = system
+        self._threat_alpha = max(0.0, min(1.0, initial_alpha))
+        self._threat_distance = distance if distance and distance > 0 else None
+
+        # Pulse on upgrade into danger/critical (only at full-ish intensity —
+        # don't pulse for distant adjacent-system alerts).
+        upgraded = prev_level is None or THREAT_LEVEL_RANK.get(
+            prev_level, 0
+        ) < THREAT_LEVEL_RANK.get(level, 0)
+        if (
+            upgraded
+            and level in (ThreatLevel.DANGER, ThreatLevel.CRITICAL)
+            and initial_alpha >= 0.9
+        ):
+            self._start_pulse()
+
+        # Restart decay timer
+        self._threat_decay_timer.start(THREAT_DECAY_TICK_MS)
+        self._update_tooltip()
+        self._update_accessible_name()
+        self.update()
+
+    def _tick_threat_decay(self) -> None:
+        """Linear decay of the threat-border alpha."""
+        if self._threat_alpha <= 0.0:
+            self._threat_decay_timer.stop()
+            return
+        self._threat_alpha = max(0.0, self._threat_alpha - 1.0 / self._threat_decay_steps)
+        if self._threat_alpha <= 0.0:
+            self._threat_level = None
+            self._threat_system = None
+            self._threat_distance = None
+            self._threat_decay_timer.stop()
+        self.update()
+
+    def _start_pulse(self) -> None:
+        """Trigger a single pulse cycle on upgrade to danger/critical."""
+        self._pulse_phase = 1.0
+        self._pulse_timer.start(THREAT_PULSE_TICK_MS)
+
+    def _tick_pulse(self) -> None:
+        """Decrement pulse phase toward 0; stop when done."""
+        self._pulse_phase = max(0.0, self._pulse_phase - 1.0 / self._pulse_steps)
+        if self._pulse_phase <= 0.0:
+            self._pulse_timer.stop()
+        self.update()
+
+    def _tick_capture_health(self) -> None:
+        """PR1: Periodic health evaluation. Triggers repaint so the badge
+        text (e.g. 'STALE · 7s') stays current without requiring a frame.
+
+        PR2: toggles the retry button visibility when the frame enters ERROR
+        or STALE so the operator can recover without digging into a menu.
+        """
+        self.update()
+        btn = getattr(self, "_retry_button", None)
+        if btn is None:
+            return
+        try:
+            health = self._capture_health_label()
+            show = health in ("ERROR",) or health.startswith("STALE")
+            btn.setVisible(show)
+            if show:
+                btn.move(self.width() - btn.width() - 4, 4)
+        except RuntimeError:
+            pass
+
+    def _capture_health_label(self) -> str:
+        """PR1: Human-readable capture state for the bottom-right badge.
+
+        Returns empty string when the widget should not display a badge
+        (e.g. not yet initialized and not visible).
+        """
+        try:
+            if not self.isVisible():
+                return "PAUSED"
+        except RuntimeError:
+            return ""  # Defensive: mock widgets in tests
+        if getattr(self, "_capture_error_count", 0) > 0:
+            return "ERROR"
+        last_frame_at = getattr(self, "_last_frame_received_at", 0.0)
+        if last_frame_at == 0.0:
+            return "INITIALIZING"
+        elapsed = time.monotonic() - last_frame_at
+        if elapsed > 2.0:
+            return f"STALE · {int(elapsed)}s"
+        if getattr(self, "_last_frame_was_dedup", False):
+            return "STATIC"
+        return "LIVE"
+
+    def _capture_health_color(self) -> str:
+        """PR1: Semantic color for the capture-health badge text."""
+        from argus_overview.ui.design_system import colors as ds
+
+        label = self._capture_health_label()
+        if label.startswith("LIVE"):
+            return ds.HEALTHY
+        if label == "STATIC":
+            return ds.TEXT_SECONDARY
+        if label.startswith("STALE"):
+            return ds.WARNING
+        if label == "ERROR":
+            return ds.CRITICAL
+        return ds.TEXT_MUTED
+
+    def set_spotlight(self, mode: str | None) -> None:
+        """
+        Apply or clear focus/spotlight presentation.
+
+        Args:
+            mode: 'focused' to upscale + full opacity (this widget is the
+                spotlight target), 'dimmed' to fade and desaturate (another
+                widget owns the spotlight), None to return to normal.
+        """
+        if mode not in (None, "focused", "dimmed"):
+            raise ValueError(f"Invalid spotlight mode: {mode!r}")
+        self._spotlight_mode = mode
+
+        if mode == "focused":
+            # Allow growth beyond the normal max so the focused widget
+            # actually uses the freed space when others are minimized/hidden.
+            self.setMinimumSize(QSize(360, 270))
+            self.setMaximumSize(QSize(16777215, 16777215))  # QWIDGETSIZE_MAX
+            self.opacity_effect.setOpacity(1.0)
+        elif mode == "dimmed":
+            self.setMinimumSize(self._normal_min_size)
+            self.setMaximumSize(self._normal_max_size)
+            self.opacity_effect.setOpacity(0.25)
+        else:  # None — restore baseline
+            self.setMinimumSize(self._normal_min_size)
+            self.setMaximumSize(self._normal_max_size)
+            # Hover state may want partial opacity; reset to full on exit.
+            self.opacity_effect.setOpacity(self._opacity_on_hover if self._is_hovered else 1.0)
+        self.update()
+
+    def flash_border(self, color: str, duration_ms: int) -> None:
+        """
+        Legacy color/duration border flash hook used by border_flash_requested.
+
+        Kept independent of set_threat_state so callers without IntelReport
+        context still get visual feedback.
+        """
+        self._flash_color = QColor(color)
+        self._flash_timer.start(max(0, int(duration_ms)))
+        self.update()
+
+    def _clear_flash(self) -> None:
+        self._flash_color = None
+        self.update()
+
+    # ----- PR10 replay strip ------------------------------------------------
+    def _sample_replay_buffer(self, pixmap: QPixmap) -> None:
+        """Throttle-sample a captured pixmap into the ring buffer."""
+        if pixmap is None or pixmap.isNull():
+            return
+        now_ms = int(time.monotonic() * 1000)
+        if now_ms - self._replay_last_sample_ms < REPLAY_THROTTLE_MS:
+            return
+        # Store an immutable copy at modest size; full-res pixmaps would
+        # blow up memory across many widgets. 240×180 keeps it ~170KB max.
+        thumb = pixmap.scaled(
+            240,
+            180,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
+        self._replay_buffer.append(thumb)
+        self._replay_last_sample_ms = now_ms
+        if self._replay_strip is not None:
+            try:
+                self._replay_strip.set_frames(list(self._replay_buffer))
+            except RuntimeError:
+                self._replay_strip = None
+
+    def is_replay_strip_enabled(self) -> bool:
+        return self._replay_strip is not None
+
+    def enable_replay_strip(self, enabled: bool) -> None:
+        """Show or hide the replay strip inside its fixed-height container.
+
+        The container is always present in the layout so cards keep uniform
+        height and the flow grid never shifts when the strip is toggled.
+        """
+        if enabled and self._replay_strip is None:
+            self._replay_strip = ReplayStrip(parent=self._replay_container)
+            self._replay_strip.frame_hovered.connect(self._on_replay_frame_hovered)
+            self._replay_container.layout().addWidget(self._replay_strip)
+            self._replay_strip.set_frames(list(self._replay_buffer))
+        elif not enabled and self._replay_strip is not None:
+            try:
+                self._replay_strip.frame_hovered.disconnect(self._on_replay_frame_hovered)
+            except (RuntimeError, TypeError):
+                pass
+            self._replay_container.layout().removeWidget(self._replay_strip)
+            self._replay_strip.deleteLater()
+            self._replay_strip = None
+            # Drop any held buffered view.
+            self._replay_view_index = None
+
+    def _on_retry_clicked(self) -> None:
+        """PR2: emit retry_requested so MainTab / WindowManager can restart
+        capture for this window."""
+        self._capture_error_count = 0
+        self._last_frame_received_at = time.monotonic()
+        self.retry_requested.emit(self.window_id)
+
+    def resizeEvent(self, event) -> None:
+        """PR2: keep the retry button pinned to the top-right corner.
+        PR4: keep the session timer label at bottom-left."""
+        super().resizeEvent(event)
+        btn = getattr(self, "_retry_button", None)
+        if btn is not None:
+            try:
+                btn.move(self.width() - btn.width() - 4, 4)
+            except RuntimeError:
+                pass
+        lbl = getattr(self, "timer_label", None)
+        if lbl is not None:
+            try:
+                lbl.move(4, self.height() - lbl.height() - 2)
+            except RuntimeError:
+                pass
+
+    def _on_replay_frame_hovered(self, idx: int) -> None:
+        """Swap the main image label between live capture and a buffered frame."""
+        if idx < 0 or idx >= len(self._replay_buffer):
+            self._replay_view_index = None
+            # Restore the live capture if we have one cached.
+            if self.current_pixmap is not None and not self.current_pixmap.isNull():
+                scaled = self.current_pixmap.scaled(
+                    self.image_label.size(),
+                    Qt.AspectRatioMode.KeepAspectRatio,
+                    Qt.TransformationMode.FastTransformation,
+                )
+                self.image_label.setPixmap(scaled)
+            return
+        self._replay_view_index = idx
+        buffered = self._replay_buffer[idx]
+        if buffered is None or buffered.isNull():
+            return
+        scaled = buffered.scaled(
+            self.image_label.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.FastTransformation,
+        )
+        self.image_label.setPixmap(scaled)
+
     def paintEvent(self, event):
-        """Custom paint for activity indicator"""
+        """Custom paint: decomposed into semantic layers using the design system.
+
+        Layer order (back to front):
+        1. Border (accent identity or threat tint)
+        2. Health overlay (dimming when stale/error)
+        3. Legacy flash overlay
+        4. Chrome (activity dot, lock, focus affordance)
+        5. Text badges (system pill, age pill, capture health badge)
+        """
         super().paintEvent(event)
 
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Draw activity indicator (v2.2)
+        health = self._capture_health_label()
+
+        # Layer 1 — Border
+        self._paint_border_layer(painter, health)
+
+        # Layer 2 — Health overlay (dim stale/error previews)
+        self._paint_health_overlay_layer(painter, health)
+
+        # Layer 3 — Legacy flash
+        self._paint_flash_layer(painter)
+
+        # Layer 4 — Chrome
+        self._paint_chrome_layer(painter)
+
+        # Layer 5 — Badges
+        self._paint_badge_layer(painter, health)
+
+        # PR7 — Focus ring (drawn last so it sits on top of everything)
+        self._paint_focus_layer(painter)
+
+        painter.end()
+
+    # -----------------------------------------------------------------
+    # Paint layers
+    # -----------------------------------------------------------------
+
+    def _paint_border_layer(self, painter: QPainter, health: str) -> None:
+        """Draw accent identity border or threat-tint border.
+
+        When capture health is ERROR, DISCONNECTED, or STALE, the threat
+        border is suppressed so stale data cannot look alarming.
+        """
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
+
+        # Determine if health should suppress the threat border
+        suppress_threat = health.startswith("STALE") or health in (
+            "ERROR",
+            "DISCONNECTED",
+            "PAUSED",
+        )
+
+        # Threat border (only when healthy enough to trust the data)
+        if (
+            not suppress_threat
+            and self._threat_level is not None
+            and self._threat_alpha > 0.0
+            and self._flash_color is None
+        ):
+            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            base_alpha = int(220 * self._threat_alpha)
+            pulse_boost = int(35 * self._pulse_phase)
+            alpha = max(0, min(255, base_alpha + pulse_boost))
+            pen_width = 3 + int(2 * self._pulse_phase)
+            border_color = QColor(r, g, b, alpha)
+            pen = QPen(border_color)
+            pen.setWidth(pen_width)
+            painter.setPen(pen)
+            painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            inset = pen_width // 2 + 1
+            painter.drawRoundedRect(
+                inset,
+                inset,
+                self.width() - 2 * inset,
+                self.height() - 2 * inset,
+                dm.RADIUS_CARD,
+                dm.RADIUS_CARD,
+            )
+            return
+
+        # Accent identity border (when no threat or suppressed)
+        if self._flash_color is None:
+            if not self._intel_report_received:
+                # Unknown — dashed gray border with question mark
+                pen = QPen(QColor(ds.UNKNOWN))
+                pen.setWidth(2)
+                pen.setStyle(Qt.PenStyle.DashLine)
+                painter.setPen(pen)
+                painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+                painter.drawRoundedRect(
+                    2,
+                    2,
+                    self.width() - 4,
+                    self.height() - 4,
+                    dm.RADIUS_CARD,
+                    dm.RADIUS_CARD,
+                )
+                painter.setPen(QPen(QColor(ds.TEXT_MUTED)))
+                painter.drawText(6, 14, "?")
+            else:
+                pen = QPen(self._accent_color)
+                pen.setWidth(2)
+                painter.setPen(pen)
+                painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+                painter.drawRoundedRect(
+                    2,
+                    2,
+                    self.width() - 4,
+                    self.height() - 4,
+                    dm.RADIUS_CARD,
+                    dm.RADIUS_CARD,
+                )
+
+    def _paint_health_overlay_layer(self, painter: QPainter, health: str) -> None:
+        """Dim the preview when capture is not live so the operator knows
+        the image is stale or failed."""
+        if health.startswith("STALE") or health == "PAUSED":
+            overlay = QColor(0, 0, 0, 60)
+            painter.setPen(QPen(Qt.PenStyle.NoPen))
+            painter.setBrush(QBrush(overlay))
+            painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
+        elif health in ("ERROR", "DISCONNECTED"):
+            overlay = QColor(0, 0, 0, 100)
+            painter.setPen(QPen(Qt.PenStyle.NoPen))
+            painter.setBrush(QBrush(overlay))
+            painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
+
+    def _paint_flash_layer(self, painter: QPainter) -> None:
+        """Legacy border flash (border_flash_requested)."""
+        if self._flash_color is not None:
+            pen = QPen(self._flash_color)
+            pen.setWidth(3)
+            painter.setPen(pen)
+            painter.setBrush(QBrush(Qt.BrushStyle.NoBrush))
+            painter.drawRoundedRect(2, 2, self.width() - 4, self.height() - 4, 4, 4)
+
+    def _paint_chrome_layer(self, painter: QPainter) -> None:
+        """Activity dot, lock icon, focus affordance."""
+        from argus_overview.ui.design_system import colors as ds
+
+        # Activity indicator
         if self._show_activity_indicator:
             activity = self.get_activity_state()
             if activity == "focused":
-                indicator_color = QColor(0, 255, 0, 220)  # Green
+                indicator_color = QColor(ds.HEALTHY)
             elif activity == "recent":
-                indicator_color = QColor(255, 200, 0, 220)  # Yellow
+                indicator_color = QColor(ds.WARNING)
             else:
-                indicator_color = QColor(128, 128, 128, 180)  # Gray
+                indicator_color = QColor(ds.UNKNOWN)
+            indicator_color.setAlpha(220)
 
-            # Draw small dot in top-right corner
             painter.setBrush(QBrush(indicator_color))
             painter.setPen(QPen(Qt.PenStyle.NoPen))
             painter.drawEllipse(self.width() - 14, 6, 8, 8)
 
-        # Draw lock icon if positions are locked
+            # Colorblind text label next to dot
+            label_text = activity.capitalize()
+            text_color = QColor(indicator_color)
+            text_color.setAlpha(255)
+            painter.setPen(QPen(text_color))
+            from PySide6.QtGui import QFont
+
+            label_font = QFont(painter.font())
+            label_font.setPointSize(7)
+            label_font.setBold(True)
+            painter.setFont(label_font)
+            metrics = painter.fontMetrics()
+            text_w = metrics.horizontalAdvance(label_text)
+            text_x = self.width() - 18 - text_w
+            text_y = 6 + metrics.ascent()
+            painter.drawText(text_x, text_y, label_text)
+
+        # Lock icon
         if self._positions_locked:
-            painter.setPen(QPen(QColor(200, 200, 200, 180)))
+            painter.setPen(QPen(QColor(ds.TEXT_SECONDARY)))
             painter.drawText(6, 14, "🔒")
 
-        painter.end()
+        # Focus-mode affordance on hover
+        if self._is_hovered and self._spotlight_mode is None:
+            painter.setPen(QPen(QColor(ds.TEXT_MUTED)))
+            painter.drawText(self.width() - 22, self.height() - 10, "🔍")
+
+    def _paint_badge_layer(self, painter: QPainter, health: str) -> None:
+        """System pill, age pill, capture health badge."""
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
+        from argus_overview.ui.design_system.painting import draw_badge, draw_pill
+
+        # Threat system pill (top-left)
+        if (
+            self._threat_level is not None
+            and self._threat_alpha > 0.0
+            and self._threat_system
+            and not health.startswith("STALE")
+            and health not in ("ERROR", "DISCONNECTED")
+        ):
+            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            pill_parts = [self._threat_system]
+            if self._threat_distance and self._threat_distance > 0:
+                pill_parts.append(f"+{self._threat_distance}j")
+            pill_text = " · ".join(pill_parts)
+            alpha = max(0, min(255, int(220 * self._threat_alpha)))
+            draw_pill(
+                painter,
+                6,
+                6,
+                pill_text,
+                fg_color=(r, g, b),
+                bg_color=ds.CANVAS,
+                bg_alpha=max(160, alpha),
+                font_size_pt=8,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+
+        # Report age pill (bottom-center) when threat is decaying
+        if self._threat_alpha < 0.9 and self._threat_set_at > 0.0:
+            age_secs = int(time.monotonic() - self._threat_set_at)
+            age_text = f"{age_secs}s ago"
+            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            alpha = max(0, min(255, int(220 * self._threat_alpha)))
+            pill_rect = draw_pill(
+                painter,
+                0,
+                0,
+                age_text,
+                fg_color=(r, g, b),
+                bg_color=ds.CANVAS,
+                bg_alpha=max(180, alpha),
+                font_size_pt=8,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+            # Center horizontally at bottom
+            pill_rect.moveLeft((self.width() - pill_rect.width()) // 2)
+            pill_rect.moveTop(self.height() - pill_rect.height() - 4)
+            # Re-draw at correct position (inefficient but keeps helper reusable)
+            draw_pill(
+                painter,
+                pill_rect.x(),
+                pill_rect.y(),
+                age_text,
+                fg_color=(r, g, b),
+                bg_color=ds.CANVAS,
+                bg_alpha=max(180, alpha),
+                font_size_pt=8,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+
+        # Capture health badge (bottom-right)
+        if health:
+            health_color = self._capture_health_color()
+            badge_rect = draw_badge(
+                painter,
+                0,
+                0,
+                health,
+                fg_color=health_color,
+                bg_color=ds.CANVAS,
+                bg_alpha=180,
+                font_size_pt=9,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+            badge_rect.moveLeft(self.width() - badge_rect.width() - 4)
+            badge_rect.moveTop(self.height() - badge_rect.height() - 4)
+            draw_badge(
+                painter,
+                badge_rect.x(),
+                badge_rect.y(),
+                health,
+                fg_color=health_color,
+                bg_color=ds.CANVAS,
+                bg_alpha=180,
+                font_size_pt=9,
+                pad=4,
+                radius=dm.RADIUS_CONTROL,
+            )
+
+    def _paint_focus_layer(self, painter: QPainter) -> None:
+        """PR7: draw a focus ring when this widget has keyboard focus."""
+        if not self.hasFocus():
+            return
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
+
+        pen = QPen(QColor(ds.BORDER_FOCUS))
+        pen.setWidth(2)
+        painter.setPen(pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        rect = self.rect().adjusted(1, 1, -1, -1)
+        painter.drawRoundedRect(rect, dm.RADIUS_CARD, dm.RADIUS_CARD)
 
     def mousePressEvent(self, event):
         """Handle mouse click - start drag or activate"""
@@ -873,17 +1725,47 @@ class WindowPreviewWidget(QWidget):
                 self.logger.info(f"Activating window: {self.window_id}")
             self._drag_start_pos = None
 
+    def mouseDoubleClickEvent(self, event):
+        """PR3: double-click toggles spotlight focus mode for this window."""
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.focus_requested.emit(self.window_id)
+            event.accept()
+            # Cancel the pending single-click activation that the
+            # preceding press recorded; otherwise the window still
+            # activates beneath the focus toggle.
+            self._drag_start_pos = None
+            return
+        super().mouseDoubleClickEvent(event)
+
+    def keyPressEvent(self, event: QKeyEvent) -> None:
+        """PR4: keyboard navigation — Enter/Space activate, Esc exits spotlight."""
+        key = event.key()
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter, Qt.Key.Key_Space):
+            self.window_activated.emit(self.window_id)
+            event.accept()
+            return
+        if key == Qt.Key.Key_Escape:
+            if self._spotlight_mode is not None:
+                self.focus_requested.emit(self.window_id)  # toggle off
+                event.accept()
+                return
+        super().keyPressEvent(event)
+
     def contextMenuEvent(self, event):
         """Handle right-click context menu (v2.3 - uses ActionRegistry)"""
         # Build context menu from ActionRegistry
         context_builder = ContextMenuBuilder()
 
-        # Handler map for context actions
+        # Handler map for context actions. toggle_replay_strip was added
+        # to the registry as a tier-3 WINDOW_CONTEXT action; it joins the
+        # other handlers here.
         handlers = {
             "focus_window": lambda: self.window_activated.emit(self.window_id),
             "minimize_window": self._minimize_window,
             "close_window": self._close_window,
             "set_label": self._show_label_dialog,
+            "toggle_replay_strip": self._toggle_replay_strip,
+            "retry_capture": self._on_retry_clicked,
             "remove_from_preview": lambda: self.window_removed.emit(self.window_id),
         }
 
@@ -895,6 +1777,23 @@ class WindowPreviewWidget(QWidget):
         )
 
         menu.exec(event.globalPos())
+
+    def _toggle_replay_strip(self) -> None:
+        """Flip the replay strip on/off and persist the choice per character."""
+        new_state = not self.is_replay_strip_enabled()
+        self.enable_replay_strip(new_state)
+        if self.settings_manager is not None:
+            try:
+                store = self.settings_manager.get("replay_strip_enabled", {}) or {}
+                if not isinstance(store, dict):
+                    store = {}
+                if new_state:
+                    store[self.character_name] = True
+                else:
+                    store.pop(self.character_name, None)
+                self.settings_manager.set("replay_strip_enabled", store)
+            except (AttributeError, TypeError) as e:
+                self.logger.debug(f"Failed to persist replay-strip toggle: {e}")
 
     def _show_label_dialog(self):
         """Show dialog to set custom label"""
@@ -956,6 +1855,15 @@ class WindowManager:
 
         # State
         self.preview_frames: dict[str, WindowPreviewWidget] = {}
+        # PR4: per-character current system, fed by CharacterLocationTracker.
+        # Survives window add/remove cycles. Used for chip system labels and
+        # (in a follow-up PR) smart per-character threat fan-out.
+        self._character_systems: dict[str, str] = {}
+        # PR6: optional jump calculator + max-jumps threshold for the
+        # adjacency-aware fan-out. Default max_jumps=0 preserves the PR5
+        # exact-match-only filter when no calculator is wired up.
+        self._jump_calculator = None  # type: ignore[var-annotated]
+        self._jump_max: int = 0
         self.pending_requests: dict[
             str, tuple[str, float]
         ] = {}  # request_id -> (window_id, timestamp)
@@ -994,6 +1902,22 @@ class WindowManager:
         if self.capture_timer.isActive():
             self.stop_capture_loop()
             self.start_capture_loop()
+
+    def retry_window_capture(self, window_id: str) -> None:
+        """PR2: attempt an immediate re-capture for a single window."""
+        if window_id not in self.preview_frames:
+            return
+        frame = self.preview_frames[window_id]
+        frame._capture_error_count = 0
+        frame._last_frame_received_at = time.monotonic()
+        try:
+            request_id = self.capture_system.capture_window_async(window_id)
+            if request_id:
+                with self._pending_lock:
+                    self.pending_requests[request_id] = (window_id, time.monotonic())
+                self.logger.info(f"Retry capture requested for {window_id}")
+        except (OSError, RuntimeError) as e:
+            self.logger.error(f"Retry capture failed for {window_id}: {e}")
 
     def add_window(self, window_id: str, character_name: str) -> WindowPreviewWidget | None:
         """
@@ -1035,6 +1959,104 @@ class WindowManager:
             frame.deleteLater()
 
             self.logger.info(f"Removed window {window_id} from preview")
+
+    def set_character_system(self, character_name: str, system: str | None) -> None:
+        """
+        Record the current system for a character.
+
+        Stored on a per-character map that survives across window add/remove
+        cycles, AND pushed to every active frame for that character so the
+        smart fan-out (apply_threat_state) can filter by frame state alone.
+        """
+        if system is None:
+            self._character_systems.pop(character_name, None)
+        else:
+            self._character_systems[character_name] = system
+
+        # Push to active frames whose character matches.
+        for frame in list(self.preview_frames.values()):
+            try:
+                if getattr(frame, "character_name", None) == character_name:
+                    frame.set_character_system(system)
+            except RuntimeError:
+                continue
+
+    def get_character_system(self, character_name: str) -> str | None:
+        return self._character_systems.get(character_name)
+
+    def set_jump_calculator(self, calculator, max_jumps: int = 1) -> None:
+        """
+        Wire an adjacency calculator for the jumps-from threat filter (PR6).
+
+        Args:
+            calculator: A JumpCalculator (or None to disable adjacency).
+            max_jumps: Maximum jump distance to consider "near"; 0 disables
+                adjacency tinting (exact-match-only). Default 1.
+        """
+        self._jump_calculator = calculator
+        self._jump_max = max(0, int(max_jumps))
+
+    def apply_threat_state(self, level: ThreatLevel | None, system: str | None = None) -> int:
+        """
+        Fan an intel threat state out to preview frames, filtered by system.
+
+        Filter rules:
+          1. CLEAR / None level → flush every frame regardless of system.
+          2. system is None / empty → fan to all (legacy fallback).
+          3. Otherwise → resolve_tint() decides per-frame: same-system at
+             full alpha, adjacent within max_jumps at falloff alpha,
+             beyond threshold skipped, unknown character system tinted at
+             full alpha (graceful upgrade).
+
+        Returns count of frames actually updated.
+        """
+        from argus_overview.intel.threat_filter import resolve_tint
+
+        # Rule 1 + 2: explicit-flush branches
+        if level is None or level == ThreatLevel.CLEAR or not system:
+            return self._fan_to_all(level, system)
+
+        count = 0
+        for frame in list(self.preview_frames.values()):
+            try:
+                char_name = getattr(frame, "character_name", None)
+                known = self._character_systems.get(char_name) if char_name else None
+                should_apply, alpha = resolve_tint(
+                    known_system=known,
+                    alert_system=system,
+                    jump_calculator=self._jump_calculator,
+                    max_jumps=self._jump_max,
+                )
+                if not should_apply:
+                    continue
+                # PR9: surface the jump distance for the +Nj frame badge.
+                # Mirrors StatusDock.set_threat_state behavior (PR7).
+                distance: int | None = None
+                if (
+                    alpha < 1.0
+                    and known
+                    and self._jump_calculator is not None
+                    and known.lower() != system.lower()
+                ):
+                    try:
+                        distance = self._jump_calculator.distance(known, system)
+                    except (AttributeError, TypeError, ValueError):
+                        distance = None
+                frame.set_threat_state(level, system, initial_alpha=alpha, distance=distance)
+                count += 1
+            except RuntimeError:
+                continue
+        return count
+
+    def _fan_to_all(self, level: ThreatLevel | None, system: str | None) -> int:
+        count = 0
+        for frame in list(self.preview_frames.values()):
+            try:
+                frame.set_threat_state(level, system)
+                count += 1
+            except RuntimeError:
+                continue
+        return count
 
     def _capture_cycle(self):
         """
@@ -1126,12 +2148,24 @@ class MainTab(QWidget):
     roster_navigation_requested = Signal()
     cycle_control_navigation_requested = Signal()
 
-    def __init__(self, capture_system, character_manager, settings_manager=None, parent=None):
+    def __init__(
+        self,
+        capture_system,
+        character_manager,
+        settings_manager=None,
+        layout_manager=None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.logger = logging.getLogger(__name__)
         self.capture_system = capture_system
         self.character_manager = character_manager
         self.settings_manager = settings_manager
+        # PR2: optional layout manager for preset dropdown in Overview toolbar
+        self.layout_manager = layout_manager
+
+        # PR3: focus mode state — None = normal, str = window_id holding spotlight
+        self._focus_window_id: str | None = None
 
         # v2.2 State
         self._thumbnails_visible = True
@@ -1200,9 +2234,16 @@ class MainTab(QWidget):
         layout_controls = self._create_layout_controls()
         layout.addWidget(layout_controls)
 
-        # Empty-state onboarding card
-        self.empty_state_panel = self._create_empty_state_panel()
-        layout.addWidget(self.empty_state_panel)
+        # PR2: Character status dock — chip strip with per-character system
+        # + threat dot. Clicking a chip focuses the matching window.
+        # Parent is set when the dock is added to the layout below.
+        from argus_overview.ui.status_dock import StatusDock
+
+        self.status_dock = StatusDock()
+        self.status_dock.chip_clicked.connect(self._on_window_activated)
+        sm = getattr(self, "settings_manager", None)
+        show_dock = sm.get("thumbnails.show_status_dock", True) if sm else True
+        self.status_dock.setVisible(show_dock)
 
         # Scroll area for preview frames
         scroll = QScrollArea()
@@ -1217,6 +2258,10 @@ class MainTab(QWidget):
 
         scroll.setWidget(self.preview_container)
         layout.addWidget(scroll)
+
+        # Fleet status rail — placed below the preview grid so the operational
+        # area retains maximum vertical space.
+        layout.addWidget(self.status_dock)
 
         # Status bar
         status_bar = self._create_status_bar()
@@ -1372,6 +2417,23 @@ class MainTab(QWidget):
         self._recent_import_summary = None
         self._update_empty_state_visibility()
 
+    def _sync_status_dock(self) -> None:
+        """Mirror window_manager.preview_frames into the status dock."""
+        if not hasattr(self, "status_dock") or self.status_dock is None:
+            return
+        desired: dict[str, str] = {
+            wid: getattr(frame, "character_name", wid)
+            for wid, frame in self.window_manager.preview_frames.items()
+        }
+        self.status_dock.sync_from_window_ids(desired)
+
+        # PR4: seed chip system labels from cached per-character state so
+        # newly-added chips populate without waiting for the next location
+        # change event.
+        char_systems = getattr(self.window_manager, "_character_systems", {})
+        for char_name, system in char_systems.items():
+            self.status_dock.set_character_system(char_name, system)
+
     def _create_toolbar(self) -> QWidget:
         """Create toolbar using ActionRegistry (v2.3)"""
         toolbar = QWidget()
@@ -1383,17 +2445,16 @@ class MainTab(QWidget):
         toolbar_builder = ToolbarBuilder()
         handlers = {
             "import_windows": self.one_click_import,
-            "add_window": self.show_add_window_dialog,
             "remove_all_windows": self._remove_all_windows,
             "lock_positions": self._toggle_lock,
             "minimize_inactive": self.minimize_inactive_windows,
             "refresh_capture": self._refresh_all,
+            "toggle_replay_strips": self._toggle_replay_strips_global,
         }
 
         # Create buttons in specific order with layout control
         action_order = [
             "import_windows",
-            "add_window",
             "remove_all_windows",
         ]
 
@@ -1403,11 +2464,15 @@ class MainTab(QWidget):
             action_order,
         )
 
-        # Add first group of buttons
+        # Add primary action group (import + remove)
         for action_id in action_order:
             if action_id in buttons:
                 toolbar_layout.addWidget(buttons[action_id])
 
+        # Store reference to Remove All button for state updates
+        self.remove_all_btn = buttons.get("remove_all_windows")
+
+        toolbar_layout.addSpacing(10)
         toolbar_layout.addStretch()
 
         # Add lock button (store reference for state updates)
@@ -1429,16 +2494,26 @@ class MainTab(QWidget):
         if refresh_btn:
             toolbar_layout.addWidget(refresh_btn)
 
-        toolbar_layout.addStretch()
+        # PR2: global replay-strips toggle
+        self.replay_strips_btn = toolbar_builder.create_button(
+            "toggle_replay_strips", self._toggle_replay_strips_global
+        )
+        if self.replay_strips_btn:
+            self.replay_strips_btn.setCheckable(True)
+            toolbar_layout.addWidget(self.replay_strips_btn)
 
-        # Refresh Rate (not from registry - it's a widget, not an action)
-        toolbar_layout.addWidget(QLabel("FPS:"))
-        self.refresh_rate_spin = QSpinBox()
-        self.refresh_rate_spin.setRange(1, 60)
-        self.refresh_rate_spin.setValue(30)
-        self.refresh_rate_spin.setToolTip("Capture framerate (higher = smoother but more CPU)")
-        self.refresh_rate_spin.valueChanged.connect(self._on_refresh_rate_changed)
-        toolbar_layout.addWidget(self.refresh_rate_spin)
+        # PR2: layout preset dropdown — 2-click apply without tab switching
+        if getattr(self, "layout_manager", None) is not None:
+            toolbar_layout.addSpacing(10)
+            toolbar_layout.addWidget(QLabel("Preset:"))
+            self.preset_combo = QComboBox()
+            self.preset_combo.setMinimumWidth(140)
+            self.preset_combo.setPlaceholderText("Select preset...")
+            self._refresh_preset_combo()
+            self.preset_combo.activated.connect(self._on_preset_activated)
+            toolbar_layout.addWidget(self.preset_combo)
+
+        toolbar_layout.addStretch()
 
         # Search/filter field
         toolbar_layout.addSpacing(10)
@@ -1454,7 +2529,25 @@ class MainTab(QWidget):
 
     def _create_layout_controls(self) -> QWidget:
         """Create comprehensive layout controls panel with arrangement grid"""
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
+
         section = QGroupBox("Window Layouts")
+        section.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {ds.SURFACE};
+                border: 1px solid {ds.BORDER_SUBTLE};
+                border-radius: {dm.RADIUS_PANEL}px;
+                margin-top: 8px;
+                padding-top: 8px;
+            }}
+            QGroupBox::title {{
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px;
+                color: {ds.TEXT_SECONDARY};
+            }}
+        """)
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(5, 5, 5, 5)
         main_layout.setSpacing(5)
@@ -1548,14 +2641,16 @@ class MainTab(QWidget):
 
         apply_btn = QPushButton("Apply Layout")
         apply_btn.setToolTip("Arrange EVE windows on screen")
-        apply_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ff8c00;
+        accent = get_theme_manager().get_accent_color()
+        hover = QColor(accent).lighter(120).name()
+        apply_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {accent};
                 color: black;
                 font-weight: bold;
                 padding: 8px 15px;
-            }
-            QPushButton:hover { background-color: #ffa500; }
+            }}
+            QPushButton:hover {{ background-color: {hover}; }}
         """)
         apply_btn.clicked.connect(self._apply_layout_to_windows)
         buttons_col.addWidget(apply_btn)
@@ -1686,13 +2781,24 @@ class MainTab(QWidget):
             stacked_use_grid_size=self.stack_resize_checkbox.isChecked(),
         )
 
+        results = self.grid_applier.last_apply_results
         if success:
             pattern = self.pattern_combo.currentText()
             self.status_label.setText(f"Applied {pattern} layout to {len(window_map)} windows")
             self.layout_applied.emit(pattern)
             self.logger.info(f"Applied {pattern} layout to {len(window_map)} windows")
         else:
-            QMessageBox.warning(self, "Error", "Failed to apply layout. Check logs for details.")
+            # PR3: report partial failures with specific character names
+            failed = [wid for wid, ok in results.items() if not ok]
+            char_map = {v: k for k, v in window_map.items()}
+            failed_names = [char_map.get(wid, wid) for wid in failed]
+            total = len(results)
+            moved = sum(results.values())
+            msg = (
+                f"Layout applied: {moved}/{total} windows moved.\n\n"
+                f"Failed: {', '.join(failed_names)}"
+            )
+            QMessageBox.warning(self, "Partial Failure", msg)
 
     def refresh_layout_groups(self):
         """Called when groups change in hotkeys tab"""
@@ -1784,6 +2890,12 @@ class MainTab(QWidget):
                     added=added_count,
                     skipped=skipped_count,
                 )
+                frame.focus_requested.connect(
+                    self._on_focus_requested, Qt.ConnectionType.UniqueConnection
+                )
+                frame.retry_requested.connect(
+                    self._on_retry_requested, Qt.ConnectionType.UniqueConnection
+                )
 
             # Show result
             if added_count > 0:
@@ -1801,10 +2913,8 @@ class MainTab(QWidget):
             else:
                 self._set_status_message("No new EVE windows found")
 
-            self._update_status()
-            return added_count, skipped_count, len(eve_windows)
-        finally:
-            self._set_empty_state_busy(False)
+        self._update_status()
+        self._sync_status_dock()
 
     def _toggle_lock(self):
         """Toggle thumbnail position lock"""
@@ -1839,6 +2949,126 @@ class MainTab(QWidget):
 
         self.thumbnails_toggled.emit(self._thumbnails_visible)
         self.logger.info(f"Thumbnails {'shown' if self._thumbnails_visible else 'hidden'}")
+
+    def _toggle_replay_strips_global(self) -> None:
+        """PR2: toggle replay strips for all active preview windows."""
+        # Determine target state from the first frame (flip current majority)
+        frames = list(self.window_manager.preview_frames.values())
+        if not frames:
+            return
+        currently_on = sum(1 for f in frames if f.is_replay_strip_enabled())
+        target = currently_on < len(frames) / 2
+        for frame in frames:
+            frame.enable_replay_strip(target)
+        self.logger.info(f"Replay strips toggled globally: {'ON' if target else 'OFF'}")
+
+    def _refresh_preset_combo(self) -> None:
+        """PR2: repopulate the layout preset dropdown from LayoutManager."""
+        combo = getattr(self, "preset_combo", None)
+        lm = getattr(self, "layout_manager", None)
+        if combo is None or lm is None:
+            return
+        current = combo.currentText()
+        combo.blockSignals(True)
+        combo.clear()
+        combo.addItem("Select preset...")
+        for preset in lm.get_all_presets():
+            combo.addItem(preset.name)
+        if current:
+            idx = combo.findText(current)
+            if idx >= 0:
+                combo.setCurrentIndex(idx)
+        combo.blockSignals(False)
+
+    def _on_preset_activated(self, index: int) -> None:
+        """PR2: apply the selected layout preset to all active windows."""
+        combo = getattr(self, "preset_combo", None)
+        if combo is None or index <= 0:
+            return
+        preset_name = combo.itemText(index)
+        self._apply_layout_preset(preset_name)
+        combo.setCurrentIndex(0)  # Reset to placeholder so same preset can be re-selected
+
+    def _apply_layout_preset(self, preset_name: str) -> None:
+        """PR2: apply a saved layout preset to currently active windows."""
+        lm = getattr(self, "layout_manager", None)
+        if lm is None:
+            return
+        preset = lm.get_preset(preset_name)
+        if preset is None:
+            self.status_label.setText(f"Preset '{preset_name}' not found")
+            return
+
+        active_chars = [
+            getattr(f, "character_name", wid)
+            for wid, f in self.window_manager.preview_frames.items()
+        ]
+        if not active_chars:
+            self.status_label.setText("No active windows to arrange")
+            return
+
+        pattern = preset.grid_pattern or "custom"
+        # Normalise pattern name to the display form used by get_pattern_positions
+        display_pattern = (
+            pattern.replace("_", " ")
+            .replace("2x2", "2x2 Grid")
+            .replace("3x1", "3x1 Row")
+            .replace("1x3", "1x3 Column")
+            .replace("4x1", "4x1 Row")
+            .replace("main+sides", "Main + Sides")
+            .replace("cascade", "Cascade")
+            .replace("custom", "Custom")
+        )
+        # Fallback: if the normalised name isn't in our map, try title-casing
+        if display_pattern not in get_all_layout_patterns() and display_pattern != "Custom":
+            display_pattern = "Custom"
+
+        positions = get_pattern_positions(display_pattern, len(active_chars), 4)
+        arrangement = {}
+        for i, char_name in enumerate(active_chars):
+            if i < len(positions):
+                arrangement[char_name] = positions[i]
+
+        window_map = {
+            f.character_name: wid
+            for wid, f in self.window_manager.preview_frames.items()
+            if f.character_name in arrangement
+        }
+        if not window_map:
+            self.status_label.setText("No matching windows for preset")
+            return
+
+        screen = self.grid_applier.get_screen_geometry(0)
+        if not screen:
+            screen = ScreenGeometry(0, 0, 1920, 1080, True)
+
+        # Infer grid dimensions from the pattern
+        grid_rows = max(1, max((pos[0] for pos in positions), default=0) + 1)
+        grid_cols = max(1, max((pos[1] for pos in positions), default=0) + 1)
+
+        success = self.grid_applier.apply_arrangement(
+            arrangement=arrangement,
+            window_map=window_map,
+            screen=screen,
+            grid_rows=grid_rows,
+            grid_cols=grid_cols,
+            spacing=10,
+            stacked=(display_pattern == "Stacked (All Same Position)"),
+        )
+        results = self.grid_applier.last_apply_results
+        if success:
+            self.status_label.setText(f"Applied preset: {preset_name}")
+            self.layout_applied.emit(preset_name)
+            self.logger.info(f"Applied layout preset '{preset_name}' to {len(window_map)} windows")
+        else:
+            # PR3: report partial failures with specific character names
+            failed = [wid for wid, ok in results.items() if not ok]
+            char_map = {v: k for k, v in window_map.items()}
+            failed_names = [char_map.get(wid, wid) for wid in failed]
+            moved = sum(results.values())
+            self.status_label.setText(
+                f"Partial failure: {moved}/{len(results)} moved. Failed: {', '.join(failed_names)}"
+            )
 
     def _create_status_bar(self) -> QWidget:
         """Create status bar"""
@@ -1916,11 +3146,25 @@ class MainTab(QWidget):
                     char_name = detected_name
                     break
 
-        return self.import_detected_window(
-            window_id,
-            char_name,
-            emit_character_detected=True,
-        )
+        # Add to window manager
+        frame = self.window_manager.add_window(window_id, char_name)
+        if frame:
+            frame.window_activated.connect(
+                self._on_window_activated, Qt.ConnectionType.UniqueConnection
+            )
+            frame.window_removed.connect(
+                self._on_window_removed, Qt.ConnectionType.UniqueConnection
+            )
+            frame.focus_requested.connect(
+                self._on_focus_requested, Qt.ConnectionType.UniqueConnection
+            )
+            frame.retry_requested.connect(
+                self._on_retry_requested, Qt.ConnectionType.UniqueConnection
+            )
+            self.preview_layout.addWidget(frame)
+            self._sync_status_dock()
+            return True
+        return False
 
     def show_add_window_dialog(self):
         """Show dialog to add windows"""
@@ -1976,6 +3220,50 @@ class MainTab(QWidget):
                 self.logger.info(f"Added {added} windows to preview")
                 self._update_status()
 
+    # ----- PR3 focus mode controller --------------------------------------
+    def _on_focus_requested(self, window_id: str) -> None:
+        """Toggle spotlight focus for the given window."""
+        if self._focus_window_id == window_id:
+            self.exit_focus_mode()
+        else:
+            self.enter_focus_mode(window_id)
+
+    def enter_focus_mode(self, window_id: str) -> None:
+        """Spotlight one window: scale up, dim others. Idempotent."""
+        if window_id not in self.window_manager.preview_frames:
+            self.logger.debug(f"Cannot enter focus mode — unknown window {window_id}")
+            return
+        self._focus_window_id = window_id
+        self._apply_focus_state()
+
+    def exit_focus_mode(self) -> None:
+        """Restore normal grid presentation."""
+        if self._focus_window_id is None:
+            return
+        self._focus_window_id = None
+        self._apply_focus_state()
+
+    def is_focus_mode_active(self) -> bool:
+        return self._focus_window_id is not None
+
+    def _apply_focus_state(self) -> None:
+        """Push current focus mode to all preview frames."""
+        focus_id = self._focus_window_id
+        for wid, frame in list(self.window_manager.preview_frames.items()):
+            try:
+                if focus_id is None:
+                    frame.set_spotlight(None)
+                elif wid == focus_id:
+                    frame.set_spotlight("focused")
+                else:
+                    frame.set_spotlight("dimmed")
+            except RuntimeError:
+                continue
+
+    def _on_retry_requested(self, window_id: str) -> None:
+        """PR2: handle retry capture request from a preview frame."""
+        self.window_manager.retry_window_capture(window_id)
+
     def _on_window_activated(self, window_id: str):
         """Forward window focus intent to the main window/controller."""
         self.window_focus_requested.emit(window_id)
@@ -1992,20 +3280,36 @@ class MainTab(QWidget):
                 frame.window_removed.disconnect(self._on_window_removed)
             except (RuntimeError, TypeError):
                 pass
+            try:
+                frame.focus_requested.disconnect(self._on_focus_requested)
+            except (RuntimeError, TypeError):
+                pass
+            try:
+                frame.retry_requested.disconnect(self._on_retry_requested)
+            except (RuntimeError, TypeError):
+                pass
             # Stop per-frame timers
             frame.session_timer.stop()
+        # If we just removed the spotlight target, drop focus state.
+        if self._focus_window_id == window_id:
+            self._focus_window_id = None
         self.window_manager.remove_window(window_id)
         self._update_status()
+        self._sync_status_dock()
+        # Re-apply (covers both: focus cleared, or other tile removed mid-focus)
+        self._apply_focus_state()
 
     def _remove_all_windows(self):
         """Remove all windows from preview"""
         if not self.window_manager.preview_frames:
             return
 
+        count = len(self.window_manager.preview_frames)
         reply = QMessageBox.question(
             self,
             "Remove All Windows",
-            "Remove all windows from preview?",
+            f"Remove all {count} windows from preview?\n\n"
+            "This stops capture but does NOT close the EVE clients.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
@@ -2016,6 +3320,7 @@ class MainTab(QWidget):
                 self.window_manager.remove_window(window_id)
 
             self._update_status()
+            self._sync_status_dock()
 
     def minimize_inactive_windows(self):
         """Toggle auto-minimize mode - when enabled, cycling minimizes previous window"""
@@ -2112,7 +3417,7 @@ class MainTab(QWidget):
             self._update_status()
 
     def _update_status(self):
-        """Update status bar"""
+        """Update status bar and dependent UI state."""
         count = self.window_manager.get_active_window_count()
         self.active_count_label.setText(f"Active: {count}")
         self._update_empty_state_visibility()
@@ -2122,11 +3427,23 @@ class MainTab(QWidget):
             return
 
         if count == 0:
-            self.status_label.setText(self._get_empty_state_message())
+            self.status_label.setText("No windows in preview - Click 'Import All' to start")
         else:
             self.status_label.setText(
                 f"Capturing {count} window(s) at {self.window_manager.refresh_rate} FPS"
             )
+
+        # PR2: disable layout preset dropdown when no windows are present
+        combo = getattr(self, "preset_combo", None)
+        if combo is not None:
+            combo.setEnabled(count > 0)
+            if count == 0:
+                combo.setCurrentIndex(0)  # Reset to "Select preset..."
+
+        # Update Remove All button state
+        remove_btn = getattr(self, "remove_all_btn", None)
+        if remove_btn is not None:
+            remove_btn.setEnabled(count > 0)
 
     def stop_capture_loop(self):
         """Stop capture loop and status timer for clean shutdown"""
@@ -2158,6 +3475,12 @@ class MainTab(QWidget):
     def keyPressEvent(self, event: QKeyEvent):
         """Handle keyboard shortcuts for window navigation"""
         key = event.key()
+
+        # PR3: Escape exits focus mode (only consume the key if active)
+        if key == Qt.Key.Key_Escape and self.is_focus_mode_active():
+            self.exit_focus_mode()
+            event.accept()
+            return
 
         # Number keys 1-9 to activate window by index
         if Qt.Key.Key_1 <= key <= Qt.Key.Key_9:

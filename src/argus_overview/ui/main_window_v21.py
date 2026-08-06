@@ -49,7 +49,13 @@ from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
+    QDialogButtonBox,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
+    QPushButton,
     QTabWidget,
     QVBoxLayout,
     QWidget,
@@ -64,9 +70,10 @@ from argus_overview.core.eve_settings_sync import EVESettingsSync
 from argus_overview.core.hotkey_manager import HotkeyManager
 from argus_overview.core.layout_manager import LayoutManager
 from argus_overview.core.window_capture_threaded import WindowCaptureThreaded
-from argus_overview.ui.action_registry import ActionRegistry
+from argus_overview.ui.action_registry import ActionRegistry, PrimaryHome
 from argus_overview.ui.menu_builder import MenuBuilder
 from argus_overview.ui.settings_manager import SettingsManager
+from argus_overview.ui.system_status_bar import SystemStatusBar
 from argus_overview.ui.themes import get_theme_manager
 from argus_overview.ui.tray import SystemTray
 
@@ -74,26 +81,24 @@ from argus_overview.ui.tray import SystemTray
 class MainWindowV21(QMainWindow):
     """Main application window with tabbed interface v2.2"""
 
+    # v2.2 IA: the original six-tab ordering. Preserved as a class-level
+    # constant so callers can look up indices by label (e.g. Settings)
+    # without sprinkling magic numbers through the codebase.
+    # Tab labels in registration order. Phase 4 IA: 4 tabs only —
+    # COMMAND, FLEET, LAYOUTS, SYSTEM. The Settings entry point now lands
+    # on the SYSTEM container (which holds SettingsTab on the left).
+    _TAB_LABELS: list[str] = [
+        "Command",
+        "Fleet",
+        "Layouts",
+        "System",
+    ]
+
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger(__name__)
         self.setWindowTitle(f"Argus Overview v{__version__}")
-        self.setMinimumSize(1000, 700)
-        self._is_quitting = False
-        self._auto_discovery_connected = False
-        self._tab_indexes: dict[str, int] = {}
-        self._bulk_import_active = False
-        self._bulk_import_dirty_characters = False
-        self._bulk_import_dirty_groups = False
-        self._pending_discovery_names: list[str] = []
-        self._discovery_notification_timer = QTimer(self)
-        self._discovery_notification_timer.setSingleShot(True)
-        self._discovery_notification_timer.setInterval(1200)
-        self._discovery_notification_timer.timeout.connect(self._flush_discovery_notifications)
-        self._status_refresh_timer = QTimer(self)
-        self._status_refresh_timer.setSingleShot(True)
-        self._status_refresh_timer.setInterval(150)
-        self._status_refresh_timer.timeout.connect(self._flush_main_tab_status_refresh)
+        self.setMinimumSize(960, 600)
 
         # Set window icon
         self._set_window_icon()
@@ -148,21 +153,50 @@ class MainWindowV21(QMainWindow):
 
         # Tab widget
         self.tabs = QTabWidget()
+        from argus_overview.ui.design_system import colors as ds
+        from argus_overview.ui.design_system import metrics as dm
+
+        self.tabs.setStyleSheet(f"""
+            QTabWidget::pane {{
+                border: none;
+                background: {ds.CANVAS};
+            }}
+            QTabBar::tab {{
+                background: {ds.SURFACE};
+                color: {ds.TEXT_SECONDARY};
+                padding: 6px 14px;
+                border-top-left-radius: {dm.RADIUS_CONTROL}px;
+                border-top-right-radius: {dm.RADIUS_CONTROL}px;
+            }}
+            QTabBar::tab:selected {{
+                background: {ds.SURFACE_RAISED};
+                color: {ds.TEXT_PRIMARY};
+            }}
+            QTabBar::tab:hover {{
+                background: {ds.SURFACE_HOVER};
+            }}
+            QSplitter::handle:horizontal {{
+                background: {ds.BORDER_SUBTLE};
+                width: 2px;
+            }}
+            QSplitter::handle:vertical {{
+                background: {ds.BORDER_SUBTLE};
+                height: 2px;
+            }}
+        """)
         layout.addWidget(self.tabs)
 
-        # Create tabs
-        self._create_main_tab()
-        self._create_hotkeys_tab()
-        self._create_characters_tab()
-        self._create_intel_tab()
-        self._create_settings_sync_tab()
-        self._create_settings_tab()
+        # Create tabs (order is preserved by _TAB_LABELS).
+        self._create_tabs()
 
         # Connect cross-tab signals
         self._connect_signals()
 
         # v2.2: Create system tray
         self._create_system_tray()
+
+        # PR3: System status bar — per-subsystem health indicators
+        self._create_system_status_bar()
 
         # v2.2: Register hotkeys
         self._register_hotkeys()
@@ -176,7 +210,57 @@ class MainWindowV21(QMainWindow):
         self._ensure_auto_discovery_state()
         QTimer.singleShot(250, self._run_startup_assistant)
 
+        # PR4: per-character location tracker (Local channel logs)
+        self._init_location_tracker()
+
         self.logger.info("Main window v2.2 initialized successfully")
+
+    def _init_location_tracker(self) -> None:
+        """Start the per-character location tracker if enabled."""
+        from argus_overview.intel.character_location import CharacterLocationTracker
+
+        enabled = self.settings_manager.get("intel.track_character_locations", True)
+        if not enabled:
+            self.location_tracker = None
+            return
+        self.location_tracker = CharacterLocationTracker(parent=self)
+        self.location_tracker.character_system_changed.connect(self._on_character_system_changed)
+        self.location_tracker.start()
+
+        # PR6: wire one shared JumpCalculator into both threat fan-out paths
+        # so adjacent-system alerts also tint at reduced intensity. max_jumps
+        # is gated on intel.threat_jumps_threshold (default 1).
+        self._init_threat_jump_filter()
+
+    def _init_threat_jump_filter(self) -> None:
+        """Wire a shared JumpCalculator into the manager + dock fan-out."""
+        from argus_overview.intel.jumps import JumpCalculator
+
+        max_jumps = int(self.settings_manager.get("intel.threat_jumps_threshold", 1))
+        if max_jumps <= 0:
+            self.jump_calculator = None
+            return
+        self.jump_calculator = JumpCalculator()
+        if not hasattr(self, "main_tab"):
+            return
+        wm = getattr(self.main_tab, "window_manager", None)
+        if wm is not None and hasattr(wm, "set_jump_calculator"):
+            wm.set_jump_calculator(self.jump_calculator, max_jumps=max_jumps)
+        dock = getattr(self.main_tab, "status_dock", None)
+        if dock is not None and hasattr(dock, "set_jump_calculator"):
+            dock.set_jump_calculator(self.jump_calculator, max_jumps=max_jumps)
+
+    @Slot(str, str)
+    def _on_character_system_changed(self, character_name: str, system: str) -> None:
+        """Forward per-character system updates to the dock + window manager."""
+        if not hasattr(self, "main_tab"):
+            return
+        wm = getattr(self.main_tab, "window_manager", None)
+        if wm is not None and hasattr(wm, "set_character_system"):
+            wm.set_character_system(character_name, system)
+        dock = getattr(self.main_tab, "status_dock", None)
+        if dock is not None and hasattr(dock, "set_character_system"):
+            dock.set_character_system(character_name, system)
 
     def _create_system_tray(self):
         """Create system tray icon (v2.4 - uses ActionRegistry)"""
@@ -201,51 +285,35 @@ class MainWindowV21(QMainWindow):
         self.system_tray.show()
         self.logger.info("System tray initialized (ActionRegistry)")
 
-    def _connect_auto_discovery(self):
-        """Ensure auto-discovery signals are connected exactly once."""
-        if self._auto_discovery_connected:
-            return
-
-        self.auto_discovery.new_character_found.connect(
-            self._on_new_character_discovered,
-            Qt.ConnectionType.UniqueConnection,
-        )
-        self.auto_discovery.character_gone.connect(
-            self._on_character_gone,
-            Qt.ConnectionType.UniqueConnection,
-        )
-        self._auto_discovery_connected = True
-
-    def _disconnect_auto_discovery(self):
-        """Disconnect auto-discovery signals if they were connected."""
-        if not self._auto_discovery_connected:
-            return
-
+    def _create_system_status_bar(self) -> None:
+        """PR3: create per-subsystem health indicator bar in the status bar."""
         try:
-            self.auto_discovery.new_character_found.disconnect(self._on_new_character_discovered)
-        except (RuntimeError, TypeError):
-            pass
+            statusbar = self.statusBar()
+        except RuntimeError:
+            # Defensive: tests patch QMainWindow.__init__ so statusBar is unavailable.
+            self.system_status_bar = None
+            return
+        self.system_status_bar = SystemStatusBar()
+        statusbar.addPermanentWidget(self.system_status_bar)
 
-        try:
-            self.auto_discovery.character_gone.disconnect(self._on_character_gone)
-        except (RuntimeError, TypeError):
-            pass
+        # Initial states
+        self.system_status_bar.set_status("capture", "healthy", "capture workers running")
+        self.system_status_bar.set_status("discovery", "healthy", "auto-discovery idle")
+        self.system_status_bar.set_status("intel", "healthy", "intel pipeline active")
+        self.system_status_bar.set_status("location", "healthy", "location tracker active")
 
-        self._auto_discovery_connected = False
+        # Wire hotkey health signal
+        self.hotkey_manager.health_changed.connect(self._on_hotkey_health_changed)
 
-    def _ensure_auto_discovery_state(self):
-        """Synchronize auto-discovery wiring and runtime state with settings."""
-        enabled = self.settings_manager.get("general.auto_discovery", True)
-        interval = self.settings_manager.get("general.auto_discovery_interval", 5)
+        # Seed current hotkey health if already known
+        hk_status, hk_detail = self.hotkey_manager.get_health()
+        self.system_status_bar.set_status("hotkeys", hk_status, hk_detail)
 
-        self.auto_discovery.set_interval(interval)
-
-        if enabled:
-            self._connect_auto_discovery()
-            if not self.auto_discovery.scan_timer.isActive():
-                self.auto_discovery.start()
-        else:
-            self.auto_discovery.stop()
+    @Slot(str, str)
+    def _on_hotkey_health_changed(self, status: str, detail: str) -> None:
+        """PR3: update hotkeys indicator when HotkeyManager reports health change."""
+        if getattr(self, "system_status_bar", None) is not None:
+            self.system_status_bar.set_status("hotkeys", status, detail)
 
     def _register_hotkeys(self):
         """Register global hotkeys (v2.2)"""
@@ -316,6 +384,12 @@ class MainWindowV21(QMainWindow):
         """Toggle thumbnail visibility"""
         if hasattr(self, "main_tab"):
             self.main_tab.toggle_thumbnails_visibility()
+
+    @Slot()
+    def _toggle_replay_strips_global(self):
+        """PR2: toggle replay strips for all preview windows (delegates to MainTab)."""
+        if hasattr(self, "main_tab"):
+            self.main_tab._toggle_replay_strips_global()
 
     @Slot()
     def _toggle_lock(self):
@@ -450,6 +524,17 @@ class MainWindowV21(QMainWindow):
             self._cycle_window(direction=self._pending_cycle_direction)
             self._pending_cycle_direction = None
 
+    def activate_window(self, window_id: str) -> None:
+        """Public alias for :meth:`_activate_window`.
+
+        Peer subsystems (e.g. :class:`CommandIntegrator`) are not
+        subclasses of MainWindowV21 — they call into this entry point
+        rather than reaching into the private implementation. The body
+        is intentionally identical so internal callers can keep using
+        ``_activate_window`` without churn.
+        """
+        self._activate_window(window_id)
+
     def _activate_window(self, window_id: str):
         """Activate a window by ID."""
         self.cycle_controller.activate_window(window_id)
@@ -465,30 +550,16 @@ class MainWindowV21(QMainWindow):
 
     @Slot()
     def _show_settings(self):
-        """Show settings tab"""
-        self.show()
-        self.raise_()
-        settings_index = self._tab_indexes.get("Settings")
-        if settings_index is not None:
-            self.tabs.setCurrentIndex(settings_index)
+        """Show the SYSTEM tab — Settings lives inside that container.
 
-    @Slot()
-    def _show_roster(self):
-        """Show roster tab."""
+        Phase 4 IA: there is no top-level Settings tab. The SettingsTab
+        inner widget is the left pane of the SYSTEM container. We
+        navigate to SYSTEM so the operator lands on (or immediately
+        adjacent to) the panel they expect.
+        """
         self.show()
         self.raise_()
-        roster_index = self._tab_indexes.get("Roster")
-        if roster_index is not None:
-            self.tabs.setCurrentIndex(roster_index)
-
-    @Slot()
-    def _show_cycle_control(self):
-        """Show cycle control tab."""
-        self.show()
-        self.raise_()
-        cycle_index = self._tab_indexes.get("Cycle Control")
-        if cycle_index is not None:
-            self.tabs.setCurrentIndex(cycle_index)
+        self.tabs.setCurrentIndex(self._TAB_LABELS.index("System"))
 
     @Slot()
     def _reload_config(self):
@@ -597,15 +668,21 @@ class MainWindowV21(QMainWindow):
                         self._queue_discovery_notification(char_name)
 
     def _create_menu_bar(self):
-        """Create menu bar with Help menu (v2.4 - uses ActionRegistry)"""
+        """Create menu bar with App menu and Help menu (v2.4 - uses ActionRegistry)"""
         menubar = self.menuBar()
 
-        # Build Help menu using MenuBuilder (actions from ActionRegistry)
+        # Build App menu (PR2: replay strips toggle + other global actions)
         registry = ActionRegistry.get_instance()
         menu_builder = MenuBuilder(registry)
 
-        # Handler map for Help menu actions
-        handlers = {
+        app_handlers = {
+            "toggle_replay_strips_app": self._toggle_replay_strips_global,
+        }
+        app_menu = menu_builder.build_menu(PrimaryHome.APP_MENU, parent=self, handlers=app_handlers)
+        menubar.addMenu(app_menu)
+
+        # Build Help menu using MenuBuilder (actions from ActionRegistry)
+        help_handlers = {
             "about": self._show_about_dialog,
             "donate": self._open_donation_link,
             "documentation": lambda: self._open_url(
@@ -616,7 +693,7 @@ class MainWindowV21(QMainWindow):
             ),
         }
 
-        help_menu = menu_builder.build_help_menu(parent=self, handlers=handlers)
+        help_menu = menu_builder.build_help_menu(parent=self, handlers=help_handlers)
         menubar.addMenu(help_menu)
 
     def _show_about_dialog(self):
@@ -670,16 +747,113 @@ class MainWindowV21(QMainWindow):
 
         self.logger.info("Initial settings applied")
 
+    def _create_tabs(self) -> None:
+        """Create the v3.3 OPS four-tab IA: COMMAND/FLEET/LAYOUTS/SYSTEM.
+
+        Two phases:
+
+        1. Build the v2.2 inner widgets (main_tab, characters_tab,
+           hotkeys_tab, intel_tab, settings_sync_tab, settings_tab).
+           These remain named attributes on ``self`` so cross-tab
+           signal connections keep working.
+        2. Wrap them in the v3.3 IA containers
+           (:class:`CommandTab`, :class:`FleetTab`,
+           :class:`LayoutsContainer`, :class:`SystemTab`) and add those
+           to the QTabWidget.
+
+        The inner widget factories are unchanged — they remain the
+        source of truth for the cross-tab signal wiring.
+        """
+        # Phase 1 — build inner widgets (preserves all v2.2 cross-tab wiring)
+        self._create_main_tab()
+        self._create_layouts_tab()
+        self._create_characters_tab()
+        self._create_hotkeys_tab()
+        self._create_intel_tab()
+        self._create_settings_sync_tab()
+        self._create_settings_tab()
+
+        # Phase 2 — wrap in IA containers
+        self._create_command_tab()
+        self._create_fleet_tab()
+        self._create_layouts_container()
+        self._create_system_tab()
+
+    def _create_command_tab(self) -> None:
+        """Build the COMMAND tab container.
+
+        :class:`CommandTab` is parented to the main window's QTabWidget
+        but the flagship widget is a :class:`CommandCenterWidget`, not
+        the legacy ``MainTab``. ``MainTab`` remains an attribute on
+        ``self`` because :class:`CommandIntegrator` reads its
+        ``window_manager`` for character mirroring.
+        """
+        from argus_overview.ui.tabs.command_tab import CommandTab
+
+        self.command_tab = CommandTab()
+        self.tabs.addTab(self.command_tab, "Command")
+
+    def _create_fleet_tab(self) -> None:
+        """Build the FLEET tab container (Roster + Intel splitter)."""
+        from argus_overview.ui.tabs.fleet_tab import FleetTab
+
+        self.fleet_tab = FleetTab(self.characters_tab, self.intel_tab)
+        self.tabs.addTab(self.fleet_tab, "Fleet")
+
+    def _create_layouts_container(self) -> None:
+        """Build the LAYOUTS tab container (presets + Cycle Control)."""
+        from argus_overview.ui.tabs.layouts_tab import LayoutsContainer
+
+        self.layouts_tab = LayoutsContainer(self.presets_panel, self.hotkeys_tab)
+        self.tabs.addTab(self.layouts_tab, "Layouts")
+
+    def _create_system_tab(self) -> None:
+        """Build the SYSTEM tab container (Settings + Sync)."""
+        from argus_overview.ui.tabs.system_tab import SystemTab
+
+        self.system_tab = SystemTab(self.settings_tab, self.settings_sync_tab)
+        self.tabs.addTab(self.system_tab, "System")
+
+    def _create_layouts_tab(self) -> None:
+        """Build the inner LayoutsTab used by the LAYOUTS container.
+
+        Lives between :meth:`_create_main_tab` (which creates
+        ``main_tab`` that the layouts tab references) and
+        :meth:`_create_hotkeys_tab`. Stored as ``self.presets_panel``
+        so the container attribute can claim ``self.layouts_tab``.
+        """
+        from argus_overview.ui.layouts_tab import LayoutsTab
+
+        # Signature: LayoutsTab(layout_manager, main_tab,
+        # settings_manager=None, character_manager=None). Pass as kwargs
+        # to keep the call resilient to signature reorders.
+        self.presets_panel = LayoutsTab(
+            self.layout_manager,
+            self.main_tab,
+            settings_manager=self.settings_manager,
+            character_manager=self.character_manager,
+        )
+        # NOTE: layout_applied is NOT connected here — main_tab owns that
+        # signal (see _create_main_tab). Connecting both would emit
+        # _on_layout_applied twice per apply.
+
     def _create_main_tab(self):
-        """Create Overview tab (window preview management) - formerly 'Main'"""
+        """Create the inner MainTab used by the COMMAND container.
+
+        The MainTab is *not* added to the QTabWidget directly. The v3.3
+        IA container (:class:`CommandTab`) wraps it inside CommandCenter
+        via :class:`CommandIntegrator` which reads MainTab's
+        ``window_manager`` for character mirroring. We keep MainTab as
+        ``self.main_tab`` so cross-tab signal connections remain stable.
+        """
         from argus_overview.ui.main_tab import MainTab
 
         self.main_tab = MainTab(
             self.capture_system,
             self.character_manager,
             settings_manager=self.settings_manager,
+            layout_manager=self.layout_manager,
         )
-        self._tab_indexes["Overview"] = self.tabs.addTab(self.main_tab, "Overview")
 
         # Connect signals
         self.main_tab.character_detected.connect(self._on_character_detected)
@@ -698,7 +872,14 @@ class MainWindowV21(QMainWindow):
         )
 
     def _create_characters_tab(self):
-        """Create Roster tab (character & team management) - formerly 'Characters & Teams'"""
+        """Create the inner CharactersTeamsTab used by the FLEET container.
+
+        The Roster widget is *not* added to the QTabWidget directly. The
+        v3.3 IA container :class:`FleetTab` wraps it inside a 60/40
+        splitter beside :class:`IntelTab`. We keep it as
+        ``self.characters_tab`` so cross-tab signal connections remain
+        stable.
+        """
         from argus_overview.ui.characters_teams_tab import CharactersTeamsTab
 
         self.characters_tab = CharactersTeamsTab(
@@ -706,19 +887,24 @@ class MainWindowV21(QMainWindow):
             self.layout_manager,
             settings_sync=self.settings_sync,  # v2.2: Enable EVE folder scanning
         )
-        self._tab_indexes["Roster"] = self.tabs.addTab(self.characters_tab, "Roster")
 
         # Connect signals
         self.characters_tab.team_selected.connect(self._on_team_selected)
 
     def _create_hotkeys_tab(self):
-        """Create Cycle Control tab (hotkeys, cycling, alerts)"""
+        """Create the inner HotkeysTab used by the LAYOUTS container.
+
+        The Cycle Control widget is *not* added to the QTabWidget
+        directly. The v3.3 IA container :class:`LayoutsContainer` wraps
+        it inside a 70/30 splitter beside :class:`LayoutsTab`. We keep
+        it as ``self.hotkeys_tab`` so cross-tab signal connections
+        remain stable.
+        """
         from argus_overview.ui.hotkeys_tab import HotkeysTab
 
         self.hotkeys_tab = HotkeysTab(
             self.character_manager, self.settings_manager, main_tab=self.main_tab
         )
-        self._tab_indexes["Cycle Control"] = self.tabs.addTab(self.hotkeys_tab, "Cycle Control")
 
         # Connect group changes to refresh layout sources in overview tab
         self.hotkeys_tab.group_changed.connect(self.main_tab.refresh_layout_groups)
@@ -733,11 +919,17 @@ class MainWindowV21(QMainWindow):
         self.hotkeys_tab.cycle_backward_edit.recordingStopped.connect(self.hotkey_manager.resume)
 
     def _create_intel_tab(self):
-        """Create Intel tab (chat log monitoring and alerts)"""
+        """Create the inner IntelTab used by the FLEET container.
+
+        The Intel widget is *not* added to the QTabWidget directly. The
+        v3.3 IA container :class:`FleetTab` wraps it inside a 60/40
+        splitter beside :class:`CharactersTeamsTab`. We keep it as
+        ``self.intel_tab`` so cross-tab signal connections remain
+        stable.
+        """
         from argus_overview.ui.intel_tab import IntelTab
 
         self.intel_tab = IntelTab(self.settings_manager)
-        self._tab_indexes["Intel"] = self.tabs.addTab(self.intel_tab, "Intel")
 
         # Connect alert signals to main window for visual feedback
         self.intel_tab.alert_triggered.connect(self._on_intel_alert)
@@ -746,6 +938,15 @@ class MainWindowV21(QMainWindow):
         # Connect alert dispatcher border flash to main tab
         alert_dispatcher = self.intel_tab.get_alert_dispatcher()
         alert_dispatcher.border_flash_requested.connect(self._flash_preview_borders)
+
+        # Connect pipeline health to system status bar
+        self.intel_tab.pipeline_health_changed.connect(
+            lambda s, d: (
+                self.system_status_bar.set_status("intel", s, d)
+                if getattr(self, "system_status_bar", None) is not None
+                else None
+            )
+        )
 
         self.logger.info("Intel tab created")
 
@@ -760,10 +961,30 @@ class MainWindowV21(QMainWindow):
     @Slot(object, object)
     def _on_intel_alert(self, report, alert_type):
         """Handle intel alert from intel tab."""
+        from argus_overview.intel.alerts import AlertType
         from argus_overview.intel.parser import IntelReport
 
         if not isinstance(report, IntelReport):
             return
+
+        # Master toggle (v3.2.0): when off, suppress all visual chrome but
+        # still let other AlertTypes fire (audio, tray notification). The
+        # parser keeps running, only the preview/dock tints are gated.
+        # Defensive getattr: bypassed-init test helpers don't set
+        # settings_manager — default to chrome on.
+        sm = getattr(self, "settings_manager", None)
+        chrome_enabled = sm.get("intel.preview_chrome_enabled", True) if sm is not None else True
+
+        # Fan out threat state to preview frames + status dock once per report
+        # (filter on VISUAL_BORDER so we only trigger on a single AlertType
+        # emission per report, not on every type the dispatcher fires).
+        if chrome_enabled and alert_type == AlertType.VISUAL_BORDER and hasattr(self, "main_tab"):
+            window_manager = getattr(self.main_tab, "window_manager", None)
+            if window_manager is not None and hasattr(window_manager, "apply_threat_state"):
+                window_manager.apply_threat_state(report.threat_level, report.system)
+            status_dock = getattr(self.main_tab, "status_dock", None)
+            if status_dock is not None and hasattr(status_dock, "set_threat_state"):
+                status_dock.set_threat_state(report.threat_level, report.system)
 
         # Show tray notification for critical alerts
         if report.threat_level.value == "critical":
@@ -773,6 +994,24 @@ class MainWindowV21(QMainWindow):
                     f"{report.hostile_count or '?'} hostiles - {', '.join(report.ship_types[:2]) or 'unknown ships'}",
                 )
 
+    def _clear_threat_chrome(self) -> None:
+        """Force-clear any active threat tints across previews + chips.
+
+        Called when the user toggles intel.preview_chrome_enabled off so
+        the change takes effect immediately rather than waiting for the
+        30s decay timer.
+        """
+        from argus_overview.intel.parser import ThreatLevel
+
+        if not hasattr(self, "main_tab"):
+            return
+        wm = getattr(self.main_tab, "window_manager", None)
+        if wm is not None and hasattr(wm, "apply_threat_state"):
+            wm.apply_threat_state(ThreatLevel.CLEAR, None)
+        dock = getattr(self.main_tab, "status_dock", None)
+        if dock is not None and hasattr(dock, "set_threat_state"):
+            dock.set_threat_state(ThreatLevel.CLEAR, None)
+
     @Slot(object)
     def _on_intel_received(self, report):
         """Handle intel received from intel tab."""
@@ -780,18 +1019,30 @@ class MainWindowV21(QMainWindow):
         pass
 
     def _create_settings_sync_tab(self):
-        """Create Sync tab (EVE settings sync) - formerly 'Settings Sync'"""
+        """Create the inner SettingsSyncTab used by the SYSTEM container.
+
+        The Sync widget is *not* added to the QTabWidget directly. The
+        v3.3 IA container :class:`SystemTab` wraps it inside a 60/40
+        splitter beside :class:`SettingsTab`. We keep it as
+        ``self.settings_sync_tab`` so cross-tab signal connections
+        remain stable.
+        """
         from argus_overview.ui.settings_sync_tab import SettingsSyncTab
 
         self.settings_sync_tab = SettingsSyncTab(self.settings_sync, self.character_manager)
-        self._tab_indexes["Sync"] = self.tabs.addTab(self.settings_sync_tab, "Sync")
 
     def _create_settings_tab(self):
-        """Create Settings tab (application settings)"""
+        """Create the inner SettingsTab used by the SYSTEM container.
+
+        The Settings widget is *not* added to the QTabWidget directly.
+        The v3.3 IA container :class:`SystemTab` wraps it inside a 60/40
+        splitter beside :class:`SettingsSyncTab`. We keep it as
+        ``self.settings_tab`` so cross-tab signal connections remain
+        stable.
+        """
         from argus_overview.ui.settings_tab import SettingsTab
 
         self.settings_tab = SettingsTab(self.settings_manager, self.hotkey_manager)
-        self._tab_indexes["Settings"] = self.tabs.addTab(self.settings_tab, "Settings")
 
         # Connect signals
         self.settings_tab.settings_changed.connect(self._apply_setting)
@@ -947,6 +1198,12 @@ class MainWindowV21(QMainWindow):
             # Will be implemented with hotkey functionality
             pass
 
+        elif key == "intel.preview_chrome_enabled" and not value:
+            # User just turned threat chrome off — flush any active tints
+            # so the change is visible immediately, not after the 30s
+            # decay window.
+            self._clear_threat_chrome()
+
     def _apply_low_power_mode(self, enabled: bool):
         """
         Apply low power mode settings.
@@ -1048,6 +1305,9 @@ class MainWindowV21(QMainWindow):
         ):
             self.characters_tab.update_character_status(char_name, None)
 
+        # Drop stale system from location tracker so chips clear on logoff
+        self.location_tracker.on_character_gone(char_name, window_id)
+
     @Slot(object)
     def _on_team_selected(self, team):
         """
@@ -1061,12 +1321,78 @@ class MainWindowV21(QMainWindow):
     @Slot(str)
     def _on_layout_applied(self, preset_name: str):
         """
-        Handle layout application from Layouts Tab
+        Handle layout application. Connected to ``MainTab.layout_applied``
+        in :meth:`_create_main_tab` — the canonical signal source. The
+        inner :class:`LayoutsTab` (now hosted inside the LAYOUTS IA
+        container) intentionally does NOT connect here to avoid double-
+        logging.
 
         Args:
             preset_name: Layout preset name
         """
         self.logger.info(f"Layout applied: {preset_name}")
+
+    def show_layout_chooser(self) -> None:
+        """Open a modal dialog listing all saved layout presets.
+
+        This is the operationally correct entry point for the Command
+        Center's ``Layout ▾`` button and any peer subsystem that wants
+        to surface a preset picker. The dialog is built from
+        :meth:`LayoutManager.get_all_presets` so it stays in sync with
+        whatever the user has saved.
+        """
+        from argus_overview.core.layout_manager import LayoutPreset
+
+        presets: list[LayoutPreset] = list(self.layout_manager.get_all_presets())
+        presets.sort(key=lambda p: p.name.lower())
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Layout Presets")
+        dialog.setMinimumSize(420, 360)
+        layout = QVBoxLayout(dialog)
+
+        intro = QLabel(
+            f"Select a layout preset to apply. {len(presets)} saved.",
+            dialog,
+        )
+        layout.addWidget(intro)
+
+        list_widget = QListWidget(dialog)
+        for preset in presets:
+            item = QListWidgetItem(preset.name)
+            if preset.description:
+                item.setToolTip(preset.description)
+            item.setData(Qt.UserRole, preset.name)
+            list_widget.addItem(item)
+        if presets:
+            list_widget.setCurrentRow(0)
+        layout.addWidget(list_widget, 1)
+
+        button_box = QDialogButtonBox(dialog)
+        apply_btn = QPushButton("Apply", dialog)
+        button_box.addButton(apply_btn, QDialogButtonBox.ButtonRole.AcceptRole)
+        button_box.addButton(QDialogButtonBox.StandardButton.Close)
+        layout.addWidget(button_box)
+
+        def _apply_selected() -> None:
+            current = list_widget.currentItem()
+            if current is None:
+                return
+            preset_name = current.data(Qt.UserRole)
+            try:
+                preset = self.layout_manager.get_preset(preset_name)
+                if preset is not None:
+                    self.logger.info(f"Applying layout preset: {preset_name}")
+                    self._on_layout_applied(preset_name)
+                dialog.accept()
+            except (OSError, RuntimeError, ValueError) as exc:
+                self.logger.error(f"Failed to apply preset {preset_name}: {exc}")
+
+        apply_btn.clicked.connect(_apply_selected)
+        list_widget.itemDoubleClicked.connect(lambda _item: _apply_selected())
+        button_box.rejected.connect(dialog.reject)
+
+        dialog.exec()
 
     @Slot(str)
     def _handle_hotkey(self, hotkey_name: str):
@@ -1118,6 +1444,15 @@ class MainWindowV21(QMainWindow):
         # Stop systems
         if hasattr(self, "auto_discovery"):
             self.auto_discovery.stop()
+
+        if getattr(self, "location_tracker", None) is not None:
+            try:
+                self.location_tracker.character_system_changed.disconnect(
+                    self._on_character_system_changed
+                )
+            except (RuntimeError, TypeError):
+                pass
+            self.location_tracker.stop()
 
         if hasattr(self, "capture_system"):
             self.capture_system.stop()

@@ -1,6 +1,6 @@
 # Argus Overview User Guide
 
-Complete reference for all features in Argus Overview v2.8.
+Complete reference for all features in Argus Overview v3.2.
 
 ---
 
@@ -14,10 +14,13 @@ Complete reference for all features in Argus Overview v2.8.
 6. [Cycle Control Tab](#cycle-control-tab)
 7. [Settings Sync Tab](#settings-sync-tab)
 8. [Settings Tab](#settings-tab)
-9. [System Tray](#system-tray)
-10. [Keyboard Shortcuts](#keyboard-shortcuts)
-11. [Configuration Files](#configuration-files)
-12. [Troubleshooting](#troubleshooting)
+9. [Intel Tab](#intel-tab)
+10. [Focus Mode](#focus-mode)
+11. [Replay Strip](#replay-strip)
+12. [System Tray](#system-tray)
+13. [Keyboard Shortcuts](#keyboard-shortcuts)
+14. [Configuration Files](#configuration-files)
+15. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -94,7 +97,8 @@ Each preview shows:
 - **Character name** or custom label
 - **Activity indicator**: Green (focused), Yellow (recent), Gray (idle)
 - **Session timer** (optional): How long the character has been active
-- **Status border**: Shows window state
+- **Status border**: Character accent color (unique per character) or threat tint when intel is active
+- **Health badge** (bottom-right): `LIVE`, `STATIC`, `STALE`, `PAUSED`, or `ERROR` — shows capture pipeline health at a glance
 
 ### Preview Controls
 
@@ -301,6 +305,79 @@ Application configuration.
 
 ---
 
+## Intel Tab
+
+The Intel tab provides real-time threat detection by monitoring EVE Online chat logs.
+
+### Threat Detection
+
+- **Log Watcher**: Monitors `Chatlogs/` directory for new messages
+- **Parser**: Extracts system names, ship types, and pilot counts from chat
+- **Alert Engine**: Highlights hostile presence based on configured rules
+- **Threat Chrome**: Visual overlay on the Overview tab showing current threat level
+
+### Configuration
+
+Intel settings are configured in `~/.config/argus-overview/settings.json` under the `intel` key:
+
+```json
+{
+  "intel": {
+    "channels": ["Alliance", "Intel"],
+    "alerts_enabled": true,
+    "visual_border": true,
+    "visual_overlay": true,
+    "audio_enabled": true,
+    "min_threat_level": "warning",
+    "jumps_threshold": 5,
+    "master_toggle": true
+  }
+}
+```
+
+### Data Files
+
+- `intel/data/systems.json` — EVE system database
+- `intel/data/jumpbridges.json` — Jump bridge connections
+
+---
+
+## Focus Mode
+
+Focus Mode minimizes distractions by dimming inactive windows and highlighting the active EVE client.
+
+- **Activation**: Toggle via hotkey or tray menu
+- **Behavior**: Active window stays bright; inactive windows dim to configurable opacity
+- **Opacity Control**: Adjustable in Settings (default 0.3)
+
+---
+
+## Replay Strip
+
+The Replay Strip shows a timeline of recent window captures for quick review.
+
+- **Navigation**: Scroll or click thumbnails to jump to specific moments
+- **Cache**: Frames cached in memory; configurable retention
+- **Export**: Right-click to save a frame to disk
+
+---
+
+## Platform Notes
+
+### Linux X11
+
+Fully supported. Uses `wmctrl`, `xdotool`, and `xwd`/`convert` for window operations.
+
+### Linux Wayland
+
+Best-effort support via `wlroots` protocols and `grim`/`slurp`. Some features (window activation, precise positioning) may be limited depending on compositor.
+
+### Windows
+
+Supported via Win32 API (`EnumWindows`, `SetForegroundWindow`, `PrintWindow`). Install from the Windows installer or run from source with Python 3.10+.
+
+---
+
 ## System Tray
 
 The orange "V" icon provides quick access:
@@ -409,10 +486,19 @@ Edit `settings.json` while running, then use **Tray → Reload Config** to apply
 
 **Cause**: Window capture issue
 
-**Fix**:
+**Fix (X11)**:
 1. Click Refresh in Overview toolbar
 2. Re-add the window
-3. Check that xdotool and wmctrl are installed
+3. Check that `xdotool` and `wmctrl` are installed
+
+**Fix (Wayland)**:
+1. Ensure compositor supports `wlr-screenshot` or `grim`
+2. Try XWayland fallback mode
+3. Some compositors do not support window-level capture
+
+**Fix (Windows)**:
+1. Ensure EVE is not running elevated (Admin) while Argus is not
+2. Try the "Compatibility Capture" mode in Settings
 
 ### Hotkeys not working
 
@@ -422,6 +508,24 @@ Edit `settings.json` while running, then use **Tray → Reload Config** to apply
 1. Check for conflicting system hotkeys
 2. Try different key combinations
 3. Ensure Argus has permission to grab global hotkeys
+
+### Wayland-specific issues
+
+**Cause**: Wayland compositors vary in protocol support
+
+**Fix**:
+1. Check compositor supports `wlroots` protocols
+2. Use XWayland for EVE client if native capture fails
+3. Window activation may require manual focus on some compositors
+
+### Windows-specific issues
+
+**Cause**: Win32 API differences, UAC elevation
+
+**Fix**:
+1. Run Argus and EVE at same privilege level
+2. Disable "Game Mode" if it interferes with window detection
+3. Check Windows Defender exclusions for Python/PySide6
 
 ### Logs
 

@@ -10,6 +10,8 @@ from PySide6.QtGui import QColor, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
+    QDialog,
+    QDialogButtonBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
@@ -25,6 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from argus_overview.ui.design_system import colors as _ds
 from argus_overview.ui.hotkey_edit import HotkeyEdit
 from argus_overview.ui.menu_builder import ToolbarBuilder
 
@@ -58,15 +61,15 @@ class CyclingGroupList(QListWidget):
         self.setAlternatingRowColors(True)
 
         # Style for drop target
-        self.setStyleSheet("""
-            QListWidget {
-                border: 2px dashed #555;
+        self.setStyleSheet(f"""
+            QListWidget {{
+                border: 2px dashed {_ds.BORDER_SUBTLE};
                 border-radius: 5px;
                 min-height: 200px;
-            }
-            QListWidget:focus {
-                border-color: #ff8c00;
-            }
+            }}
+            QListWidget:focus {{
+                border-color: {_ds.INFO};
+            }}
         """)
 
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -123,6 +126,7 @@ class HotkeysTab(QWidget):
 
     group_changed = Signal(str, list)  # group_name, members
     hotkeys_changed = Signal()  # Emitted when cycling hotkeys are saved
+    character_hotkeys_changed = Signal()  # Emitted when per-character hotkeys are saved
 
     def __init__(self, character_manager, settings_manager, main_tab=None, parent=None):
         super().__init__(parent)
@@ -185,7 +189,7 @@ class HotkeysTab(QWidget):
 
         # Instructions
         instructions = QLabel("Drag characters to the cycling group on the right")
-        instructions.setStyleSheet("color: #888; font-style: italic;")
+        instructions.setStyleSheet(f"color: {_ds.TEXT_MUTED}; font-style: italic;")
         instructions.setWordWrap(True)
         layout.addWidget(instructions)
 
@@ -246,7 +250,7 @@ class HotkeysTab(QWidget):
 
         # Drop zone label
         drop_label = QLabel("Drop characters here to add them to the cycling group")
-        drop_label.setStyleSheet("color: #888; font-style: italic;")
+        drop_label.setStyleSheet(f"color: {_ds.TEXT_MUTED}; font-style: italic;")
         drop_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         members_layout.addWidget(drop_label)
 
@@ -316,6 +320,35 @@ class HotkeysTab(QWidget):
             hotkey_layout.addRow("", save_hotkeys_btn)
 
         layout.addWidget(hotkey_group)
+
+        # PR2: per-character hotkeys section
+        char_hotkey_group = QGroupBox("Character Hotkeys")
+        char_hotkey_layout = QVBoxLayout()
+        char_hotkey_group.setLayout(char_hotkey_layout)
+
+        self.character_hotkey_list = QListWidget()
+        self.character_hotkey_list.setAlternatingRowColors(True)
+        self._populate_character_hotkey_list()
+        char_hotkey_layout.addWidget(self.character_hotkey_list)
+
+        char_hotkey_controls = QHBoxLayout()
+
+        edit_char_hotkey_btn = QPushButton("Edit")
+        edit_char_hotkey_btn.clicked.connect(self._edit_character_hotkey)
+        char_hotkey_controls.addWidget(edit_char_hotkey_btn)
+
+        remove_char_hotkey_btn = QPushButton("Remove")
+        remove_char_hotkey_btn.clicked.connect(self._remove_character_hotkey)
+        char_hotkey_controls.addWidget(remove_char_hotkey_btn)
+
+        save_char_hotkeys_btn = QPushButton("Save")
+        save_char_hotkeys_btn.clicked.connect(self._save_character_hotkeys)
+        char_hotkey_controls.addWidget(save_char_hotkeys_btn)
+
+        char_hotkey_controls.addStretch()
+        char_hotkey_layout.addLayout(char_hotkey_controls)
+
+        layout.addWidget(char_hotkey_group)
 
         # Load initial group
         if self.cycling_groups:
@@ -414,7 +447,8 @@ class HotkeysTab(QWidget):
         reply = QMessageBox.question(
             self,
             "Delete Group",
-            f"Delete cycling group '{self.current_group}'?",
+            f"Delete cycling group '{self.current_group}'?\n\n"
+            "This will remove all member assignments and unbind any cycling hotkeys for this group.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
@@ -439,7 +473,8 @@ class HotkeysTab(QWidget):
         reply = QMessageBox.question(
             self,
             "Clear Group",
-            "Remove all members from this group?",
+            f"Remove all members from '{self.current_group}'?\n\n"
+            "This empties the group but keeps the group itself and its hotkey binding.",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
 
@@ -542,6 +577,95 @@ class HotkeysTab(QWidget):
         )
         self.logger.info(f"Saved hotkeys: forward={forward}, backward={backward}")
 
+    def _populate_character_hotkey_list(self) -> None:
+        """PR2: populate the per-character hotkey list from settings."""
+        if not hasattr(self, "character_hotkey_list"):
+            return
+        self.character_hotkey_list.clear()
+        char_hotkeys = self.settings_manager.get("character_hotkeys", {}) or {}
+        if not isinstance(char_hotkeys, dict):
+            char_hotkeys = {}
+        characters = self.character_manager.get_all_characters()
+        for char in characters:
+            hotkey = char_hotkeys.get(char.name, "")
+            display = f"{char.name}  —  {hotkey}" if hotkey else char.name
+            item = QListWidgetItem(display)
+            item.setData(Qt.ItemDataRole.UserRole, char.name)
+            self.character_hotkey_list.addItem(item)
+
+    def _edit_character_hotkey(self) -> None:
+        """PR2: open a dialog to record a hotkey for the selected character."""
+        current = self.character_hotkey_list.currentItem()
+        if not current:
+            QMessageBox.information(
+                self, "Select Character", "Please select a character from the list."
+            )
+            return
+        char_name = current.data(Qt.ItemDataRole.UserRole)
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Hotkey for {char_name}")
+        layout = QVBoxLayout(dialog)
+
+        edit = HotkeyEdit()
+        # Load existing hotkey if any
+        char_hotkeys = self.settings_manager.get("character_hotkeys", {}) or {}
+        if isinstance(char_hotkeys, dict):
+            edit.setText(char_hotkeys.get(char_name, ""))
+        layout.addWidget(edit)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        # Pause/resume global listeners while recording
+        edit.recordingStarted.connect(
+            lambda: getattr(self, "_pause_global_listeners", lambda: None)()
+        )
+        edit.recordingStopped.connect(
+            lambda: getattr(self, "_resume_global_listeners", lambda: None)()
+        )
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            new_hotkey = edit.text()
+            current.setText(f"{char_name}  —  {new_hotkey}" if new_hotkey else char_name)
+            # Store transiently on the item for later save
+            current.setData(Qt.ItemDataRole.UserRole + 1, new_hotkey)
+
+    def _remove_character_hotkey(self) -> None:
+        """PR2: clear the hotkey for the selected character."""
+        current = self.character_hotkey_list.currentItem()
+        if not current:
+            return
+        char_name = current.data(Qt.ItemDataRole.UserRole)
+        current.setText(char_name)
+        current.setData(Qt.ItemDataRole.UserRole + 1, "")
+
+    def _save_character_hotkeys(self) -> None:
+        """PR2: persist per-character hotkeys and notify listeners."""
+        char_hotkeys: dict[str, str] = {}
+        for i in range(self.character_hotkey_list.count()):
+            item = self.character_hotkey_list.item(i)
+            char_name = item.data(Qt.ItemDataRole.UserRole)
+            # Check transient data first, then fall back to existing settings
+            hotkey = item.data(Qt.ItemDataRole.UserRole + 1)
+            if hotkey is None:
+                existing = self.settings_manager.get("character_hotkeys", {}) or {}
+                hotkey = existing.get(char_name, "") if isinstance(existing, dict) else ""
+            if hotkey:
+                char_hotkeys[char_name] = hotkey
+        self.settings_manager.set("character_hotkeys", char_hotkeys, auto_save=True)
+        self.character_hotkeys_changed.emit()
+        QMessageBox.information(
+            self,
+            "Saved",
+            f"Character hotkeys saved.\n\n{len(char_hotkeys)} character(s) assigned.",
+        )
+        self.logger.info(f"Saved {len(char_hotkeys)} character hotkeys")
+
     def get_cycling_group(self, name: str) -> list[str]:
         """Get members of a cycling group"""
         return self.cycling_groups.get(name, [])
@@ -553,3 +677,4 @@ class HotkeysTab(QWidget):
     def refresh_characters(self):
         """Refresh character list (called when characters change)"""
         self._populate_character_list()
+        self._populate_character_hotkey_list()

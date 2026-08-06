@@ -9,7 +9,7 @@ Professional multi-boxing tool for EVE Online on Linux & Windows. Window preview
 
 ## Current State
 
-- **Version**: 3.1.0
+- **Version**: 3.3.0 (unreleased)
 - **Language**: Python
 - **Files**: 154 across 2 languages
 - **Lines**: 58,394
@@ -138,7 +138,8 @@ src/argus_overview/
 ├── ui/                  # PySide6 widgets and windows
 │   ├── action_registry.py  # Single source of truth for all UI actions
 │   ├── main_window.py
-│   └── tabs/            # Overview, Roster, Layouts, Cycle Control, Sync, Settings
+│   └── tabs/            # IA containers (v3.3 OPS): command_tab, fleet_tab,
+│                        # layouts_tab (container), system_tab
 ├── core/                # Business logic
 ├── platform/            # Cross-platform abstraction layer
 │   ├── base.py          # Abstract base classes
@@ -166,16 +167,19 @@ All UI actions follow tier rules:
 4. Bind handler in appropriate widget
 5. Run audit: `python -m argus_overview.ui.action_registry`
 
-### Tab Structure
+### Tab Structure (v3.3 OPS — Phase 4 IA)
 
-| Tab | Purpose | Toolbar |
-|-----|---------|---------|
-| Overview | Window preview, capture | OVERVIEW_TOOLBAR |
-| Roster | Characters & teams | ROSTER_TOOLBAR |
-| Layouts | Window arrangement patterns | LAYOUTS_TOOLBAR |
-| Cycle Control | Hotkeys, cycling | CYCLE_CONTROL_TOOLBAR |
-| Sync | EVE settings sync | SYNC_TOOLBAR |
-| Settings | App configuration | SETTINGS_PANEL |
+| Tab | Container | Inner widgets | Toolbar homes covered |
+|-----|-----------|---------------|------------------------|
+| Command | `CommandTab` | `CommandCenterWidget` (live operations) | OVERVIEW_TOOLBAR |
+| Fleet | `FleetTab` (60/40 splitter) | `CharactersTeamsTab` + `IntelTab` | ROSTER_TOOLBAR, INTEL_TOOLBAR |
+| Layouts | `LayoutsContainer` (70/30 splitter) | `LayoutsTab` + `HotkeysTab` | LAYOUTS_TOOLBAR, CYCLE_CONTROL_TOOLBAR |
+| System | `SystemTab` (60/40 splitter) | `SettingsTab` + `SettingsSyncTab` | SETTINGS_PANEL, SYNC_TOOLBAR |
+
+The six v2.2 tabs (Overview, Roster, Cycle Control, Intel, Sync, Settings)
+are still built as inner widgets so cross-tab signal wiring and the
+`ActionRegistry` primary homes remain stable — they're just composed into
+the four IA containers above. `_show_settings` lands on the SYSTEM tab.
 
 ### Platform Abstraction
 - PySide6 signal/slot architecture
@@ -207,7 +211,7 @@ This is a fan project, not affiliated with or endorsed by CCP hf.
 
 ## Testing
 
-- **2,184 tests** via pytest
+- **2,580 tests** via pytest
 - Python 3.10, 3.11, 3.12 matrix
 - Platform-specific tests guarded by `sys.platform` checks
 - Run: `pytest tests/ -v` or `pytest tests/ -v --cov=src/argus_overview`

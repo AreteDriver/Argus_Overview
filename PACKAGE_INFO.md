@@ -157,8 +157,8 @@ from eve_overview_pro.core.layout_manager import LayoutManager, GridPattern
 manager = LayoutManager()
 
 # Calculate grid layout
-screen = {'x': 0, 'y': 0, 'width': 1920, 'height': 1080}
-windows = ['0x123', '0x124', '0x125', '0x126']
+screen = {"x": 0, "y": 0, "width": 1920, "height": 1080}
+windows = ["0x123", "0x124", "0x125", "0x126"]
 layout = manager.calculate_grid_layout(GridPattern.GRID_2X2, windows, screen)
 ```
 
@@ -168,11 +168,13 @@ from eve_overview_pro.core.alert_detector import AlertDetector, AlertLevel
 
 detector = AlertDetector()
 
+
 def on_alert(level):
     print(f"ALERT: {level}")
 
-detector.register_callback('0x123', on_alert)
-alert_level = detector.analyze_frame('0x123', image)
+
+detector.register_callback("0x123", on_alert)
+alert_level = detector.analyze_frame("0x123", image)
 ```
 
 ### Settings Sync

@@ -338,7 +338,7 @@ class TestGetSetting:
 
             value = manager.get("thumbnails.opacity_on_hover")
 
-            assert value == 0.3  # Default value
+            assert value == 0.85  # Default value (PR4 raised from 0.3)
 
     def test_get_nonexistent_key_returns_default(self):
         """Test that get returns default for nonexistent key"""
