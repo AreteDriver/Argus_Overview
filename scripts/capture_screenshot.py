@@ -7,10 +7,8 @@ Usage:
 from __future__ import annotations
 
 import sys
-import time
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 
 # Ensure src is on path

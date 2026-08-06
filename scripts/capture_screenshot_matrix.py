@@ -15,7 +15,6 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 
 sys.path.insert(0, "src")
@@ -31,8 +30,8 @@ _hm.HotkeyManager.pause = lambda self: None
 _hm.HotkeyManager.resume = lambda self: None
 _hm.HotkeyManager.get_health = lambda self: ("unknown", "")
 
-from argus_overview.ui.main_window_v21 import MainWindowV21
-
+# Import after the monkey patches so MainWindowV21 picks them up.
+from argus_overview.ui.main_window_v21 import MainWindowV21  # noqa: E402
 
 RESOLUTIONS = [
     (1024, 768),
