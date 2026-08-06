@@ -65,6 +65,7 @@ class TestToolbarBuilderStyling:
     def test_success_style_uses_healthy_green(self):
         """SUCCESS_STYLE should use design-system healthy green"""
         from argus_overview.ui.design_system import colors as ds
+
         builder = ToolbarBuilder()
         style = builder._get_success_style().lower()
         assert ds.HEALTHY.lower() in style
@@ -72,6 +73,7 @@ class TestToolbarBuilderStyling:
     def test_danger_style_uses_critical_red(self):
         """DANGER_STYLE should use design-system critical red"""
         from argus_overview.ui.design_system import colors as ds
+
         builder = ToolbarBuilder()
         style = builder._get_danger_style().lower()
         assert ds.CRITICAL.lower() in style
@@ -624,6 +626,7 @@ class TestToolbarBuilderCreateButton:
     def test_create_button_success_style(self, mock_button):
         """create_button applies SUCCESS_STYLE for success actions"""
         from argus_overview.ui.design_system import colors as ds
+
         mock_button_instance = MagicMock()
         mock_button.return_value = mock_button_instance
 
@@ -638,6 +641,7 @@ class TestToolbarBuilderCreateButton:
     def test_create_button_danger_style(self, mock_button):
         """create_button applies DANGER_STYLE for danger actions"""
         from argus_overview.ui.design_system import colors as ds
+
         mock_button_instance = MagicMock()
         mock_button.return_value = mock_button_instance
 

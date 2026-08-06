@@ -45,6 +45,64 @@ instead of hardcoded values.
   hardcoded RGB `QColor` objects to design-system semantic tokens
   (`HEALTHY`, `TEXT_SECONDARY`, `WARNING`, `CRITICAL`, `TEXT_MUTED`).
 
+## [Unreleased] — IA Overhaul: COMMAND / FLEET / LAYOUTS / SYSTEM
+
+Six v2.2 tabs collapsed to four IA-aligned tabs that match the operator's
+mental model. The Command Center (v3.3 OPS flagship surface) is now the
+default home tab, with all live fleet operations under one roof.
+
+### Added
+- **Tab containers** under `src/argus_overview/ui/tabs/`:
+  - `CommandTab` — hosts the flagship `CommandCenterWidget`.
+  - `FleetTab` — Roster + Intel side-by-side via `QSplitter` (60/40).
+  - `LayoutsContainer` — Layout presets + Cycle Control via `QSplitter` (70/30).
+  - `SystemTab` — Settings + Sync via `QSplitter` (60/40).
+- **`MainWindowV21._create_tabs()`** — single entry point that builds the
+  inner widgets, then wraps them in IA containers. The legacy six factory
+  methods (`_create_main_tab`, `_create_characters_tab`, etc.) remain the
+  source of truth for cross-tab signal wiring.
+- **`MainWindowV21._create_layouts_tab()`** — builds the inner `LayoutsTab`
+  consumed by the LAYOUTS container, stored as `self.presets_panel`. The
+  container occupies `self.layouts_tab`.
+- **`TestPhase4InformationArchitecture`** + **`tests/test_tab_containers.py`**
+  — 24 new tests pin the four IA labels, container wiring, and splitter
+  orientations.
+- **IA contract pin** — `_TAB_LABELS` is now `["Command", "Fleet", "Layouts",
+  "System"]`. `_show_settings` lands on SYSTEM.
+
+### Changed
+- **`_show_settings`** — points at the SYSTEM container (which holds
+  SettingsTab on the left), since "Settings" is no longer a top-level tab.
+- **ActionRegistry section comments** — section headers now note the
+  Phase 4 IA mapping (`OVERVIEW_TOOLBAR → COMMAND`, `ROSTER_TOOLBAR` /
+  `INTEL_TOOLBAR → FLEET`, `LAYOUTS_TOOLBAR` / `CYCLE_CONTROL_TOOLBAR →
+  LAYOUTS`, `SYNC_TOOLBAR` / `SETTINGS_PANEL → SYSTEM`). The `PrimaryHome`
+  enum values are unchanged — actions still bind to the same inner widget.
+- **Refresh Layout Groups tooltip** — now says "from the LAYOUTS tab
+  (Cycle Control pane)" instead of "from Cycle Control tab".
+
+### Tests
+- 24 new tests across `tests/test_tab_containers.py` and the new
+  `TestPhase4InformationArchitecture` class in `tests/test_main_window_v21.py`.
+- Full suite: 2,580 passed, 5 skipped.
+
+### Senior review fixes
+Addressed 11 findings from the Phase 4 senior review (1 critical):
+- **Critical**: `_create_layouts_tab` passed `character_manager` as the
+  second positional arg to `LayoutsTab` — the actual signature is
+  `(layout_manager, main_tab, settings_manager=None, character_manager=None)`.
+  Switched to kwargs, pinned by `test_create_layouts_tab_passes_main_tab_to_main_slot`.
+- **Naming symmetry**: inner widget renamed `self.layouts_tab` →
+  `self.presets_panel` so `self.layouts_tab` consistently denotes the
+  IA container (matches `command_tab` / `fleet_tab` / `system_tab`).
+- **Duplicate signal**: dropped redundant `layouts_tab.layout_applied`
+  connection; `main_tab.layout_applied` remains the single canonical
+  source for `_on_layout_applied` and the `CommandIntegrator`.
+- **Tautological alias**: removed the `LayoutPresetsPanel` re-export
+  from `tabs/layouts_tab.py` (and its pinning test). The inner widget
+  is accessed via `window.presets_panel`; the alias was unconsumed
+  after the rename.
+
 ## [3.2.0] - 2026-04-26 — Intel-Aware Edition
 
 This release ships a 10-PR arc that turns Argus's preview chrome into an

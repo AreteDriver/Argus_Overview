@@ -10,21 +10,20 @@ to print the palette and compute WCAG-like contrast ratios.
 
 from __future__ import annotations
 
-
 # ---------------------------------------------------------------------------
 # Canvas / background
 # ---------------------------------------------------------------------------
-CANVAS = "#0B0E13"        # Deepest background (app window)
-SURFACE = "#11161D"       # Primary card/panel background
+CANVAS = "#0B0E13"  # Deepest background (app window)
+SURFACE = "#11161D"  # Primary card/panel background
 SURFACE_RAISED = "#171D26"  # Elevated surface (hover, active)
-SURFACE_HOVER = "#1D2530"   # Hover state background
+SURFACE_HOVER = "#1D2530"  # Hover state background
 
 # ---------------------------------------------------------------------------
 # Borders
 # ---------------------------------------------------------------------------
 BORDER_SUBTLE = "#27313D"
 BORDER_STRONG = "#3A4655"
-BORDER_FOCUS = "#63C7FF"   # Focus ring (also used for keyboard focus)
+BORDER_FOCUS = "#63C7FF"  # Focus ring (also used for keyboard focus)
 
 # ---------------------------------------------------------------------------
 # Text
@@ -78,6 +77,7 @@ THREAT_MAP: dict[str, tuple[int, int, int]] = {
 # ---------------------------------------------------------------------------
 # Utility helpers
 # ---------------------------------------------------------------------------
+
 
 def _luminance(rgb: tuple[int, int, int]) -> float:
     """Relative luminance of an sRGB color (simplified)."""

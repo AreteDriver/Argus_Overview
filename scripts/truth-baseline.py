@@ -10,23 +10,25 @@ Outputs truth-baseline.json and exits non-zero on mismatch.
 
 Python 3.11+ required (uses tomllib).
 """
+
 from __future__ import annotations
 
 import glob
 import json
-import os
 import re
 import subprocess
 import sys
-import tomllib
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+import tomllib
 
 REPO_ROOT = Path.cwd()
 
 
 # ── Data structures ─────────────────────────────────────────────────────────
+
 
 @dataclass
 class CheckResult:
@@ -49,8 +51,10 @@ class BaselineReport:
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
+
 def _now() -> str:
     from datetime import datetime, timezone
+
     return datetime.now(timezone.utc).isoformat()
 
 
@@ -92,6 +96,7 @@ def _json_extract(data: Any, path: str) -> Any:
 
 
 # ── Check implementations ─────────────────────────────────────────────────
+
 
 def check_count(cfg: dict[str, Any]) -> CheckResult:
     """Count files matching glob(s), compare against expected."""
@@ -156,7 +161,7 @@ def check_version_consistency(cfg: dict[str, Any]) -> CheckResult:
             errors.append(f"{path}: file not found or empty")
             continue
 
-        pattern = src.get("pattern", r'(\d+\.\d+(?:\.\d+)?)')
+        pattern = src.get("pattern", r"(\d+\.\d+(?:\.\d+)?)")
         m = re.search(pattern, text)
         if m:
             versions[path] = m.group(1)
@@ -195,7 +200,7 @@ def check_test_count(cfg: dict[str, Any]) -> CheckResult:
     """Run test collection command, parse count."""
     name = cfg["name"]
     cmd = cfg.get("command", "python -m pytest --collect-only -q")
-    pattern = cfg.get("pattern", r'(\d+) tests? collected')
+    pattern = cfg.get("pattern", r"(\d+) tests? collected")
     expected = cfg.get("expected")
     op = cfg.get("op", "==")
     cwd = cfg.get("cwd")
@@ -433,7 +438,10 @@ def check_package_unused(cfg: dict[str, Any]) -> CheckResult:
     imported = False
     for f in sorted(files):
         text = _read_text(f)
-        if re.search(rf'\b(import\s+{re.escape(import_name)}|from\s+{re.escape(import_name)}|require\(["\']{re.escape(import_name)}["\']\))', text):
+        if re.search(
+            rf'\b(import\s+{re.escape(import_name)}|from\s+{re.escape(import_name)}|require\(["\']{re.escape(import_name)}["\']\))',
+            text,
+        ):
             imported = True
             break
 
@@ -481,7 +489,7 @@ def check_markdown_claim(cfg: dict[str, Any]) -> CheckResult:
         escaped = re.escape(header.lstrip("# ").strip())
         # Match header line, then capture until next header
         m = re.search(
-            rf'^#+\s*{escaped}\s*\n(.*?)(?=\n#+\s|\Z)',
+            rf"^#+\s*{escaped}\s*\n(.*?)(?=\n#+\s|\Z)",
             text,
             re.MULTILINE | re.DOTALL | re.IGNORECASE,
         )
@@ -539,6 +547,7 @@ CHECK_DISPATCH = {
 
 # ── Main ────────────────────────────────────────────────────────────────────
 
+
 def run_checks(config_path: str) -> BaselineReport:
     raw = _read_text(config_path)
     if not raw:
@@ -554,23 +563,27 @@ def run_checks(config_path: str) -> BaselineReport:
         ctype = check["type"]
         handler = CHECK_DISPATCH.get(ctype)
         if not handler:
-            results.append(CheckResult(
-                name=check.get("name", ctype),
-                check_type=ctype,
-                status="ERROR",
-                message=f"Unknown check type: {ctype}",
-            ))
+            results.append(
+                CheckResult(
+                    name=check.get("name", ctype),
+                    check_type=ctype,
+                    status="ERROR",
+                    message=f"Unknown check type: {ctype}",
+                )
+            )
             continue
 
         try:
             results.append(handler(check))
         except Exception as e:
-            results.append(CheckResult(
-                name=check.get("name", ctype),
-                check_type=ctype,
-                status="ERROR",
-                message=f"Exception: {e}",
-            ))
+            results.append(
+                CheckResult(
+                    name=check.get("name", ctype),
+                    check_type=ctype,
+                    status="ERROR",
+                    message=f"Exception: {e}",
+                )
+            )
 
     summary = {"pass": 0, "fail": 0, "skip": 0, "error": 0}
     for r in results:
@@ -607,7 +620,9 @@ def main() -> None:
         if r["status"] in ("FAIL", "ERROR"):
             print(f"      → {r['message']}")
     print(f"{'-' * 60}")
-    print(f"Summary: {ok}/{total} passed  ({report.summary['fail']} fail, {report.summary['error']} error, {report.summary['skip']} skip)")
+    print(
+        f"Summary: {ok}/{total} passed  ({report.summary['fail']} fail, {report.summary['error']} error, {report.summary['skip']} skip)"
+    )
     print(f"Output: {out_path}")
 
     if report.summary["fail"] > 0 or report.summary["error"] > 0:

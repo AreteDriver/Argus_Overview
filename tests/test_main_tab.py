@@ -10307,6 +10307,7 @@ class TestCharacterAccentColor:
         env_base["QT_QPA_PLATFORM"] = "offscreen"
         # Ensure the subprocess can find argus_overview when running via pytest
         import pathlib
+
         repo_root = str(pathlib.Path(__file__).resolve().parents[1] / "src")
         env_base["PYTHONPATH"] = repo_root + os.pathsep + env_base.get("PYTHONPATH", "")
 
@@ -10362,8 +10363,8 @@ class TestCharacterAccentChipFrameMatch:
             chip.deleteLater()
 
     def test_legacy_chip_aliases_resolve_to_main_tab_helpers(self):
-        from argus_overview.ui.main_tab import character_accent_color
         from argus_overview.ui.design_system.colors import ACCENT_POOL
+        from argus_overview.ui.main_tab import character_accent_color
         from argus_overview.ui.status_dock import CHIP_ACCENT_COLORS, accent_for
 
         assert CHIP_ACCENT_COLORS is ACCENT_POOL
@@ -11008,7 +11009,9 @@ class TestWindowPreviewWidgetFocus:
 
     def test_focus_in_event_calls_update(self, qapp):
         from unittest.mock import patch
+
         from PySide6.QtWidgets import QWidget
+
         from argus_overview.ui.main_tab import WindowPreviewWidget
 
         widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
@@ -11019,7 +11022,9 @@ class TestWindowPreviewWidgetFocus:
 
     def test_focus_out_event_calls_update(self, qapp):
         from unittest.mock import patch
+
         from PySide6.QtWidgets import QWidget
+
         from argus_overview.ui.main_tab import WindowPreviewWidget
 
         widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
@@ -11030,8 +11035,8 @@ class TestWindowPreviewWidgetFocus:
 
     def test_paint_focus_layer_when_focused(self, qapp):
         """When hasFocus() is True, _paint_focus_layer should draw a rounded rect."""
-        from argus_overview.ui.main_tab import WindowPreviewWidget
         from argus_overview.ui.design_system import colors as _ds
+        from argus_overview.ui.main_tab import WindowPreviewWidget
 
         with patch.object(WindowPreviewWidget, "__init__", return_value=None):
             widget = WindowPreviewWidget.__new__(WindowPreviewWidget)
@@ -11039,6 +11044,7 @@ class TestWindowPreviewWidgetFocus:
             widget.rect = MagicMock(return_value=QRect(0, 0, 200, 150))
 
             from PySide6.QtGui import QPainter
+
             mock_painter = MagicMock(spec=QPainter)
             widget._paint_focus_layer(mock_painter)
 
@@ -11059,6 +11065,7 @@ class TestWindowPreviewWidgetFocus:
             widget.hasFocus = MagicMock(return_value=False)
 
             from PySide6.QtGui import QPainter
+
             mock_painter = MagicMock(spec=QPainter)
             widget._paint_focus_layer(mock_painter)
 

@@ -139,3 +139,15 @@ class SystemStatusBar(QWidget):
     def get_status(self, subsystem: str) -> tuple[str, str]:
         """Return (status, detail) for a subsystem."""
         return self._status.get(subsystem, "unknown"), self._detail.get(subsystem, "")
+
+    def snapshot(self) -> dict[str, tuple[str, str]]:
+        """Return a copy of all subsystem (status, detail) pairs.
+
+        Used by peer subsystems (e.g. :class:`CommandIntegrator`) to
+        seed a parallel status view without reaching into private
+        state. Returns a fresh dict so callers cannot mutate ours.
+        """
+        return {
+            key: (self._status.get(key, "unknown"), self._detail.get(key, ""))
+            for key in self._status
+        }

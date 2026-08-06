@@ -206,8 +206,8 @@ from datetime import datetime
 
 # In MainWindowV21 instance scope (e.g., self):
 report = IntelReport(
-    system="HED-GP",                      # change to test specific systems
-    threat_level=ThreatLevel.DANGER,      # CLEAR / INFO / WARNING / DANGER / CRITICAL
+    system="HED-GP",  # change to test specific systems
+    threat_level=ThreatLevel.DANGER,  # CLEAR / INFO / WARNING / DANGER / CRITICAL
     hostile_count=3,
     ship_types=["sabre", "broadsword"],
     player_names=[],

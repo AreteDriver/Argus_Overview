@@ -102,7 +102,34 @@ class LayoutManager:
         self.layouts_dir.mkdir(exist_ok=True)
 
         self.presets: dict[str, LayoutPreset] = {}
+        # Lazy-initialized position registry. Created the first time
+        # ``set_locked`` or ``position`` is accessed so existing callers
+        # that never touch window positions don't pay the import.
+        self._position: object | None = None
         self._load_presets()
+
+    @property
+    def position(self):
+        """Lazily-constructed position registry.
+
+        The ``Position`` class lives in :mod:`core.position`; importing
+        it at module load time would couple layout presets to position
+        tracking even when neither is used. Defer until first access.
+        """
+        if self._position is None:
+            from argus_overview.core.position import Position
+
+            self._position = Position()
+        return self._position
+
+    def set_locked(self, locked: bool) -> None:
+        """Lock or unlock all window positions.
+
+        "Lock windows" prevents layout operations from moving EVE
+        windows. This is the operationally correct API for the Command
+        Palette's "Lock windows" / "Unlock windows" entries.
+        """
+        self.position.set_locked(locked)
 
     @staticmethod
     def _validate_preset_data(data) -> bool:

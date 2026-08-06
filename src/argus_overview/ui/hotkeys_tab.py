@@ -597,7 +597,9 @@ class HotkeysTab(QWidget):
         """PR2: open a dialog to record a hotkey for the selected character."""
         current = self.character_hotkey_list.currentItem()
         if not current:
-            QMessageBox.information(self, "Select Character", "Please select a character from the list.")
+            QMessageBox.information(
+                self, "Select Character", "Please select a character from the list."
+            )
             return
         char_name = current.data(Qt.ItemDataRole.UserRole)
 

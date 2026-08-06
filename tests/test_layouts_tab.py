@@ -1679,9 +1679,7 @@ class TestLayoutsTabCreateTopSection:
                 "argus_overview.ui.layouts_tab.QSpinBox"
             ) as mock_spin_cls, patch(
                 "argus_overview.ui.layouts_tab.QCheckBox"
-            ) as mock_checkbox_cls, patch(
-                "argus_overview.ui.layouts_tab.QWidget"
-            ), patch(
+            ) as mock_checkbox_cls, patch("argus_overview.ui.layouts_tab.QWidget"), patch(
                 "argus_overview.ui.layouts_tab.get_all_patterns", return_value=["2x2", "3x1"]
             ):
                 mock_section = MagicMock()
@@ -1738,8 +1736,9 @@ class TestLayoutsTabCreateTopSection:
                 "argus_overview.ui.layouts_tab.QPushButton"
             ), patch("argus_overview.ui.layouts_tab.QSpinBox") as mock_spin_cls, patch(
                 "argus_overview.ui.layouts_tab.QCheckBox"
-            ), patch("argus_overview.ui.layouts_tab.QWidget"
-            ), patch("argus_overview.ui.layouts_tab.get_all_patterns", return_value=[]):
+            ), patch("argus_overview.ui.layouts_tab.QWidget"), patch(
+                "argus_overview.ui.layouts_tab.get_all_patterns", return_value=[]
+            ):
                 mock_spin = MagicMock()
                 mock_spin_cls.return_value = mock_spin
 

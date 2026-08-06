@@ -38,15 +38,17 @@ but must not create duplicate clickable UI elements.
 3. **Register in ActionRegistry**: Edit `ui/action_registry.py`
 
 ```python
-self.register(ActionSpec(
-    id="my_new_action",
-    label="My Action Label",
-    scope=ActionScope.TAB,  # or GLOBAL, OBJECT
-    primary_home=PrimaryHome.OVERVIEW_TOOLBAR,  # canonical location
-    tooltip="Description of action",
-    shortcut="<ctrl>+<shift>+a",  # optional
-    handler_name="_my_action_handler",
-))
+self.register(
+    ActionSpec(
+        id="my_new_action",
+        label="My Action Label",
+        scope=ActionScope.TAB,  # or GLOBAL, OBJECT
+        primary_home=PrimaryHome.OVERVIEW_TOOLBAR,  # canonical location
+        tooltip="Description of action",
+        shortcut="<ctrl>+<shift>+a",  # optional
+        handler_name="_my_action_handler",
+    )
+)
 ```
 
 4. **Connect handler**: In the appropriate widget/tab, bind the handler:

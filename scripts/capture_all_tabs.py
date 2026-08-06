@@ -10,13 +10,13 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import QApplication
 
 sys.path.insert(0, "src")
 
 # Neutralise hotkey manager so pynput doesn't try to grab X11 in headless mode
 import argus_overview.core.hotkey_manager as _hm
+
 _hm.HotkeyManager.start = lambda self: None
 _hm.HotkeyManager.stop = lambda self: None
 _hm.HotkeyManager.register_hotkey = lambda *a, **k: None
@@ -25,7 +25,8 @@ _hm.HotkeyManager.pause = lambda self: None
 _hm.HotkeyManager.resume = lambda self: None
 _hm.HotkeyManager.get_health = lambda self: ("unknown", "")
 
-from argus_overview.ui.main_window_v21 import MainWindowV21
+# Import after the monkey patches so MainWindowV21 picks them up.
+from argus_overview.ui.main_window_v21 import MainWindowV21  # noqa: E402
 
 
 def main():
@@ -37,13 +38,13 @@ def main():
     window.resize(1440, 900)
     window.show()
 
+    # v3.3 OPS Phase 4 IA: COMMAND / FLEET / LAYOUTS / SYSTEM. Index 3 is
+    # the trailing tab "System" (last in registration order).
     tabs = [
-        (0, "overview"),
-        (1, "cycle_control"),
-        (2, "roster"),
-        (3, "intel"),
-        (4, "sync"),
-        (5, "settings"),
+        (0, "command"),
+        (1, "fleet"),
+        (2, "layouts"),
+        (3, "system"),
     ]
 
     idx = 0

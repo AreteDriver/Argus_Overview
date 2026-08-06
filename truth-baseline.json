@@ -1,6 +1,6 @@
 {
   "project": "Argus_Overview",
-  "timestamp": "2026-07-27T01:10:19.429673+00:00",
+  "timestamp": "2026-08-06T09:30:40.178528+00:00",
   "summary": {
     "pass": 7,
     "fail": 0,
@@ -12,14 +12,14 @@
       "name": "version_consistency",
       "check_type": "version_consistency",
       "status": "PASS",
-      "expected": "3.2.0",
+      "expected": "3.3.0",
       "actual": {
-        "pyproject.toml": "3.2.0",
-        "README.md": "3.2.0",
-        "CLAUDE.md": "3.2.0"
+        "pyproject.toml": "3.3.0",
+        "README.md": "3.3.0",
+        "CLAUDE.md": "3.3.0"
       },
       "claim_source": "",
-      "message": "Versions: {'pyproject.toml': '3.2.0', 'README.md': '3.2.0', 'CLAUDE.md': '3.2.0'}"
+      "message": "Versions: {'pyproject.toml': '3.3.0', 'README.md': '3.3.0', 'CLAUDE.md': '3.3.0'}"
     },
     {
       "name": "v6_artifacts_absent",
