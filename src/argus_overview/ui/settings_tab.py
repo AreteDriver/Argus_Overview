@@ -857,7 +857,9 @@ class SettingsTab(QWidget):
             item = QTreeWidgetItem([category])
             self.category_tree.addTopLevelItem(item)
 
-        self.category_tree.setCurrentItem(self.category_tree.topLevelItem(0))
+        first_category = self.category_tree.topLevelItem(0)
+        if first_category is not None:
+            self.category_tree.setCurrentItem(first_category)
         self.category_tree.currentItemChanged.connect(self._on_category_changed)
 
         # Style nav tree with design-system tokens

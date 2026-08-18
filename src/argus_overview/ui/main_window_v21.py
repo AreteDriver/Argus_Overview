@@ -48,7 +48,6 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QTimer, Slot
 from PySide6.QtGui import QCloseEvent, QIcon
 from PySide6.QtWidgets import (
-    QApplication,
     QDialog,
     QDialogButtonBox,
     QLabel,
@@ -99,6 +98,20 @@ class MainWindowV21(QMainWindow):
         self.logger = logging.getLogger(__name__)
         self.setWindowTitle(f"Argus Overview v{__version__}")
         self.setMinimumSize(960, 600)
+        self._is_quitting = False
+        self._auto_discovery_connected = False
+        self._bulk_import_active = False
+        self._bulk_import_dirty_characters = False
+        self._bulk_import_dirty_groups = False
+        self._pending_discovery_names: list[str] = []
+        self._discovery_notification_timer = QTimer(self)
+        self._discovery_notification_timer.setSingleShot(True)
+        self._discovery_notification_timer.setInterval(1200)
+        self._discovery_notification_timer.timeout.connect(self._flush_discovery_notifications)
+        self._status_refresh_timer = QTimer(self)
+        self._status_refresh_timer.setSingleShot(True)
+        self._status_refresh_timer.setInterval(150)
+        self._status_refresh_timer.timeout.connect(self._flush_main_tab_status_refresh)
 
         # Set window icon
         self._set_window_icon()
@@ -215,6 +228,52 @@ class MainWindowV21(QMainWindow):
 
         self.logger.info("Main window v2.2 initialized successfully")
 
+    def _connect_auto_discovery(self):
+        """Connect auto-discovery signals exactly once."""
+        if self._auto_discovery_connected:
+            return
+
+        self.auto_discovery.new_character_found.connect(
+            self._on_new_character_discovered,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        self.auto_discovery.character_gone.connect(
+            self._on_character_gone,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        self._auto_discovery_connected = True
+
+    def _disconnect_auto_discovery(self):
+        """Disconnect auto-discovery signals if they were connected."""
+        if not self._auto_discovery_connected:
+            return
+
+        try:
+            self.auto_discovery.new_character_found.disconnect(self._on_new_character_discovered)
+        except (RuntimeError, TypeError):
+            pass
+
+        try:
+            self.auto_discovery.character_gone.disconnect(self._on_character_gone)
+        except (RuntimeError, TypeError):
+            pass
+
+        self._auto_discovery_connected = False
+
+    def _ensure_auto_discovery_state(self):
+        """Synchronize auto-discovery wiring and runtime state with settings."""
+        enabled = self.settings_manager.get("general.auto_discovery", True)
+        interval = self.settings_manager.get("general.auto_discovery_interval", 5)
+
+        self.auto_discovery.set_interval(interval)
+
+        if enabled:
+            self._connect_auto_discovery()
+            if not self.auto_discovery.scan_timer.isActive():
+                self.auto_discovery.start()
+        else:
+            self.auto_discovery.stop()
+
     def _init_location_tracker(self) -> None:
         """Start the per-character location tracker if enabled."""
         from argus_overview.intel.character_location import CharacterLocationTracker
@@ -312,8 +371,9 @@ class MainWindowV21(QMainWindow):
     @Slot(str, str)
     def _on_hotkey_health_changed(self, status: str, detail: str) -> None:
         """PR3: update hotkeys indicator when HotkeyManager reports health change."""
-        if getattr(self, "system_status_bar", None) is not None:
-            self.system_status_bar.set_status("hotkeys", status, detail)
+        status_bar = getattr(self, "system_status_bar", None)
+        if status_bar is not None:
+            status_bar.set_status("hotkeys", status, detail)
 
     def _register_hotkeys(self):
         """Register global hotkeys (v2.2)"""
@@ -560,6 +620,20 @@ class MainWindowV21(QMainWindow):
         self.show()
         self.raise_()
         self.tabs.setCurrentIndex(self._TAB_LABELS.index("System"))
+
+    @Slot()
+    def _show_roster(self):
+        """Show the FLEET tab, which contains the roster."""
+        self.show()
+        self.raise_()
+        self.tabs.setCurrentIndex(self._TAB_LABELS.index("Fleet"))
+
+    @Slot()
+    def _show_cycle_control(self):
+        """Show the LAYOUTS tab, which contains cycle controls."""
+        self.show()
+        self.raise_()
+        self.tabs.setCurrentIndex(self._TAB_LABELS.index("Layouts"))
 
     @Slot()
     def _reload_config(self):
@@ -1306,7 +1380,9 @@ class MainWindowV21(QMainWindow):
             self.characters_tab.update_character_status(char_name, None)
 
         # Drop stale system from location tracker so chips clear on logoff
-        self.location_tracker.on_character_gone(char_name, window_id)
+        location_tracker = getattr(self, "location_tracker", None)
+        if location_tracker is not None:
+            location_tracker.on_character_gone(char_name, window_id)
 
     @Slot(object)
     def _on_team_selected(self, team):
@@ -1362,7 +1438,7 @@ class MainWindowV21(QMainWindow):
             item = QListWidgetItem(preset.name)
             if preset.description:
                 item.setToolTip(preset.description)
-            item.setData(Qt.UserRole, preset.name)
+            item.setData(Qt.ItemDataRole.UserRole, preset.name)
             list_widget.addItem(item)
         if presets:
             list_widget.setCurrentRow(0)
@@ -1378,7 +1454,7 @@ class MainWindowV21(QMainWindow):
             current = list_widget.currentItem()
             if current is None:
                 return
-            preset_name = current.data(Qt.UserRole)
+            preset_name = current.data(Qt.ItemDataRole.UserRole)
             try:
                 preset = self.layout_manager.get_preset(preset_name)
                 if preset is not None:
@@ -1445,14 +1521,15 @@ class MainWindowV21(QMainWindow):
         if hasattr(self, "auto_discovery"):
             self.auto_discovery.stop()
 
-        if getattr(self, "location_tracker", None) is not None:
+        location_tracker = getattr(self, "location_tracker", None)
+        if location_tracker is not None:
             try:
-                self.location_tracker.character_system_changed.disconnect(
+                location_tracker.character_system_changed.disconnect(
                     self._on_character_system_changed
                 )
             except (RuntimeError, TypeError):
                 pass
-            self.location_tracker.stop()
+            location_tracker.stop()
 
         if hasattr(self, "capture_system"):
             self.capture_system.stop()

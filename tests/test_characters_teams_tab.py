@@ -321,8 +321,8 @@ class TestCharacterTableMethods:
 
     def test_populate_table_with_characters(self):
         """Test populate_table with character list"""
-        from argus_overview.ui.characters_teams_tab import CharacterTable
         from argus_overview.core.character_manager import AUTO_CREATED_NOTE
+        from argus_overview.ui.characters_teams_tab import CharacterTable
 
         with patch.object(CharacterTable, "__init__", return_value=None):
             table = CharacterTable.__new__(CharacterTable)
@@ -362,8 +362,8 @@ class TestCharacterTableMethods:
 
     def test_populate_table_shows_needs_setup_for_auto_created_characters(self):
         """Test auto-created characters render a friendlier setup cue in Notes."""
-        from argus_overview.ui.characters_teams_tab import CharacterTable
         from argus_overview.core.character_manager import AUTO_CREATED_NOTE
+        from argus_overview.ui.characters_teams_tab import CharacterTable
 
         with patch.object(CharacterTable, "__init__", return_value=None):
             table = CharacterTable.__new__(CharacterTable)
@@ -391,7 +391,9 @@ class TestCharacterTableMethods:
                 created_items.append((text, item))
                 return item
 
-            with patch("argus_overview.ui.characters_teams_tab.QTableWidgetItem", side_effect=make_item):
+            with patch(
+                "argus_overview.ui.characters_teams_tab.QTableWidgetItem", side_effect=make_item
+            ):
                 table._do_populate_table()
 
             assert any(text == CharacterTable.NEEDS_SETUP_TEXT for text, _item in created_items)
@@ -1736,11 +1738,10 @@ class TestUISetupMethods:
             tab._create_left_panel = MagicMock(return_value=mock_left_panel)
             tab._create_right_panel = MagicMock(return_value=mock_right_panel)
 
-            with patch(
-                "argus_overview.ui.characters_teams_tab.QHBoxLayout"
-            ) as mock_layout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QSplitter"
-            ) as mock_splitter_cls:
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout") as mock_layout_cls,
+                patch("argus_overview.ui.characters_teams_tab.QSplitter") as mock_splitter_cls,
+            ):
                 mock_layout = MagicMock()
                 mock_layout_cls.return_value = mock_layout
 
@@ -1771,8 +1772,9 @@ class TestUISetupMethods:
             tab._create_right_panel = MagicMock(return_value=MagicMock())
             tab.setLayout = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"), patch(
-                "argus_overview.ui.characters_teams_tab.QSplitter"
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QSplitter"),
             ):
                 tab._setup_ui()
 
@@ -1791,15 +1793,13 @@ class TestUISetupMethods:
             tab._edit_character = MagicMock()
             tab._delete_character = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ) as mock_vlayout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.ToolbarBuilder"
-            ) as mock_builder_cls, patch(
-                "argus_overview.ui.characters_teams_tab.CharacterTable"
-            ) as mock_table_cls:
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls,
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout") as mock_vlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.ToolbarBuilder") as mock_builder_cls,
+                patch("argus_overview.ui.characters_teams_tab.CharacterTable") as mock_table_cls,
+            ):
                 mock_panel = MagicMock()
                 mock_widget_cls.return_value = mock_panel
 
@@ -1841,11 +1841,13 @@ class TestUISetupMethods:
             tab._delete_character = MagicMock()
             tab._scan_eve_folder = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget"), patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ), patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"), patch(
-                "argus_overview.ui.characters_teams_tab.ToolbarBuilder"
-            ) as mock_builder_cls, patch("argus_overview.ui.characters_teams_tab.CharacterTable"):
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget"),
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.ToolbarBuilder") as mock_builder_cls,
+                patch("argus_overview.ui.characters_teams_tab.CharacterTable"),
+            ):
                 mock_builder = MagicMock()
                 mock_builder.create_button.return_value = MagicMock()
                 mock_builder_cls.return_value = mock_builder
@@ -1868,13 +1870,13 @@ class TestUISetupMethods:
             tab._edit_character = MagicMock()
             tab._delete_character = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ), patch(
-                "argus_overview.ui.characters_teams_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.ToolbarBuilder"
-            ) as mock_builder_cls, patch("argus_overview.ui.characters_teams_tab.CharacterTable"):
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls,
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.ToolbarBuilder") as mock_builder_cls,
+                patch("argus_overview.ui.characters_teams_tab.CharacterTable"),
+            ):
                 mock_panel = MagicMock()
                 mock_widget_cls.return_value = mock_panel
 
@@ -1905,15 +1907,14 @@ class TestUISetupMethods:
             tab._on_team_modified = MagicMock()
             tab._refresh_teams = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ) as mock_vlayout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch("argus_overview.ui.characters_teams_tab.QLabel"), patch(
-                "argus_overview.ui.characters_teams_tab.QComboBox"
-            ) as mock_combo_cls, patch(
-                "argus_overview.ui.characters_teams_tab.TeamBuilder"
-            ) as mock_builder_cls:
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls,
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout") as mock_vlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.QLabel"),
+                patch("argus_overview.ui.characters_teams_tab.QComboBox") as mock_combo_cls,
+                patch("argus_overview.ui.characters_teams_tab.TeamBuilder") as mock_builder_cls,
+            ):
                 mock_panel = MagicMock()
                 mock_widget_cls.return_value = mock_panel
 
@@ -1956,13 +1957,14 @@ class TestUISetupMethods:
             tab._on_team_modified = MagicMock()
             tab._refresh_teams = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget"), patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ), patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"), patch(
-                "argus_overview.ui.characters_teams_tab.QLabel"
-            ), patch("argus_overview.ui.characters_teams_tab.QComboBox"), patch(
-                "argus_overview.ui.characters_teams_tab.TeamBuilder"
-            ) as mock_builder_cls:
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget"),
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QLabel"),
+                patch("argus_overview.ui.characters_teams_tab.QComboBox"),
+                patch("argus_overview.ui.characters_teams_tab.TeamBuilder") as mock_builder_cls,
+            ):
                 mock_team_builder = MagicMock()
                 mock_builder_cls.return_value = mock_team_builder
 

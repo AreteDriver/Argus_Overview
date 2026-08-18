@@ -749,8 +749,7 @@ class CharactersTeamsTab(QWidget):
             preview = f"{preview}, +{count - 3} more"
 
         self.setup_summary_label.setText(
-            "Review imported characters: "
-            f"{preview}. Edit account, role, or notes to finish setup."
+            f"Review imported characters: {preview}. Edit account, role, or notes to finish setup."
         )
         self.setup_summary_label.show()
 

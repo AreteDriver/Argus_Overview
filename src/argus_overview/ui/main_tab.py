@@ -11,7 +11,9 @@ import logging
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 from PIL import Image
 from PySide6.QtCore import (
@@ -754,7 +756,7 @@ class WindowPreviewWidget(QWidget):
 
         self._replay_buffer: deque = deque(maxlen=REPLAY_BUFFER_SIZE)
         self._replay_last_sample_ms: int = 0
-        self._replay_strip = None  # type: ignore[var-annotated]
+        self._replay_strip: ReplayStrip | None = None
         self._replay_view_index: int | None = None  # None = live; int = buffered
 
         from argus_overview.ui.design_system import metrics as dm
@@ -1322,16 +1324,21 @@ class WindowPreviewWidget(QWidget):
         height and the flow grid never shifts when the strip is toggled.
         """
         if enabled and self._replay_strip is None:
-            self._replay_strip = ReplayStrip(parent=self._replay_container)
-            self._replay_strip.frame_hovered.connect(self._on_replay_frame_hovered)
-            self._replay_container.layout().addWidget(self._replay_strip)
-            self._replay_strip.set_frames(list(self._replay_buffer))
+            replay_strip = ReplayStrip(parent=self._replay_container)
+            replay_strip.frame_hovered.connect(self._on_replay_frame_hovered)
+            container_layout = self._replay_container.layout()
+            if container_layout is not None:
+                container_layout.addWidget(replay_strip)
+            replay_strip.set_frames(list(self._replay_buffer))
+            self._replay_strip = replay_strip
         elif not enabled and self._replay_strip is not None:
             try:
                 self._replay_strip.frame_hovered.disconnect(self._on_replay_frame_hovered)
             except (RuntimeError, TypeError):
                 pass
-            self._replay_container.layout().removeWidget(self._replay_strip)
+            container_layout = self._replay_container.layout()
+            if container_layout is not None:
+                container_layout.removeWidget(self._replay_strip)
             self._replay_strip.deleteLater()
             self._replay_strip = None
             # Drop any held buffered view.
@@ -1449,7 +1456,12 @@ class WindowPreviewWidget(QWidget):
             and self._threat_alpha > 0.0
             and self._flash_color is None
         ):
-            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            age_threat_level = self._threat_level
+            r, g, b = (
+                THREAT_BORDER_COLORS.get(age_threat_level, (255, 255, 255))
+                if age_threat_level is not None
+                else (255, 255, 255)
+            )
             base_alpha = int(220 * self._threat_alpha)
             pulse_boost = int(35 * self._pulse_phase)
             alpha = max(0, min(255, base_alpha + pulse_boost))
@@ -1586,7 +1598,12 @@ class WindowPreviewWidget(QWidget):
             and not health.startswith("STALE")
             and health not in ("ERROR", "DISCONNECTED")
         ):
-            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            threat_level = self._threat_level
+            r, g, b = (
+                THREAT_BORDER_COLORS.get(threat_level, (255, 255, 255))
+                if threat_level is not None
+                else (255, 255, 255)
+            )
             pill_parts = [self._threat_system]
             if self._threat_distance and self._threat_distance > 0:
                 pill_parts.append(f"+{self._threat_distance}j")
@@ -1609,7 +1626,12 @@ class WindowPreviewWidget(QWidget):
         if self._threat_alpha < 0.9 and self._threat_set_at > 0.0:
             age_secs = int(time.monotonic() - self._threat_set_at)
             age_text = f"{age_secs}s ago"
-            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            age_threat_level = self._threat_level
+            r, g, b = (
+                THREAT_BORDER_COLORS.get(age_threat_level, (255, 255, 255))
+                if age_threat_level is not None
+                else (255, 255, 255)
+            )
             alpha = max(0, min(255, int(220 * self._threat_alpha)))
             pill_rect = draw_pill(
                 painter,
@@ -1759,7 +1781,7 @@ class WindowPreviewWidget(QWidget):
         # Handler map for context actions. toggle_replay_strip was added
         # to the registry as a tier-3 WINDOW_CONTEXT action; it joins the
         # other handlers here.
-        handlers = {
+        handlers: dict[str, Callable] = {
             "focus_window": lambda: self.window_activated.emit(self.window_id),
             "minimize_window": self._minimize_window,
             "close_window": self._close_window,
@@ -2383,8 +2405,9 @@ class MainTab(QWidget):
         if panel is None:
             return
 
+        recent_summary = getattr(self, "_recent_import_summary", None)
         count = self.window_manager.get_active_window_count()
-        panel.setVisible(count == 0 or bool(self._recent_import_summary))
+        panel.setVisible(count == 0 or bool(recent_summary))
 
         hint = getattr(self, "empty_state_hint", None)
         if hint is not None:
@@ -2392,17 +2415,17 @@ class MainTab(QWidget):
 
         summary = getattr(self, "empty_state_summary", None)
         if summary is not None:
-            summary.setVisible(bool(self._recent_import_summary))
-            if self._recent_import_summary:
-                summary.setText(self._recent_import_summary)
+            summary.setVisible(bool(recent_summary))
+            if recent_summary:
+                summary.setText(recent_summary)
 
         roster_btn = getattr(self, "empty_state_roster_btn", None)
         if roster_btn is not None:
-            roster_btn.setVisible(bool(self._recent_import_summary))
+            roster_btn.setVisible(bool(recent_summary))
 
         cycle_btn = getattr(self, "empty_state_cycle_btn", None)
         if cycle_btn is not None:
-            cycle_btn.setVisible(bool(self._recent_import_summary))
+            cycle_btn.setVisible(bool(recent_summary))
 
     def _show_import_completion_summary(self, added: int, skipped: int, detected: int):
         """Temporarily turn the onboarding card into a post-import next-steps card."""
@@ -2410,7 +2433,9 @@ class MainTab(QWidget):
             f"Import complete: {added} added, {skipped} skipped, {detected} detected."
         )
         self._update_empty_state_visibility()
-        self._import_summary_timer.start(12000)
+        timer = getattr(self, "_import_summary_timer", None)
+        if timer is not None:
+            timer.start(12000)
 
     def _clear_import_completion_summary(self):
         """Clear temporary post-import guidance from the onboarding card."""
@@ -2443,7 +2468,7 @@ class MainTab(QWidget):
 
         # Build toolbar buttons from ActionRegistry
         toolbar_builder = ToolbarBuilder()
-        handlers = {
+        handlers: dict[str, Callable[..., Any]] = {
             "import_windows": self.one_click_import,
             "remove_all_windows": self._remove_all_windows,
             "lock_positions": self._toggle_lock,
@@ -2857,7 +2882,7 @@ class MainTab(QWidget):
                         "No EVE Windows Found",
                         "No EVE Online windows were detected.\n\n"
                         "Make sure EVE Online clients are running and visible.",
-                )
+                    )
                 return 0, 0, 0
 
             self._set_empty_state_busy(
@@ -2890,12 +2915,6 @@ class MainTab(QWidget):
                     added=added_count,
                     skipped=skipped_count,
                 )
-                frame.focus_requested.connect(
-                    self._on_focus_requested, Qt.ConnectionType.UniqueConnection
-                )
-                frame.retry_requested.connect(
-                    self._on_retry_requested, Qt.ConnectionType.UniqueConnection
-                )
 
             # Show result
             if added_count > 0:
@@ -2913,8 +2932,11 @@ class MainTab(QWidget):
             else:
                 self._set_status_message("No new EVE windows found")
 
-        self._update_status()
-        self._sync_status_dock()
+            return added_count, skipped_count, len(eve_windows)
+        finally:
+            self._set_empty_state_busy(False)
+            self._update_status()
+            self._sync_status_dock()
 
     def _toggle_lock(self):
         """Toggle thumbnail position lock"""
@@ -3124,6 +3146,14 @@ class MainTab(QWidget):
             self._on_window_removed,
             Qt.ConnectionType.UniqueConnection,
         )
+        frame.focus_requested.connect(
+            self._on_focus_requested,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        frame.retry_requested.connect(
+            self._on_retry_requested,
+            Qt.ConnectionType.UniqueConnection,
+        )
         self.preview_layout.addWidget(frame)
 
         if emit_character_detected:
@@ -3146,22 +3176,7 @@ class MainTab(QWidget):
                     char_name = detected_name
                     break
 
-        # Add to window manager
-        frame = self.window_manager.add_window(window_id, char_name)
-        if frame:
-            frame.window_activated.connect(
-                self._on_window_activated, Qt.ConnectionType.UniqueConnection
-            )
-            frame.window_removed.connect(
-                self._on_window_removed, Qt.ConnectionType.UniqueConnection
-            )
-            frame.focus_requested.connect(
-                self._on_focus_requested, Qt.ConnectionType.UniqueConnection
-            )
-            frame.retry_requested.connect(
-                self._on_retry_requested, Qt.ConnectionType.UniqueConnection
-            )
-            self.preview_layout.addWidget(frame)
+        if self.import_detected_window(window_id, char_name):
             self._sync_status_dock()
             return True
         return False

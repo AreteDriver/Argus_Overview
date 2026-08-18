@@ -74,7 +74,7 @@ jobs:
           pip install "mypy==${MYPY_VERSION}" types-requests types-cachetools
 
       - name: Run mypy
-        run: mypy . --ignore-missing-imports --no-error-summary --exclude 'src/argus_overview/platform/windows.py'
+        run: mypy src/argus_overview --ignore-missing-imports --no-error-summary
 
   test:
     name: Test (Python ${{ matrix.python-version }})

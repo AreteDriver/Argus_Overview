@@ -487,7 +487,9 @@ class TestGridApplier:
 
         expected = ScreenGeometry(0, 0, 1920, 1080, True)
 
-        with patch("argus_overview.ui.main_tab.get_screen_geometry", return_value=expected) as mock_get:
+        with patch(
+            "argus_overview.ui.main_tab.get_screen_geometry", return_value=expected
+        ) as mock_get:
             result = applier.get_screen_geometry(0)
 
         assert result == expected
@@ -1881,6 +1883,8 @@ class TestMainTabOneClickImport:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
+            tab._update_status = MagicMock()
+            tab._sync_status_dock = MagicMock()
 
             with patch("argus_overview.ui.main_tab.scan_eve_windows", return_value=[]):
                 with patch("PySide6.QtWidgets.QMessageBox.information") as mock_msg:
@@ -2456,7 +2460,7 @@ class TestWindowPreviewWidgetActions:
                 mock_msgbox.StandardButton.No = 0
                 mock_msgbox.question.return_value = 1  # Yes
 
-                with patch("subprocess.run") as mock_run:
+                with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
                     mock_run.return_value = MagicMock(returncode=0)
 
                     widget._close_window()
@@ -4673,6 +4677,8 @@ class TestMainTabOneClickImport:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
+            tab._update_status = MagicMock()
+            tab._sync_status_dock = MagicMock()
 
             with patch("argus_overview.ui.main_tab.scan_eve_windows", return_value=[]):
                 with patch("argus_overview.ui.main_tab.QMessageBox") as mock_msgbox:
@@ -7629,6 +7635,8 @@ class TestImportDetectedWindow:
 
             assert result is True
             tab.window_manager.add_window.assert_called_once_with("0x123", "DetectedPilot")
+            mock_frame.focus_requested.connect.assert_called_once()
+            mock_frame.retry_requested.connect.assert_called_once()
             tab.preview_layout.addWidget.assert_called_once_with(mock_frame)
             tab.character_detected.emit.assert_called_once_with("0x123", "DetectedPilot")
 
@@ -7673,6 +7681,7 @@ class TestAddWindowToPreview:
             mock_frame = MagicMock()
             tab.window_manager.add_window.return_value = mock_frame
             tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
 
             result = tab._add_window_to_preview("0x123", "EVE - TestChar")
 
@@ -7693,6 +7702,7 @@ class TestAddWindowToPreview:
             mock_frame = MagicMock()
             tab.window_manager.add_window.return_value = mock_frame
             tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
 
             tab._add_window_to_preview("0x123", "EVE - My Character")
 
@@ -7711,6 +7721,7 @@ class TestAddWindowToPreview:
             mock_frame = MagicMock()
             tab.window_manager.add_window.return_value = mock_frame
             tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
 
             tab._add_window_to_preview("0x123", "EVE Online - Another Char")
 
@@ -7729,6 +7740,7 @@ class TestAddWindowToPreview:
             mock_frame = MagicMock()
             tab.window_manager.add_window.return_value = mock_frame
             tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
 
             tab._add_window_to_preview("0x123", "EVE -")
 
@@ -7822,10 +7834,11 @@ class TestCreateStatusBar:
             mock_layout = MagicMock()
             mock_label = MagicMock()
 
-            with patch("argus_overview.ui.main_tab.QTimer", return_value=mock_timer), patch(
-                "argus_overview.ui.main_tab.QWidget", return_value=mock_widget
-            ), patch("argus_overview.ui.main_tab.QHBoxLayout", return_value=mock_layout), patch(
-                "argus_overview.ui.main_tab.QLabel", return_value=mock_label
+            with (
+                patch("argus_overview.ui.main_tab.QTimer", return_value=mock_timer),
+                patch("argus_overview.ui.main_tab.QWidget", return_value=mock_widget),
+                patch("argus_overview.ui.main_tab.QHBoxLayout", return_value=mock_layout),
+                patch("argus_overview.ui.main_tab.QLabel", return_value=mock_label),
             ):
                 result = tab._create_status_bar()
 
@@ -7844,10 +7857,11 @@ class TestCreateStatusBar:
 
             mock_timer = MagicMock()
 
-            with patch("argus_overview.ui.main_tab.QTimer", return_value=mock_timer), patch(
-                "argus_overview.ui.main_tab.QWidget"
-            ), patch("argus_overview.ui.main_tab.QHBoxLayout"), patch(
-                "argus_overview.ui.main_tab.QLabel"
+            with (
+                patch("argus_overview.ui.main_tab.QTimer", return_value=mock_timer),
+                patch("argus_overview.ui.main_tab.QWidget"),
+                patch("argus_overview.ui.main_tab.QHBoxLayout"),
+                patch("argus_overview.ui.main_tab.QLabel"),
             ):
                 tab._create_status_bar()
 
@@ -8258,10 +8272,13 @@ class TestMinimizeInactiveXdotoolFails:
             tab.status_label = MagicMock()
             tab._update_minimize_button_style = MagicMock()
 
-            # Mock subprocess.run to fail
+            # Mock the platform abstraction to report xdotool failure.
             mock_result = MagicMock()
             mock_result.returncode = 1  # Non-zero = failure
-            with patch("subprocess.run", return_value=mock_result):
+            with patch(
+                "argus_overview.utils.window_utils.run_x11_subprocess",
+                return_value=mock_result,
+            ):
                 tab.minimize_inactive_windows()
 
                 # Should set status to "Auto-minimize ON" without count
@@ -9055,7 +9072,8 @@ class TestMainTabInitNoSkip:
             assert tab._windows_minimized is False
 
             # Timer configured
-            mock_timer.setSingleShot.assert_called_once_with(True)
+            assert mock_timer.setSingleShot.call_count == 3
+            assert all(call.args == (True,) for call in mock_timer.setSingleShot.call_args_list)
             mock_timer.setInterval.assert_called_once_with(150)
 
             # Window manager created and capture loop started
@@ -9198,7 +9216,7 @@ class TestOnWindowActivatedException:
             tab.logger.error.assert_not_called()
 
     def test_on_window_activated_catches_value_error(self):
-        """Forwarding path no longer validates window IDs in MainTab."""
+        """Forwarding path emits focus intent without local validation."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
@@ -9208,7 +9226,8 @@ class TestOnWindowActivatedException:
 
             tab._on_window_activated("0x123")
 
-            tab.logger.error.assert_called_once()
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
+            tab.logger.error.assert_not_called()
 
 
 # =============================================================================

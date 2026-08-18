@@ -327,7 +327,7 @@ class CommandCenterHeader(QWidget):
             finally:
                 p.end()
 
-        self.paintEvent = paintEvent
+        self.paintEvent = paintEvent  # type: ignore[method-assign]
 
     def update_state(
         self, fleet_count: int, alert_count: int = 0, intel_health: str = "live"

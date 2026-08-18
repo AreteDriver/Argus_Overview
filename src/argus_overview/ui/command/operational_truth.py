@@ -167,7 +167,7 @@ class OperationalTruthBar(QWidget):
             finally:
                 pp.end()
 
-        self.paintEvent = _paint
+        self.paintEvent = _paint  # type: ignore[method-assign]
 
     # ---- properties --------------------------------------------------------
     def _get_pulse(self) -> float:

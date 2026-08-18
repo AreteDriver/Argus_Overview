@@ -334,11 +334,15 @@ class FleetCard(QFrame):
             event.accept()
             return
         if event.key() == Qt.Key.Key_Right:
-            self.parentWidget().focusNextChild()
+            parent = self.parentWidget()
+            if parent is not None:
+                parent.focusNextChild()
             event.accept()
             return
         if event.key() == Qt.Key.Key_Left:
-            self.parentWidget().focusPreviousChild()
+            parent = self.parentWidget()
+            if parent is not None:
+                parent.focusPreviousChild()
             event.accept()
             return
         super().keyPressEvent(event)

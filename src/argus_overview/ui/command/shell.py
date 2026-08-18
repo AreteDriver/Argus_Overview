@@ -138,7 +138,9 @@ class CommandCenterWidget(QWidget):
     def truth(self) -> OperationalTruthBar:
         return self._truth
 
-    def palette(self, entries: list[PaletteEntry] | None = None) -> CommandPalette:
+    def palette(  # type: ignore[override]
+        self, entries: list[PaletteEntry] | None = None
+    ) -> CommandPalette:
         pal = CommandPalette(self.window())
         if entries is not None:
             pal.set_entries(entries)
