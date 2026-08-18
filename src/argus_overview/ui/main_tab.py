@@ -2277,6 +2277,8 @@ class MainTab(QWidget):
         self.preview_container = QWidget()
         self.preview_layout = FlowLayout(margin=15, spacing=15)  # Grid-style flow layout
         self.preview_container.setLayout(self.preview_layout)
+        self.empty_state_panel = self._create_empty_state_panel()
+        self.preview_layout.addWidget(self.empty_state_panel)
 
         scroll.setWidget(self.preview_container)
         layout.addWidget(scroll)
@@ -2860,9 +2862,18 @@ class MainTab(QWidget):
             )
         return "No windows in preview"
 
-    def one_click_import(self, show_dialogs: bool = True) -> tuple[int, int, int]:
+    def one_click_import(
+        self,
+        _checked: bool = False,
+        *,
+        show_dialogs: bool = True,
+    ) -> tuple[int, int, int]:
         """
         v2.2 One-Click Import: Scan and import all EVE windows automatically
+
+        ``_checked`` absorbs the boolean emitted by ``QPushButton.clicked`` so
+        user-triggered imports retain the default dialog behavior. Startup
+        automation controls dialogs explicitly through the keyword-only flag.
         """
         self.logger.info("Starting one-click import...")
         self._set_empty_state_busy(True)

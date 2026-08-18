@@ -1,3 +1,3 @@
-"""Argus Overview v3.2 - Intel-Aware Edition"""
+"""Argus Overview v3.3 release candidate."""
 
-__version__ = "3.2.0"
+__version__ = "3.3.0"

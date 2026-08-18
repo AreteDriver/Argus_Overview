@@ -2,15 +2,16 @@
 
 **Project**: Argus Overview — EVE Online desktop multi-boxing / window-preview tool  
 **Classification**: Flagship  
-**Version**: 3.2.0  
-**Last updated**: 2026-07-26  
+**Version**: 3.3.0 (release candidate)
+**Last updated**: 2026-08-18
 **Next review**: 2026-08-26  
 
 ---
 
 ## Current State
 
-- Shipping v3.2.0 with 2,495 tests, 96%+ coverage
+- Actively maintaining v3.2.0 while preparing the v3.3.0 release candidate
+- 2,580+ tests with 96%+ coverage
 - Mature PySide6 codebase with Windows, Linux (X11/Wayland) support
 - Full `intel/` subsystem for chat-log parsing and threat detection
 - v6 aspirational artifacts **archived** (no longer misleading)
@@ -63,7 +64,8 @@
 
 ## Blockers
 
-- None. Docs-only work.
+- Release automation is green; final confidence depends on manual validation
+  with real EVE clients on Linux/Wayland and Windows.
 
 ## Definition of Done (Phase 1) — ✅ COMPLETE
 

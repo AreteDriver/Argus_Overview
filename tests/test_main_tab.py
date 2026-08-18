@@ -4686,6 +4686,22 @@ class TestMainTabOneClickImport:
 
                     mock_msgbox.information.assert_called_once()
 
+    def test_button_checked_argument_does_not_disable_dialogs(self):
+        """Qt's clicked(bool) payload must not override show_dialogs."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab._update_status = MagicMock()
+            tab._sync_status_dock = MagicMock()
+
+            with patch("argus_overview.ui.main_tab.scan_eve_windows", return_value=[]):
+                with patch("argus_overview.ui.main_tab.QMessageBox") as mock_msgbox:
+                    tab.one_click_import(False)
+
+                    mock_msgbox.information.assert_called_once()
+
     def test_one_click_import_with_windows(self):
         """Test one_click_import with EVE windows found"""
         from argus_overview.ui.main_tab import MainTab
@@ -8673,6 +8689,10 @@ class TestMainTabSetupUi:
 
                                 # Preview container and layout stored
                                 assert tab.preview_container is mock_container
+                                tab._create_empty_state_panel.assert_called_once()
+                                mock_flow_layout.addWidget.assert_called_once_with(
+                                    tab.empty_state_panel
+                                )
                                 assert tab.preview_layout is mock_flow_layout
 
                                 # 5 widgets added to layout (PR2 added status dock)
