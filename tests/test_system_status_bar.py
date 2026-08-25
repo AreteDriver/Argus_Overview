@@ -90,9 +90,10 @@ class TestSystemStatusBarPaint:
         bar = SystemStatusBar()
         indicator = bar._indicators["capture"]
 
-        with patch.object(QPainter, "drawText") as mock_draw_text, patch.object(
-            QPainter, "drawEllipse"
-        ) as mock_draw_ellipse:
+        with (
+            patch.object(QPainter, "drawText") as mock_draw_text,
+            patch.object(QPainter, "drawEllipse") as mock_draw_ellipse,
+        ):
             # Fake a paint event
             event = QPaintEvent(indicator.rect())
             indicator.paintEvent(event)

@@ -13,8 +13,9 @@ reachable in two keystrokes from anywhere in Argus.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import cast
 
 from PySide6.QtCore import (
     QEasingCurve,
@@ -54,7 +55,7 @@ class PaletteEntry:
     subtitle: str = ""
     category: str = "action"  # pilot | layout | theme | system | action
     keywords: tuple[str, ...] = field(default_factory=tuple)
-    handler: Callable[[], None] | None = None
+    handler: Callable[[], object] | None = None
     enabled: bool = True
 
 
@@ -351,8 +352,9 @@ class CommandPalette(QDialog):
 
     def eventFilter(self, obj, event: QEvent) -> bool:
         if obj is self._input and event.type() == QEvent.Type.KeyPress:
-            if event.key() in (Qt.Key.Key_Down, Qt.Key.Key_Up):
+            key_event = cast(QKeyEvent, event)
+            if key_event.key() in (Qt.Key.Key_Down, Qt.Key.Key_Up):
                 self._list.setFocus()
-                self._list.keyPressEvent(event)
+                self._list.keyPressEvent(key_event)
                 return True
         return super().eventFilter(obj, event)

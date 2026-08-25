@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 # Check for Win32 availability
 try:
-    from ctypes import windll
+    from ctypes import windll  # type: ignore[attr-defined]
 
     import pywintypes
     import win32api
@@ -366,7 +366,7 @@ class WindowCaptureWindows(WindowCapture):
                 if scale < 1.0:
                     new_width = int(width * scale)
                     new_height = int(height * scale)
-                    image = image.resize((new_width, new_height), Image.LANCZOS)
+                    image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
                 return image
 

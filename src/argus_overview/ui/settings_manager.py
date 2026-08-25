@@ -23,6 +23,8 @@ class SettingsManager:
             "start_with_system": False,
             "minimize_to_tray": True,
             "show_notifications": True,
+            "auto_import_on_startup": True,
+            "show_setup_guidance": True,
             "auto_save_interval": 5,  # minutes
             "auto_discovery": True,
             "auto_discovery_interval": 5,  # seconds

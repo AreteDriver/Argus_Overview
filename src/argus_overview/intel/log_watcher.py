@@ -224,7 +224,7 @@ class ChatLogWatcher(QObject):
         Returns:
             List of new ChatMessages
         """
-        messages = []
+        messages: list[ChatMessage] = []
 
         if not filepath.exists():
             return messages

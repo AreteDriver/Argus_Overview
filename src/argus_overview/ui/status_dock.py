@@ -291,11 +291,15 @@ class CharacterChip(QFrame):
             event.accept()
             return
         if event.key() == Qt.Key.Key_Right:
-            self.parentWidget().focusNextChild()
+            parent = self.parentWidget()
+            if parent is not None:
+                parent.focusNextChild()
             event.accept()
             return
         if event.key() == Qt.Key.Key_Left:
-            self.parentWidget().focusPreviousChild()
+            parent = self.parentWidget()
+            if parent is not None:
+                parent.focusPreviousChild()
             event.accept()
             return
         super().keyPressEvent(event)
@@ -501,6 +505,7 @@ class StatusDock(QWidget):
                     chip.set_threat_state(level, system)
                     count += 1
                     continue
+                assert system is not None
                 chip_system = getattr(chip, "_system", None)
                 should_apply, alpha = resolve_tint(
                     known_system=chip_system,

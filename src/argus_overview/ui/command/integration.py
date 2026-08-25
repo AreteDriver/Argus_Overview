@@ -179,6 +179,10 @@ class CommandIntegrator(QObject):
         )
         # Theme switching
         for theme in ("dark", "light", "eve", "high_contrast"):
+
+            def apply_theme(theme_name: str = theme) -> None:
+                self._apply_theme(theme_name)
+
             entries.append(
                 PaletteEntry(
                     id=f"theme::{theme}",
@@ -186,7 +190,7 @@ class CommandIntegrator(QObject):
                     subtitle="Switch Argus appearance theme",
                     category="theme",
                     keywords=("theme", "appearance", "color", theme),
-                    handler=lambda t=theme: self._apply_theme(t),
+                    handler=apply_theme,
                 )
             )
         self._palette.set_entries(entries)

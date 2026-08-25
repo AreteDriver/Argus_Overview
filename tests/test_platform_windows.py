@@ -844,11 +844,11 @@ class TestWindowCaptureWindows:
 
         with patch(f"{MODULE}.Image") as mock_image_mod:
             mock_image_mod.frombuffer.return_value = fake_img
-            mock_image_mod.LANCZOS = Image.LANCZOS
+            mock_image_mod.Resampling.LANCZOS = Image.Resampling.LANCZOS
             result = cap.capture_window_sync("0x1", scale=0.5)
 
         assert result is resized_img
-        fake_img.resize.assert_called_once_with((100, 50), Image.LANCZOS)
+        fake_img.resize.assert_called_once_with((100, 50), Image.Resampling.LANCZOS)
 
     def test_capture_sync_scale_1_no_resize(self, mock_win32):
         """Scale = 1.0 does not resize."""

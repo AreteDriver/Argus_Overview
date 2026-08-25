@@ -36,6 +36,15 @@ import sys
 from io import TextIOWrapper
 from pathlib import Path
 
+# Enforce runtime floor before importing PySide6/Qt.
+if sys.version_info < (3, 10):  # noqa: UP036
+    raise SystemExit(
+        "Argus Overview requires Python 3.10+.\n"
+        "Detected: "
+        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}\n"
+        "Please recreate your environment with Python 3.10+."
+    )
+
 # Platform-specific imports for single-instance locking
 if sys.platform == "win32":
     import msvcrt

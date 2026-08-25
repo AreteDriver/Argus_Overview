@@ -31,7 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from argus_overview.core.character_manager import Character, Team
+from argus_overview.core.character_manager import AUTO_CREATED_NOTE, Character, Team
 from argus_overview.ui.menu_builder import ToolbarBuilder
 
 
@@ -41,6 +41,7 @@ class CharacterTable(QTableWidget):
     character_selected = Signal(str)  # character name
 
     ROLES = ["DPS", "Miner", "Scout", "Logi", "Hauler", "Trader", "FC", "Booster"]
+    NEEDS_SETUP_TEXT = "Needs setup"
 
     def __init__(self, character_manager, parent=None):
         super().__init__(parent)
@@ -91,18 +92,26 @@ class CharacterTable(QTableWidget):
         self.setRowCount(len(characters))
 
         for row, char in enumerate(characters):
+            needs_setup = (char.notes or "").strip() == AUTO_CREATED_NOTE
+
             # Name
             name_item = QTableWidgetItem(char.name)
             if char.is_main:
                 name_item.setForeground(QColor(66, 135, 245))  # Blue for main
+            elif needs_setup:
+                name_item.setForeground(QColor(240, 195, 109))  # Amber for review-needed
             self.setItem(row, 0, name_item)
 
             # Account
             account_item = QTableWidgetItem(char.account or "")
+            if needs_setup:
+                account_item.setForeground(QColor(240, 195, 109))
             self.setItem(row, 1, account_item)
 
             # Role
             role_item = QTableWidgetItem(char.role)
+            if needs_setup:
+                role_item.setForeground(QColor(240, 195, 109))
             self.setItem(row, 2, role_item)
 
             # Status
@@ -120,7 +129,10 @@ class CharacterTable(QTableWidget):
             self.setItem(row, 4, window_item)
 
             # Notes
-            notes_item = QTableWidgetItem(char.notes or "")
+            notes_text = self.NEEDS_SETUP_TEXT if needs_setup else (char.notes or "")
+            notes_item = QTableWidgetItem(notes_text)
+            if needs_setup:
+                notes_item.setForeground(QColor(240, 195, 109))
             self.setItem(row, 5, notes_item)
 
         self.setSortingEnabled(True)
@@ -162,6 +174,27 @@ class CharacterTable(QTableWidget):
             if item.column() == 0:  # Name column
                 names.append(item.text())
         return names
+
+    def apply_filters(self, search_text: str = "", needs_setup_only: bool = False):
+        """Filter visible rows by text and/or setup-needed state."""
+        search = search_text.strip().lower()
+
+        for row in range(self.rowCount()):
+            name_item = self.item(row, 0)
+            account_item = self.item(row, 1)
+            role_item = self.item(row, 2)
+            notes_item = self.item(row, 5)
+
+            name = name_item.text() if name_item else ""
+            account = account_item.text() if account_item else ""
+            role = role_item.text() if role_item else ""
+            notes = notes_item.text() if notes_item else ""
+
+            haystack = " ".join([name, account, role, notes]).lower()
+            matches_search = not search or search in haystack
+            matches_setup = (not needs_setup_only) or notes == self.NEEDS_SETUP_TEXT
+
+            self.setRowHidden(row, not (matches_search and matches_setup))
 
     def _on_selection_changed(self):
         """Handle selection change"""
@@ -669,11 +702,74 @@ class CharactersTeamsTab(QWidget):
 
         layout.addLayout(toolbar_layout)
 
+        self.setup_summary_label = QLabel()
+        self.setup_summary_label.setWordWrap(True)
+        self.setup_summary_label.setStyleSheet(
+            "color: #f0c36d; background-color: rgba(255, 140, 0, 0.08); "
+            "border: 1px solid rgba(255, 140, 0, 0.25); border-radius: 8px; padding: 8px;"
+        )
+        layout.addWidget(self.setup_summary_label)
+
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(QLabel("Filter:"))
+
+        self.character_filter_edit = QLineEdit()
+        self.character_filter_edit.setPlaceholderText("Search characters, account, role, or notes")
+        self.character_filter_edit.setClearButtonEnabled(True)
+        filter_layout.addWidget(self.character_filter_edit)
+
+        self.needs_setup_only_check = QCheckBox("Needs setup only")
+        filter_layout.addWidget(self.needs_setup_only_check)
+        layout.addLayout(filter_layout)
+
         # Character table
         self.character_table = CharacterTable(self.character_manager)
         layout.addWidget(self.character_table)
+        self.character_filter_edit.textChanged.connect(self._apply_character_filters)
+        self.needs_setup_only_check.toggled.connect(self._apply_character_filters)
+        self._refresh_setup_summary()
+        self._apply_character_filters()
 
         return panel
+
+    def _refresh_setup_summary(self):
+        """Show a lightweight summary for auto-created characters needing review."""
+        if not hasattr(self, "setup_summary_label"):
+            return
+
+        pending = self.character_manager.get_characters_needing_setup()
+        count = len(pending)
+
+        if count == 0:
+            self.setup_summary_label.hide()
+            return
+
+        preview = ", ".join(char.name for char in pending[:3])
+        if count > 3:
+            preview = f"{preview}, +{count - 3} more"
+
+        self.setup_summary_label.setText(
+            f"Review imported characters: {preview}. Edit account, role, or notes to finish setup."
+        )
+        self.setup_summary_label.show()
+
+    def _apply_character_filters(self):
+        """Apply current roster filter controls to the character table."""
+        if not hasattr(self, "character_table"):
+            return
+
+        search_text = ""
+        if hasattr(self, "character_filter_edit"):
+            search_text = self.character_filter_edit.text()
+
+        needs_setup_only = False
+        if hasattr(self, "needs_setup_only_check"):
+            needs_setup_only = self.needs_setup_only_check.isChecked()
+
+        self.character_table.apply_filters(
+            search_text=search_text,
+            needs_setup_only=needs_setup_only,
+        )
 
     def _create_right_panel(self) -> QWidget:
         """Create right panel with team builder"""
@@ -735,6 +831,7 @@ class CharactersTeamsTab(QWidget):
             char = dialog.get_character()
             if self.character_manager.add_character(char):
                 self.character_table.populate_table()
+                self._refresh_setup_summary()
                 self.logger.info(f"Added character: {char.name}")
 
     def _edit_character(self):
@@ -760,6 +857,7 @@ class CharactersTeamsTab(QWidget):
                 notes=updated_char.notes,
             )
             self.character_table.populate_table()
+            self._refresh_setup_summary()
             self.logger.info(f"Updated character: {char_name}")
 
     def _delete_character(self):
@@ -783,6 +881,7 @@ class CharactersTeamsTab(QWidget):
         if reply == QMessageBox.StandardButton.Yes:
             if self.character_manager.remove_character(char_name):
                 self.character_table.populate_table()
+                self._refresh_setup_summary()
                 self.logger.info(f"Deleted character: {char_name}")
 
     def _scan_eve_folder(self):
@@ -817,6 +916,7 @@ class CharactersTeamsTab(QWidget):
 
             # Refresh table
             self.character_table.populate_table()
+            self._refresh_setup_summary()
 
             # Show results
             QMessageBox.information(
@@ -854,3 +954,4 @@ class CharactersTeamsTab(QWidget):
     def update_character_status(self, char_name: str, window_id: str | None):
         """Update character status (called from main window)"""
         self.character_table.update_character_status(char_name, window_id)
+        self._refresh_setup_summary()

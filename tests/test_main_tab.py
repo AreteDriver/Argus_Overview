@@ -480,34 +480,32 @@ class TestGridApplier:
         assert applier.logger is not None
 
     def test_get_screen_geometry_with_xrandr(self):
-        """Test get_screen_geometry parses xrandr output"""
-        from argus_overview.ui.main_tab import GridApplier
+        """Test get_screen_geometry delegates to the shared screen helper."""
+        from argus_overview.ui.main_tab import GridApplier, ScreenGeometry
 
         applier = GridApplier()
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(
-                stdout="DP-1 connected primary 1920x1080+0+0 (normal left inverted right x axis y axis) 527mm x 296mm",
-                returncode=0,
-            )
+        expected = ScreenGeometry(0, 0, 1920, 1080, True)
 
-            applier.get_screen_geometry(0)
+        with patch(
+            "argus_overview.ui.main_tab.get_screen_geometry", return_value=expected
+        ) as mock_get:
+            result = applier.get_screen_geometry(0)
 
-            # Returns None or ScreenGeometry based on parsing
-            # Just verify no exception
+        assert result == expected
+        mock_get.assert_called_once_with(0)
 
     def test_get_screen_geometry_no_display(self):
-        """Test get_screen_geometry with no connected display"""
+        """Test get_screen_geometry tolerates no detected display."""
         from argus_overview.ui.main_tab import GridApplier
 
         applier = GridApplier()
 
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="", returncode=0)
+        with patch("argus_overview.ui.main_tab.get_screen_geometry", return_value=None) as mock_get:
+            result = applier.get_screen_geometry(0)
 
-            applier.get_screen_geometry(0)
-
-            # Result depends on fallback logic, just verify no exception
+        assert result is None
+        mock_get.assert_called_once_with(0)
 
     def test_apply_arrangement_empty(self):
         """Test apply_arrangement with empty arrangement"""
@@ -1424,104 +1422,67 @@ class TestWindowPreviewWidgetAdditional:
 
 
 class TestMainTabAutoMinimize:
-    """Tests for MainTab auto-minimize functionality"""
+    """Tests for MainTab activation forwarding."""
 
     def test_on_window_activated_without_auto_minimize(self):
-        """Test _on_window_activated when auto_minimize is disabled"""
+        """Test _on_window_activated emits a focus request."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = False
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
-            tab.logger = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
-            with patch("subprocess.run") as mock_run:
-                tab._on_window_activated("0x123")
+            tab._on_window_activated("0x123")
 
-                # Should NOT minimize anything
-                mock_run.assert_not_called()
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
 
     def test_on_window_activated_with_auto_minimize(self):
-        """Test _on_window_activated when auto_minimize is enabled"""
+        """Test _on_window_activated no longer performs auto-minimize logic locally."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = True
-            tab.settings_manager.get_last_activated_window.return_value = "0x111"
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
-            tab.logger = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
-            with patch("subprocess.run") as mock_run:
-                mock_result = MagicMock()
-                mock_result.returncode = 0
-                mock_run.return_value = mock_result
-                tab._on_window_activated("0x123")
+            tab._on_window_activated("0x123")
 
-                # Should minimize previous window
-                mock_run.assert_called_once()
-                call_args = mock_run.call_args[0][0]
-                assert "xdotool" in call_args
-                assert "windowminimize" in call_args
-                assert "0x111" in call_args
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
 
     def test_on_window_activated_same_window(self):
-        """Test _on_window_activated with same window (no minimize)"""
+        """Test _on_window_activated emits even when the same window is requested."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = True
-            tab.settings_manager.get_last_activated_window.return_value = "0x123"
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
-            tab.logger = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
-            with patch("subprocess.run") as mock_run:
-                tab._on_window_activated("0x123")
+            tab._on_window_activated("0x123")
 
-                # Should NOT minimize same window
-                mock_run.assert_not_called()
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
 
     def test_on_window_activated_tracks_last_window(self):
-        """Test _on_window_activated updates last activated window"""
+        """Test _on_window_activated does not mutate settings directly anymore."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = False
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
-            tab.logger = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             tab._on_window_activated("0x456")
 
-            tab.settings_manager.set_last_activated_window.assert_called_with("0x456")
+            tab.window_focus_requested.emit.assert_called_once_with("0x456")
 
     def test_on_window_activated_no_previous(self):
-        """Test _on_window_activated with no previous window"""
+        """Test _on_window_activated only forwards the activation request."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = True
-            tab.settings_manager.get_last_activated_window.return_value = None
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
-            tab.logger = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
-            with patch("subprocess.run") as mock_run:
-                # Should not raise, should not minimize
-                tab._on_window_activated("0x123")
-                mock_run.assert_not_called()
+            tab._on_window_activated("0x123")
+
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
 
 
 # =============================================================================
@@ -1922,6 +1883,8 @@ class TestMainTabOneClickImport:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
+            tab._update_status = MagicMock()
+            tab._sync_status_dock = MagicMock()
 
             with patch("argus_overview.ui.main_tab.scan_eve_windows", return_value=[]):
                 with patch("PySide6.QtWidgets.QMessageBox.information") as mock_msg:
@@ -2497,7 +2460,7 @@ class TestWindowPreviewWidgetActions:
                 mock_msgbox.StandardButton.No = 0
                 mock_msgbox.question.return_value = 1  # Yes
 
-                with patch("subprocess.run") as mock_run:
+                with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_run:
                     mock_run.return_value = MagicMock(returncode=0)
 
                     widget._close_window()
@@ -4068,20 +4031,17 @@ class TestMainTabWindowMethods:
             tab.lock_btn.setText.assert_called_with("Lock")
 
     def test_on_window_activated(self):
-        """Test _on_window_activated sets last activated window"""
+        """Test _on_window_activated forwards focus requests."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = False  # auto_minimize off
-            tab.capture_system = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             tab._on_window_activated("12345")
 
-            # Should set the last activated window on settings_manager
-            tab.settings_manager.set_last_activated_window.assert_called_with("12345")
+            tab.window_focus_requested.emit.assert_called_once_with("12345")
 
     def test_on_window_removed(self):
         """Test _on_window_removed removes frame"""
@@ -4717,10 +4677,28 @@ class TestMainTabOneClickImport:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
+            tab._update_status = MagicMock()
+            tab._sync_status_dock = MagicMock()
 
             with patch("argus_overview.ui.main_tab.scan_eve_windows", return_value=[]):
                 with patch("argus_overview.ui.main_tab.QMessageBox") as mock_msgbox:
                     tab.one_click_import()
+
+                    mock_msgbox.information.assert_called_once()
+
+    def test_button_checked_argument_does_not_disable_dialogs(self):
+        """Qt's clicked(bool) payload must not override show_dialogs."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab._update_status = MagicMock()
+            tab._sync_status_dock = MagicMock()
+
+            with patch("argus_overview.ui.main_tab.scan_eve_windows", return_value=[]):
+                with patch("argus_overview.ui.main_tab.QMessageBox") as mock_msgbox:
+                    tab.one_click_import(False)
 
                     mock_msgbox.information.assert_called_once()
 
@@ -4838,6 +4816,13 @@ class TestMainTabUpdateStatus:
             tab.window_manager.get_active_window_count.return_value = 0
             tab.active_count_label = MagicMock()
             tab.status_label = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.side_effect = lambda key, default=None: {
+                "general.show_setup_guidance": True,
+                "general.auto_discovery": True,
+            }.get(key, default)
+            tab._status_override_text = None
+            tab._get_empty_state_message = lambda: MainTab._get_empty_state_message(tab)
 
             tab.preset_combo = MagicMock()
             tab.remove_all_btn = MagicMock()
@@ -7161,10 +7146,9 @@ class TestMainTabKeyPressEvent:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
             tab.status_label = MagicMock()
             tab.window_manager = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             # Mock preview frames
             frame1 = MagicMock()
@@ -7176,8 +7160,7 @@ class TestMainTabKeyPressEvent:
 
             tab.keyPressEvent(event)
 
-            # Window should be activated
-            tab.capture_system.activate_window.assert_called_once_with("win1")
+            tab.window_focus_requested.emit.assert_called_once_with("win1")
 
     def test_number_key_2_activates_second_window(self):
         """Test pressing number key 2 activates second window"""
@@ -7189,10 +7172,9 @@ class TestMainTabKeyPressEvent:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
             tab.status_label = MagicMock()
             tab.window_manager = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             frame1 = MagicMock()
             frame1.character_name = "FirstCharacter"
@@ -7204,7 +7186,7 @@ class TestMainTabKeyPressEvent:
 
             tab.keyPressEvent(event)
 
-            tab.capture_system.activate_window.assert_called_once_with("win2")
+            tab.window_focus_requested.emit.assert_called_once_with("win2")
 
     def test_number_key_out_of_range_does_nothing(self):
         """Test pressing number key higher than window count does nothing"""
@@ -7216,8 +7198,8 @@ class TestMainTabKeyPressEvent:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
             tab.window_manager = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             frame1 = MagicMock()
             frame1.character_name = "OnlyCharacter"
@@ -7229,7 +7211,7 @@ class TestMainTabKeyPressEvent:
             tab.keyPressEvent(event)
 
             # Should not call activate
-            tab.capture_system.activate_window.assert_not_called()
+            tab.window_focus_requested.emit.assert_not_called()
 
     def test_non_number_key_does_not_activate(self):
         """Test non-number keys do not activate any windows"""
@@ -7238,8 +7220,8 @@ class TestMainTabKeyPressEvent:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
             tab.window_manager = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             frame1 = MagicMock()
             frame1.character_name = "Character"
@@ -7247,7 +7229,7 @@ class TestMainTabKeyPressEvent:
 
             # Key 'A' (not a number) should not activate any window
             # We test by checking activate_window is never called
-            tab.capture_system.activate_window.assert_not_called()
+            tab.window_focus_requested.emit.assert_not_called()
 
 
 class TestMainTabActivateWindowByIndex:
@@ -7260,10 +7242,9 @@ class TestMainTabActivateWindowByIndex:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
             tab.status_label = MagicMock()
             tab.window_manager = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             frame = MagicMock()
             frame.character_name = "TestCharacter"
@@ -7271,10 +7252,9 @@ class TestMainTabActivateWindowByIndex:
 
             tab._activate_window_by_index(0)
 
-            tab.capture_system.activate_window.assert_called_once_with("win123")
-            # Status should be updated
+            tab.window_focus_requested.emit.assert_called_once_with("win123")
             tab.status_label.setText.assert_called()
-            assert "TestCharacter" in tab.status_label.setText.call_args[0][0]
+            assert "Activating: TestCharacter" == tab.status_label.setText.call_args[0][0]
 
     def test_activate_invalid_index(self):
         """Test activating window at invalid index does nothing"""
@@ -7283,24 +7263,24 @@ class TestMainTabActivateWindowByIndex:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
             tab.window_manager = MagicMock()
             tab.window_manager.preview_frames = {}
+            tab.window_focus_requested = MagicMock()
 
             tab._activate_window_by_index(5)
 
-            tab.capture_system.activate_window.assert_not_called()
+            tab.window_focus_requested.emit.assert_not_called()
 
     def test_activate_failed_logs_warning(self):
-        """Test failed activation logs warning"""
+        """Test valid index no longer depends on direct activation success."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = False
             tab.window_manager = MagicMock()
+            tab.window_focus_requested = MagicMock()
+            tab.status_label = MagicMock()
 
             frame = MagicMock()
             frame.character_name = "TestCharacter"
@@ -7308,7 +7288,7 @@ class TestMainTabActivateWindowByIndex:
 
             tab._activate_window_by_index(0)
 
-            tab.logger.warning.assert_called()
+            tab.window_focus_requested.emit.assert_called_once_with("win123")
 
     def test_activate_multiple_windows(self):
         """Test activating different windows by index"""
@@ -7317,10 +7297,9 @@ class TestMainTabActivateWindowByIndex:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
             tab.status_label = MagicMock()
             tab.window_manager = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             frame1 = MagicMock()
             frame1.character_name = "First"
@@ -7338,7 +7317,7 @@ class TestMainTabActivateWindowByIndex:
             # Activate third window (index 2)
             tab._activate_window_by_index(2)
 
-            tab.capture_system.activate_window.assert_called_once_with("win3")
+            tab.window_focus_requested.emit.assert_called_once_with("win3")
 
     def test_activate_index_9_works(self):
         """Test activating window at index 8 (key 9) works"""
@@ -7347,10 +7326,9 @@ class TestMainTabActivateWindowByIndex:
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
             tab.status_label = MagicMock()
             tab.window_manager = MagicMock()
+            tab.window_focus_requested = MagicMock()
 
             # Create 9 windows
             frames = {}
@@ -7363,7 +7341,7 @@ class TestMainTabActivateWindowByIndex:
             # Activate 9th window (index 8)
             tab._activate_window_by_index(8)
 
-            tab.capture_system.activate_window.assert_called_once_with("win8")
+            tab.window_focus_requested.emit.assert_called_once_with("win8")
 
 
 # =============================================================================
@@ -7649,6 +7627,55 @@ class TestGetAvailableWindows:
 
 
 # =============================================================================
+# Shared Import Path Tests
+# =============================================================================
+
+
+class TestImportDetectedWindow:
+    """Tests for MainTab.import_detected_window shared import path."""
+
+    def test_import_detected_window_adds_frame_and_emits(self):
+        """Test detected windows use the shared add/connect/layout path."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.window_manager = MagicMock()
+            mock_frame = MagicMock()
+            tab.window_manager.add_window.return_value = mock_frame
+            tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
+
+            result = tab.import_detected_window("0x123", "DetectedPilot")
+
+            assert result is True
+            tab.window_manager.add_window.assert_called_once_with("0x123", "DetectedPilot")
+            mock_frame.focus_requested.connect.assert_called_once()
+            mock_frame.retry_requested.connect.assert_called_once()
+            tab.preview_layout.addWidget.assert_called_once_with(mock_frame)
+            tab.character_detected.emit.assert_called_once_with("0x123", "DetectedPilot")
+
+    def test_import_detected_window_returns_false_when_add_fails(self):
+        """Test shared import path returns False when no frame is created."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.logger = MagicMock()
+            tab.window_manager = MagicMock()
+            tab.window_manager.add_window.return_value = None
+            tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
+
+            result = tab.import_detected_window("0x123", "DetectedPilot")
+
+            assert result is False
+            tab.preview_layout.addWidget.assert_not_called()
+            tab.character_detected.emit.assert_not_called()
+
+
+# =============================================================================
 # Add Window To Preview Tests
 # =============================================================================
 
@@ -7670,6 +7697,7 @@ class TestAddWindowToPreview:
             mock_frame = MagicMock()
             tab.window_manager.add_window.return_value = mock_frame
             tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
 
             result = tab._add_window_to_preview("0x123", "EVE - TestChar")
 
@@ -7690,6 +7718,7 @@ class TestAddWindowToPreview:
             mock_frame = MagicMock()
             tab.window_manager.add_window.return_value = mock_frame
             tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
 
             tab._add_window_to_preview("0x123", "EVE - My Character")
 
@@ -7708,6 +7737,7 @@ class TestAddWindowToPreview:
             mock_frame = MagicMock()
             tab.window_manager.add_window.return_value = mock_frame
             tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
 
             tab._add_window_to_preview("0x123", "EVE Online - Another Char")
 
@@ -7726,6 +7756,7 @@ class TestAddWindowToPreview:
             mock_frame = MagicMock()
             tab.window_manager.add_window.return_value = mock_frame
             tab.preview_layout = MagicMock()
+            tab.character_detected = MagicMock()
 
             tab._add_window_to_preview("0x123", "EVE -")
 
@@ -7819,10 +7850,11 @@ class TestCreateStatusBar:
             mock_layout = MagicMock()
             mock_label = MagicMock()
 
-            with patch("argus_overview.ui.main_tab.QTimer", return_value=mock_timer), patch(
-                "argus_overview.ui.main_tab.QWidget", return_value=mock_widget
-            ), patch("argus_overview.ui.main_tab.QHBoxLayout", return_value=mock_layout), patch(
-                "argus_overview.ui.main_tab.QLabel", return_value=mock_label
+            with (
+                patch("argus_overview.ui.main_tab.QTimer", return_value=mock_timer),
+                patch("argus_overview.ui.main_tab.QWidget", return_value=mock_widget),
+                patch("argus_overview.ui.main_tab.QHBoxLayout", return_value=mock_layout),
+                patch("argus_overview.ui.main_tab.QLabel", return_value=mock_label),
             ):
                 result = tab._create_status_bar()
 
@@ -7841,14 +7873,152 @@ class TestCreateStatusBar:
 
             mock_timer = MagicMock()
 
-            with patch("argus_overview.ui.main_tab.QTimer", return_value=mock_timer), patch(
-                "argus_overview.ui.main_tab.QWidget"
-            ), patch("argus_overview.ui.main_tab.QHBoxLayout"), patch(
-                "argus_overview.ui.main_tab.QLabel"
+            with (
+                patch("argus_overview.ui.main_tab.QTimer", return_value=mock_timer),
+                patch("argus_overview.ui.main_tab.QWidget"),
+                patch("argus_overview.ui.main_tab.QHBoxLayout"),
+                patch("argus_overview.ui.main_tab.QLabel"),
             ):
                 tab._create_status_bar()
 
                 mock_timer.timeout.connect.assert_called_once_with(tab._update_status)
+
+
+class TestEmptyStateVisibility:
+    """Tests for Overview empty-state onboarding visibility."""
+
+    def test_update_empty_state_visibility_shows_panel_when_empty(self):
+        """Test empty-state panel is shown when no windows are loaded."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.window_manager = MagicMock()
+            tab.window_manager.get_active_window_count.return_value = 0
+            tab.empty_state_panel = MagicMock()
+            tab.empty_state_hint = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.side_effect = lambda key, default=None: {
+                "general.show_setup_guidance": True,
+                "general.auto_discovery": True,
+            }.get(key, default)
+
+            tab._update_empty_state_visibility()
+
+            tab.empty_state_panel.setVisible.assert_called_once_with(True)
+            tab.empty_state_hint.setText.assert_called_once()
+
+    def test_update_empty_state_visibility_hides_panel_when_windows_exist(self):
+        """Test empty-state panel is hidden once windows are active."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.window_manager = MagicMock()
+            tab.window_manager.get_active_window_count.return_value = 2
+            tab.empty_state_panel = MagicMock()
+            tab.empty_state_hint = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.return_value = True
+
+            tab._update_empty_state_visibility()
+
+            tab.empty_state_panel.setVisible.assert_called_once_with(False)
+
+
+class TestEmptyStateBusy:
+    """Tests for Overview empty-state busy state handling."""
+
+    def test_set_empty_state_busy_updates_controls(self):
+        """Test onboarding actions switch into a busy/importing state."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.empty_state_import_btn = MagicMock()
+            tab.empty_state_add_btn = MagicMock()
+            tab.empty_state_hint = MagicMock()
+
+            tab._set_empty_state_busy(True, "Scanning now...")
+
+            tab.empty_state_import_btn.setEnabled.assert_called_once_with(False)
+            tab.empty_state_import_btn.setText.assert_called_once_with("Importing...")
+            tab.empty_state_add_btn.setEnabled.assert_called_once_with(False)
+            tab.empty_state_hint.setText.assert_called_once_with("Scanning now...")
+
+    def test_set_empty_state_busy_restores_default_copy(self):
+        """Test leaving busy state restores the default onboarding text."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.empty_state_import_btn = MagicMock()
+            tab.empty_state_add_btn = MagicMock()
+            tab.empty_state_hint = MagicMock()
+            tab.settings_manager = MagicMock()
+            tab.settings_manager.get.side_effect = lambda key, default=None: {
+                "general.show_setup_guidance": True,
+                "general.auto_discovery": True,
+            }.get(key, default)
+
+            tab._set_empty_state_busy(False)
+
+            tab.empty_state_import_btn.setEnabled.assert_called_once_with(True)
+            tab.empty_state_import_btn.setText.assert_called_once_with("Import Windows")
+            tab.empty_state_add_btn.setEnabled.assert_called_once_with(True)
+            tab.empty_state_hint.setText.assert_called_once()
+
+
+class TestEmptyStateProgress:
+    """Tests for onboarding progress copy during imports."""
+
+    def test_set_empty_state_progress_updates_hint(self):
+        """Test progress helper shows import counts and remaining work."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab.empty_state_hint = MagicMock()
+
+            tab._set_empty_state_progress(current=2, total=5, added=1, skipped=1)
+
+            tab.empty_state_hint.setText.assert_called_once_with(
+                "Processing clients... Imported 1 client(s), skipped 1. 3 remaining."
+            )
+
+
+class TestImportCompletionSummary:
+    """Tests for temporary post-import guidance in Overview."""
+
+    def test_show_import_completion_summary_sets_summary_and_starts_timer(self):
+        """Test import completion summary is stored and timed."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab._import_summary_timer = MagicMock()
+            tab._update_empty_state_visibility = MagicMock()
+            tab._recent_import_summary = None
+
+            tab._show_import_completion_summary(added=3, skipped=1, detected=4)
+
+            assert tab._recent_import_summary == "Import complete: 3 added, 1 skipped, 4 detected."
+            tab._update_empty_state_visibility.assert_called_once()
+            tab._import_summary_timer.start.assert_called_once_with(12000)
+
+    def test_clear_import_completion_summary_resets_card(self):
+        """Test clearing the import summary returns the card to normal state."""
+        from argus_overview.ui.main_tab import MainTab
+
+        with patch.object(MainTab, "__init__", return_value=None):
+            tab = MainTab.__new__(MainTab)
+            tab._recent_import_summary = "Import complete: 1 added, 0 skipped, 1 detected."
+            tab._update_empty_state_visibility = MagicMock()
+
+            tab._clear_import_completion_summary()
+
+            assert tab._recent_import_summary is None
+            tab._update_empty_state_visibility.assert_called_once()
 
 
 class TestArrangementGridDragMoveEvent:
@@ -8081,24 +8251,21 @@ class TestOneClickImportAllDuplicates:
 
 
 class TestOnWindowActivatedFailure:
-    """Tests for _on_window_activated when activation fails"""
+    """Tests for _on_window_activated forwarding behavior."""
 
-    def test_on_window_activated_logs_warning_on_failure(self):
-        """Test _on_window_activated logs warning when activate_window returns False"""
+    def test_on_window_activated_does_not_attempt_local_activation(self):
+        """Test _on_window_activated only emits a focus request."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = False  # Disable auto-minimize
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = False  # Activation fails
+            tab.window_focus_requested = MagicMock()
 
             tab._on_window_activated("0x123")
 
-            tab.logger.warning.assert_called_once()
-            assert "Failed to activate" in str(tab.logger.warning.call_args)
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
+            tab.logger.warning.assert_not_called()
 
 
 class TestMinimizeInactiveXdotoolFails:
@@ -8121,10 +8288,13 @@ class TestMinimizeInactiveXdotoolFails:
             tab.status_label = MagicMock()
             tab._update_minimize_button_style = MagicMock()
 
-            # Mock subprocess.run to fail
+            # Mock the platform abstraction to report xdotool failure.
             mock_result = MagicMock()
             mock_result.returncode = 1  # Non-zero = failure
-            with patch("subprocess.run", return_value=mock_result):
+            with patch(
+                "argus_overview.utils.window_utils.run_x11_subprocess",
+                return_value=mock_result,
+            ):
                 tab.minimize_inactive_windows()
 
                 # Should set status to "Auto-minimize ON" without count
@@ -8479,7 +8649,9 @@ class TestMainTabSetupUi:
             tab.logger = MagicMock()
             tab._create_toolbar = MagicMock(return_value=MagicMock())
             tab._create_layout_controls = MagicMock(return_value=MagicMock())
+            tab._create_empty_state_panel = MagicMock(return_value=MagicMock())
             tab._create_status_bar = MagicMock(return_value=MagicMock())
+            tab._update_empty_state_visibility = MagicMock()
             tab.setLayout = MagicMock()
 
             mock_scroll = MagicMock()
@@ -8517,6 +8689,10 @@ class TestMainTabSetupUi:
 
                                 # Preview container and layout stored
                                 assert tab.preview_container is mock_container
+                                tab._create_empty_state_panel.assert_called_once()
+                                mock_flow_layout.addWidget.assert_called_once_with(
+                                    tab.empty_state_panel
+                                )
                                 assert tab.preview_layout is mock_flow_layout
 
                                 # 5 widgets added to layout (PR2 added status dock)
@@ -8842,54 +9018,35 @@ class TestMinimizeInactiveCountingDetail:
 
 
 class TestOnWindowActivatedAutoMinimizeSuccess:
-    """Tests for _on_window_activated successful auto-minimize of previous window"""
+    """Tests for _on_window_activated forwarding with no side effects."""
 
     def test_on_window_activated_auto_minimizes_previous(self):
-        """Test successful xdotool minimize logs info message"""
+        """Test forwarding no longer minimizes windows inside MainTab."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = True  # auto_minimize enabled
-            tab.settings_manager.get_last_activated_window.return_value = "0xOLD"
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
+            tab.window_focus_requested = MagicMock()
 
-            with patch("argus_overview.utils.window_utils.run_x11_subprocess") as mock_x11:
-                mock_x11.return_value = MagicMock(returncode=0)
-                tab._on_window_activated("0xNEW")
+            tab._on_window_activated("0xNEW")
 
-                # Should have minimized old window
-                mock_x11.assert_called_once_with(["xdotool", "windowminimize", "0xOLD"], timeout=2)
-                # Should log success
-                tab.logger.info.assert_any_call("Auto-minimized previous EVE window: 0xOLD")
-
-            # Should track new window
-            tab.settings_manager.set_last_activated_window.assert_called_with("0xNEW")
+            tab.window_focus_requested.emit.assert_called_once_with("0xNEW")
+            tab.logger.info.assert_not_called()
 
     def test_on_window_activated_auto_minimize_fails(self):
-        """Test xdotool failure logs warning, doesn't crash"""
+        """Test forwarding path stays simple even when prior state exists."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = True
-            tab.settings_manager.get_last_activated_window.return_value = "0xOLD"
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.return_value = True
+            tab.window_focus_requested = MagicMock()
 
-            with patch(
-                "argus_overview.utils.window_utils.run_x11_subprocess",
-                side_effect=OSError("xdotool failed"),
-            ):
-                tab._on_window_activated("0xNEW")
+            tab._on_window_activated("0xNEW")
 
-                tab.logger.warning.assert_called_once()
-                assert "Failed to auto-minimize" in str(tab.logger.warning.call_args)
+            tab.window_focus_requested.emit.assert_called_once_with("0xNEW")
+            tab.logger.warning.assert_not_called()
 
 
 # =============================================================================
@@ -8935,7 +9092,8 @@ class TestMainTabInitNoSkip:
             assert tab._windows_minimized is False
 
             # Timer configured
-            mock_timer.setSingleShot.assert_called_once_with(True)
+            assert mock_timer.setSingleShot.call_count == 3
+            assert all(call.args == (True,) for call in mock_timer.setSingleShot.call_args_list)
             mock_timer.setInterval.assert_called_once_with(150)
 
             # Window manager created and capture loop started
@@ -9047,56 +9205,49 @@ class TestStopCaptureLoopNoSkip:
 
 
 class TestOnWindowActivatedException:
-    """Tests for _on_window_activated when activate_window raises an exception."""
+    """Tests for _on_window_activated simple forwarding behavior."""
 
     def test_on_window_activated_catches_runtime_error(self):
-        """Lines 1760-1761: RuntimeError from capture_system.activate_window is caught."""
+        """Forwarding path does not depend on capture-system runtime errors."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = False
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.side_effect = RuntimeError("X11 gone")
+            tab.window_focus_requested = MagicMock()
 
             tab._on_window_activated("0x123")
 
-            tab.logger.error.assert_called_once()
-            assert "Error activating window" in str(tab.logger.error.call_args)
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
+            tab.logger.error.assert_not_called()
 
     def test_on_window_activated_catches_os_error(self):
-        """Lines 1760-1761: OSError from capture_system.activate_window is caught."""
+        """Forwarding path remains a pure signal emit."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = False
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.side_effect = OSError("No display")
+            tab.window_focus_requested = MagicMock()
 
             tab._on_window_activated("0x123")
 
-            tab.logger.error.assert_called_once()
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
+            tab.logger.error.assert_not_called()
 
     def test_on_window_activated_catches_value_error(self):
-        """Lines 1760-1761: ValueError from capture_system.activate_window is caught."""
+        """Forwarding path emits focus intent without local validation."""
         from argus_overview.ui.main_tab import MainTab
 
         with patch.object(MainTab, "__init__", return_value=None):
             tab = MainTab.__new__(MainTab)
             tab.logger = MagicMock()
-            tab.settings_manager = MagicMock()
-            tab.settings_manager.get.return_value = False
-            tab.capture_system = MagicMock()
-            tab.capture_system.activate_window.side_effect = ValueError("bad id")
+            tab.window_focus_requested = MagicMock()
 
             tab._on_window_activated("0x123")
 
-            tab.logger.error.assert_called_once()
+            tab.window_focus_requested.emit.assert_called_once_with("0x123")
+            tab.logger.error.assert_not_called()
 
 
 # =============================================================================

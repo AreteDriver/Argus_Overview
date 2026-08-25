@@ -840,12 +840,15 @@ class TestWindowManagerLinuxActivateMinimizeRestore:
 
         wm = WindowManagerLinux()
 
-        with patch(
-            "argus_overview.platform.linux.run_x11_subprocess",
-            side_effect=subprocess.TimeoutExpired("cmd", 2),
-        ), patch(
-            "argus_overview.platform.linux.HAS_XLIB",
-            False,
+        with (
+            patch(
+                "argus_overview.platform.linux.run_x11_subprocess",
+                side_effect=subprocess.TimeoutExpired("cmd", 2),
+            ),
+            patch(
+                "argus_overview.platform.linux.HAS_XLIB",
+                False,
+            ),
         ):
             result = wm.activate_window("0x12345")
 

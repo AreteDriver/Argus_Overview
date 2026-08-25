@@ -187,6 +187,36 @@ class GeneralPanel(QWidget):
         )
         form.addRow("Show notifications:", self.notifications_check)
 
+        self.auto_import_check = QCheckBox()
+        self.auto_import_check.setChecked(
+            self.settings_manager.get("general.auto_import_on_startup", True)
+        )
+        self.auto_import_check.setToolTip(
+            "Scan for running EVE windows when Argus starts and import them automatically."
+        )
+        self.auto_import_check.stateChanged.connect(
+            lambda: self.setting_changed.emit(
+                "general.auto_import_on_startup",
+                self.auto_import_check.isChecked(),
+            )
+        )
+        form.addRow("Auto-import on startup:", self.auto_import_check)
+
+        self.setup_guidance_check = QCheckBox()
+        self.setup_guidance_check.setChecked(
+            self.settings_manager.get("general.show_setup_guidance", True)
+        )
+        self.setup_guidance_check.setToolTip(
+            "Show quick-start guidance when no EVE clients are loaded yet."
+        )
+        self.setup_guidance_check.stateChanged.connect(
+            lambda: self.setting_changed.emit(
+                "general.show_setup_guidance",
+                self.setup_guidance_check.isChecked(),
+            )
+        )
+        form.addRow("Show setup guidance:", self.setup_guidance_check)
+
         # Auto-save interval
         self.auto_save_spin = QSpinBox()
         self.auto_save_spin.setRange(1, 60)
@@ -827,7 +857,9 @@ class SettingsTab(QWidget):
             item = QTreeWidgetItem([category])
             self.category_tree.addTopLevelItem(item)
 
-        self.category_tree.setCurrentItem(self.category_tree.topLevelItem(0))
+        first_category = self.category_tree.topLevelItem(0)
+        if first_category is not None:
+            self.category_tree.setCurrentItem(first_category)
         self.category_tree.currentItemChanged.connect(self._on_category_changed)
 
         # Style nav tree with design-system tokens

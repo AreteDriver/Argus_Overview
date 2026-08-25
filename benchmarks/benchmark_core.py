@@ -14,8 +14,8 @@ import gc
 import statistics
 import sys
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, List
 from unittest.mock import MagicMock, patch
 
 # Add src to path
@@ -32,7 +32,7 @@ def benchmark(func: Callable, iterations: int = 1000, warmup: int = 10) -> dict:
     gc.collect()
 
     # Actual benchmark
-    times: List[float] = []
+    times: list[float] = []
     for _ in range(iterations):
         start = time.perf_counter_ns()
         func()

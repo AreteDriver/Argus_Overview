@@ -1669,18 +1669,19 @@ class TestLayoutsTabCreateTopSection:
             tab._auto_arrange = MagicMock()
             tab._update_grid_size = MagicMock()
 
-            with patch("argus_overview.ui.layouts_tab.QGroupBox") as mock_groupbox_cls, patch(
-                "argus_overview.ui.layouts_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch("argus_overview.ui.layouts_tab.QVBoxLayout"), patch(
-                "argus_overview.ui.layouts_tab.QLabel"
-            ), patch("argus_overview.ui.layouts_tab.QComboBox") as mock_combo_cls, patch(
-                "argus_overview.ui.layouts_tab.QPushButton"
-            ) as mock_btn_cls, patch(
-                "argus_overview.ui.layouts_tab.QSpinBox"
-            ) as mock_spin_cls, patch(
-                "argus_overview.ui.layouts_tab.QCheckBox"
-            ) as mock_checkbox_cls, patch("argus_overview.ui.layouts_tab.QWidget"), patch(
-                "argus_overview.ui.layouts_tab.get_all_patterns", return_value=["2x2", "3x1"]
+            with (
+                patch("argus_overview.ui.layouts_tab.QGroupBox") as mock_groupbox_cls,
+                patch("argus_overview.ui.layouts_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.layouts_tab.QVBoxLayout"),
+                patch("argus_overview.ui.layouts_tab.QLabel"),
+                patch("argus_overview.ui.layouts_tab.QComboBox") as mock_combo_cls,
+                patch("argus_overview.ui.layouts_tab.QPushButton") as mock_btn_cls,
+                patch("argus_overview.ui.layouts_tab.QSpinBox") as mock_spin_cls,
+                patch("argus_overview.ui.layouts_tab.QCheckBox") as mock_checkbox_cls,
+                patch("argus_overview.ui.layouts_tab.QWidget"),
+                patch(
+                    "argus_overview.ui.layouts_tab.get_all_patterns", return_value=["2x2", "3x1"]
+                ),
             ):
                 mock_section = MagicMock()
                 mock_groupbox_cls.return_value = mock_section
@@ -1728,16 +1729,17 @@ class TestLayoutsTabCreateTopSection:
             tab._auto_arrange = MagicMock()
             tab._update_grid_size = MagicMock()
 
-            with patch("argus_overview.ui.layouts_tab.QGroupBox"), patch(
-                "argus_overview.ui.layouts_tab.QHBoxLayout"
-            ), patch("argus_overview.ui.layouts_tab.QVBoxLayout"), patch(
-                "argus_overview.ui.layouts_tab.QLabel"
-            ), patch("argus_overview.ui.layouts_tab.QComboBox"), patch(
-                "argus_overview.ui.layouts_tab.QPushButton"
-            ), patch("argus_overview.ui.layouts_tab.QSpinBox") as mock_spin_cls, patch(
-                "argus_overview.ui.layouts_tab.QCheckBox"
-            ), patch("argus_overview.ui.layouts_tab.QWidget"), patch(
-                "argus_overview.ui.layouts_tab.get_all_patterns", return_value=[]
+            with (
+                patch("argus_overview.ui.layouts_tab.QGroupBox"),
+                patch("argus_overview.ui.layouts_tab.QHBoxLayout"),
+                patch("argus_overview.ui.layouts_tab.QVBoxLayout"),
+                patch("argus_overview.ui.layouts_tab.QLabel"),
+                patch("argus_overview.ui.layouts_tab.QComboBox"),
+                patch("argus_overview.ui.layouts_tab.QPushButton"),
+                patch("argus_overview.ui.layouts_tab.QSpinBox") as mock_spin_cls,
+                patch("argus_overview.ui.layouts_tab.QCheckBox"),
+                patch("argus_overview.ui.layouts_tab.QWidget"),
+                patch("argus_overview.ui.layouts_tab.get_all_patterns", return_value=[]),
             ):
                 mock_spin = MagicMock()
                 mock_spin_cls.return_value = mock_spin
@@ -1760,13 +1762,13 @@ class TestLayoutsTabCreateGridSection:
         with patch.object(LayoutsTab, "__init__", return_value=None):
             tab = LayoutsTab.__new__(LayoutsTab)
 
-            with patch("argus_overview.ui.layouts_tab.QGroupBox") as mock_groupbox_cls, patch(
-                "argus_overview.ui.layouts_tab.QVBoxLayout"
-            ) as mock_vlayout_cls, patch("argus_overview.ui.layouts_tab.QLabel"), patch(
-                "argus_overview.ui.layouts_tab.QScrollArea"
-            ) as mock_scroll_cls, patch(
-                "argus_overview.ui.layouts_tab.ArrangementGrid"
-            ) as mock_grid_cls:
+            with (
+                patch("argus_overview.ui.layouts_tab.QGroupBox") as mock_groupbox_cls,
+                patch("argus_overview.ui.layouts_tab.QVBoxLayout") as mock_vlayout_cls,
+                patch("argus_overview.ui.layouts_tab.QLabel"),
+                patch("argus_overview.ui.layouts_tab.QScrollArea") as mock_scroll_cls,
+                patch("argus_overview.ui.layouts_tab.ArrangementGrid") as mock_grid_cls,
+            ):
                 mock_section = MagicMock()
                 mock_groupbox_cls.return_value = mock_section
 
@@ -1800,11 +1802,13 @@ class TestLayoutsTabCreateGridSection:
         with patch.object(LayoutsTab, "__init__", return_value=None):
             tab = LayoutsTab.__new__(LayoutsTab)
 
-            with patch("argus_overview.ui.layouts_tab.QGroupBox"), patch(
-                "argus_overview.ui.layouts_tab.QVBoxLayout"
-            ), patch("argus_overview.ui.layouts_tab.QLabel") as mock_label_cls, patch(
-                "argus_overview.ui.layouts_tab.QScrollArea"
-            ), patch("argus_overview.ui.layouts_tab.ArrangementGrid"):
+            with (
+                patch("argus_overview.ui.layouts_tab.QGroupBox"),
+                patch("argus_overview.ui.layouts_tab.QVBoxLayout"),
+                patch("argus_overview.ui.layouts_tab.QLabel") as mock_label_cls,
+                patch("argus_overview.ui.layouts_tab.QScrollArea"),
+                patch("argus_overview.ui.layouts_tab.ArrangementGrid"),
+            ):
                 mock_label = MagicMock()
                 mock_label_cls.return_value = mock_label
 
@@ -1826,11 +1830,12 @@ class TestLayoutsTabCreateBottomSection:
             tab = LayoutsTab.__new__(LayoutsTab)
             tab._apply_to_active_windows = MagicMock()
 
-            with patch("argus_overview.ui.layouts_tab.QWidget") as mock_widget_cls, patch(
-                "argus_overview.ui.layouts_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch(
-                "argus_overview.ui.layouts_tab.QLabel"
-            ) as mock_label_cls, patch("argus_overview.ui.layouts_tab.QPushButton") as mock_btn_cls:
+            with (
+                patch("argus_overview.ui.layouts_tab.QWidget") as mock_widget_cls,
+                patch("argus_overview.ui.layouts_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.layouts_tab.QLabel") as mock_label_cls,
+                patch("argus_overview.ui.layouts_tab.QPushButton") as mock_btn_cls,
+            ):
                 mock_widget = MagicMock()
                 mock_widget_cls.return_value = mock_widget
 
@@ -1864,11 +1869,12 @@ class TestLayoutsTabCreateBottomSection:
             tab = LayoutsTab.__new__(LayoutsTab)
             tab._apply_to_active_windows = MagicMock()
 
-            with patch("argus_overview.ui.layouts_tab.QWidget"), patch(
-                "argus_overview.ui.layouts_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch(
-                "argus_overview.ui.layouts_tab.QLabel"
-            ) as mock_label_cls, patch("argus_overview.ui.layouts_tab.QPushButton"):
+            with (
+                patch("argus_overview.ui.layouts_tab.QWidget"),
+                patch("argus_overview.ui.layouts_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.layouts_tab.QLabel") as mock_label_cls,
+                patch("argus_overview.ui.layouts_tab.QPushButton"),
+            ):
                 mock_layout = MagicMock()
                 mock_hlayout_cls.return_value = mock_layout
 

@@ -321,6 +321,7 @@ class TestCharacterTableMethods:
 
     def test_populate_table_with_characters(self):
         """Test populate_table with character list"""
+        from argus_overview.core.character_manager import AUTO_CREATED_NOTE
         from argus_overview.ui.characters_teams_tab import CharacterTable
 
         with patch.object(CharacterTable, "__init__", return_value=None):
@@ -343,7 +344,7 @@ class TestCharacterTableMethods:
             char2.role = "Miner"
             char2.is_main = False
             char2.window_id = None
-            char2.notes = None
+            char2.notes = AUTO_CREATED_NOTE
 
             table.character_manager.get_all_characters.return_value = [char1, char2]
 
@@ -358,6 +359,44 @@ class TestCharacterTableMethods:
 
             table.setRowCount.assert_called_once_with(2)
             assert mock_item.call_count >= 12  # 6 columns * 2 rows
+
+    def test_populate_table_shows_needs_setup_for_auto_created_characters(self):
+        """Test auto-created characters render a friendlier setup cue in Notes."""
+        from argus_overview.core.character_manager import AUTO_CREATED_NOTE
+        from argus_overview.ui.characters_teams_tab import CharacterTable
+
+        with patch.object(CharacterTable, "__init__", return_value=None):
+            table = CharacterTable.__new__(CharacterTable)
+            table.logger = MagicMock()
+            table.character_manager = MagicMock()
+
+            char = MagicMock()
+            char.name = "Pilot1"
+            char.account = ""
+            char.role = "DPS"
+            char.is_main = False
+            char.window_id = None
+            char.notes = AUTO_CREATED_NOTE
+
+            table.character_manager.get_all_characters.return_value = [char]
+            table.setSortingEnabled = MagicMock()
+            table.setRowCount = MagicMock()
+            table.setItem = MagicMock()
+
+            created_items = []
+
+            def make_item(text):
+                item = MagicMock()
+                item._text = text
+                created_items.append((text, item))
+                return item
+
+            with patch(
+                "argus_overview.ui.characters_teams_tab.QTableWidgetItem", side_effect=make_item
+            ):
+                table._do_populate_table()
+
+            assert any(text == CharacterTable.NEEDS_SETUP_TEXT for text, _item in created_items)
 
     def test_update_character_status_active(self):
         """Test update_character_status when character becomes active"""
@@ -432,6 +471,65 @@ class TestCharacterTableMethods:
 
             # Should not raise, just not find the character
             table.update_character_status("NonExistent", "0x123")
+
+    def test_apply_filters_hides_non_matching_rows(self):
+        """Test text filtering hides rows that do not match the search."""
+        from argus_overview.ui.characters_teams_tab import CharacterTable
+
+        with patch.object(CharacterTable, "__init__", return_value=None):
+            table = CharacterTable.__new__(CharacterTable)
+            table.rowCount = MagicMock(return_value=2)
+            table.setRowHidden = MagicMock()
+
+            def item_side_effect(row, col):
+                data = {
+                    (0, 0): MagicMock(text=MagicMock(return_value="Pilot One")),
+                    (0, 1): MagicMock(text=MagicMock(return_value="AccountA")),
+                    (0, 2): MagicMock(text=MagicMock(return_value="DPS")),
+                    (0, 5): MagicMock(text=MagicMock(return_value="Main")),
+                    (1, 0): MagicMock(text=MagicMock(return_value="Pilot Two")),
+                    (1, 1): MagicMock(text=MagicMock(return_value="AccountB")),
+                    (1, 2): MagicMock(text=MagicMock(return_value="Miner")),
+                    (1, 5): MagicMock(text=MagicMock(return_value="Needs setup")),
+                }
+                return data.get((row, col))
+
+            table.item = MagicMock(side_effect=item_side_effect)
+
+            table.apply_filters(search_text="pilot one", needs_setup_only=False)
+
+            table.setRowHidden.assert_any_call(0, False)
+            table.setRowHidden.assert_any_call(1, True)
+
+    def test_apply_filters_respects_needs_setup_toggle(self):
+        """Test setup-only filtering keeps only review-needed rows visible."""
+        from argus_overview.ui.characters_teams_tab import CharacterTable
+
+        with patch.object(CharacterTable, "__init__", return_value=None):
+            table = CharacterTable.__new__(CharacterTable)
+            table.NEEDS_SETUP_TEXT = "Needs setup"
+            table.rowCount = MagicMock(return_value=2)
+            table.setRowHidden = MagicMock()
+
+            def item_side_effect(row, col):
+                data = {
+                    (0, 0): MagicMock(text=MagicMock(return_value="Pilot One")),
+                    (0, 1): MagicMock(text=MagicMock(return_value="AccountA")),
+                    (0, 2): MagicMock(text=MagicMock(return_value="DPS")),
+                    (0, 5): MagicMock(text=MagicMock(return_value="Main")),
+                    (1, 0): MagicMock(text=MagicMock(return_value="Pilot Two")),
+                    (1, 1): MagicMock(text=MagicMock(return_value="")),
+                    (1, 2): MagicMock(text=MagicMock(return_value="Miner")),
+                    (1, 5): MagicMock(text=MagicMock(return_value="Needs setup")),
+                }
+                return data.get((row, col))
+
+            table.item = MagicMock(side_effect=item_side_effect)
+
+            table.apply_filters(search_text="", needs_setup_only=True)
+
+            table.setRowHidden.assert_any_call(0, True)
+            table.setRowHidden.assert_any_call(1, False)
 
     def test_get_selected_characters_with_selection(self):
         """Test get_selected_characters with selected items"""
@@ -1213,6 +1311,7 @@ class TestCharactersTeamsTabMethods:
             tab.logger = MagicMock()
             tab.character_manager = MagicMock()
             tab.character_manager.add_character.return_value = True
+            tab._refresh_setup_summary = MagicMock()
 
             mock_char = MagicMock()
             mock_char.name = "NewPilot"
@@ -1229,6 +1328,7 @@ class TestCharactersTeamsTabMethods:
 
             tab.character_manager.add_character.assert_called_once_with(mock_char)
             tab.character_table.populate_table.assert_called_once()
+            tab._refresh_setup_summary.assert_called_once()
 
     def test_add_character_dialog_cancelled(self):
         """Test _add_character when dialog is cancelled"""
@@ -1274,6 +1374,7 @@ class TestCharactersTeamsTabMethods:
             tab = CharactersTeamsTab.__new__(CharactersTeamsTab)
             tab.logger = MagicMock()
             tab.character_manager = MagicMock()
+            tab._refresh_setup_summary = MagicMock()
 
             mock_char = MagicMock()
             mock_char.name = "Pilot1"
@@ -1293,6 +1394,7 @@ class TestCharactersTeamsTabMethods:
 
             tab.character_manager.update_character.assert_called_once()
             tab.character_table.populate_table.assert_called_once()
+            tab._refresh_setup_summary.assert_called_once()
 
     def test_delete_character_no_selection(self):
         """Test _delete_character with no selection"""
@@ -1319,6 +1421,7 @@ class TestCharactersTeamsTabMethods:
             tab.logger = MagicMock()
             tab.character_manager = MagicMock()
             tab.character_manager.remove_character.return_value = True
+            tab._refresh_setup_summary = MagicMock()
 
             tab.character_table = MagicMock()
             tab.character_table.get_selected_characters.return_value = ["Pilot1"]
@@ -1331,6 +1434,7 @@ class TestCharactersTeamsTabMethods:
                 tab._delete_character()
 
             tab.character_manager.remove_character.assert_called_once_with("Pilot1")
+            tab._refresh_setup_summary.assert_called_once()
 
     def test_delete_character_cancelled(self):
         """Test _delete_character when user cancels"""
@@ -1395,6 +1499,7 @@ class TestCharactersTeamsTabMethods:
 
             tab.character_manager = MagicMock()
             tab.character_manager.import_from_eve_sync.return_value = 2
+            tab._refresh_setup_summary = MagicMock()
 
             tab.character_table = MagicMock()
             tab.characters_imported = MagicMock()
@@ -1404,6 +1509,7 @@ class TestCharactersTeamsTabMethods:
 
             tab.character_manager.import_from_eve_sync.assert_called_once()
             tab.character_table.populate_table.assert_called_once()
+            tab._refresh_setup_summary.assert_called_once()
             tab.characters_imported.emit.assert_called_once_with(2)
 
     def test_scan_eve_folder_exception(self):
@@ -1486,10 +1592,68 @@ class TestCharactersTeamsTabMethods:
         with patch.object(CharactersTeamsTab, "__init__", return_value=None):
             tab = CharactersTeamsTab.__new__(CharactersTeamsTab)
             tab.character_table = MagicMock()
+            tab._refresh_setup_summary = MagicMock()
 
             tab.update_character_status("Pilot1", "0x123")
 
             tab.character_table.update_character_status.assert_called_once_with("Pilot1", "0x123")
+            tab._refresh_setup_summary.assert_called_once()
+
+    def test_refresh_setup_summary_shows_pending_imports(self):
+        """Test roster summary shows auto-created characters needing review."""
+        from argus_overview.ui.characters_teams_tab import CharactersTeamsTab
+
+        with patch.object(CharactersTeamsTab, "__init__", return_value=None):
+            tab = CharactersTeamsTab.__new__(CharactersTeamsTab)
+            tab.character_manager = MagicMock()
+            tab.setup_summary_label = MagicMock()
+
+            pending_one = MagicMock()
+            pending_one.name = "Pilot1"
+            pending_two = MagicMock()
+            pending_two.name = "Pilot2"
+            tab.character_manager.get_characters_needing_setup.return_value = [
+                pending_one,
+                pending_two,
+            ]
+
+            tab._refresh_setup_summary()
+
+            tab.setup_summary_label.setText.assert_called_once()
+            tab.setup_summary_label.show.assert_called_once()
+
+    def test_refresh_setup_summary_hides_when_clean(self):
+        """Test roster summary hides when nothing needs review."""
+        from argus_overview.ui.characters_teams_tab import CharactersTeamsTab
+
+        with patch.object(CharactersTeamsTab, "__init__", return_value=None):
+            tab = CharactersTeamsTab.__new__(CharactersTeamsTab)
+            tab.character_manager = MagicMock()
+            tab.setup_summary_label = MagicMock()
+            tab.character_manager.get_characters_needing_setup.return_value = []
+
+            tab._refresh_setup_summary()
+
+            tab.setup_summary_label.hide.assert_called_once()
+
+    def test_apply_character_filters_delegates_to_table(self):
+        """Test roster filter controls delegate to the character table."""
+        from argus_overview.ui.characters_teams_tab import CharactersTeamsTab
+
+        with patch.object(CharactersTeamsTab, "__init__", return_value=None):
+            tab = CharactersTeamsTab.__new__(CharactersTeamsTab)
+            tab.character_table = MagicMock()
+            tab.character_filter_edit = MagicMock()
+            tab.character_filter_edit.text.return_value = "pilot"
+            tab.needs_setup_only_check = MagicMock()
+            tab.needs_setup_only_check.isChecked.return_value = True
+
+            tab._apply_character_filters()
+
+            tab.character_table.apply_filters.assert_called_once_with(
+                search_text="pilot",
+                needs_setup_only=True,
+            )
 
     def test_edit_character_not_found(self):
         """Test _edit_character when character not found in manager"""
@@ -1574,11 +1738,10 @@ class TestUISetupMethods:
             tab._create_left_panel = MagicMock(return_value=mock_left_panel)
             tab._create_right_panel = MagicMock(return_value=mock_right_panel)
 
-            with patch(
-                "argus_overview.ui.characters_teams_tab.QHBoxLayout"
-            ) as mock_layout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QSplitter"
-            ) as mock_splitter_cls:
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout") as mock_layout_cls,
+                patch("argus_overview.ui.characters_teams_tab.QSplitter") as mock_splitter_cls,
+            ):
                 mock_layout = MagicMock()
                 mock_layout_cls.return_value = mock_layout
 
@@ -1609,8 +1772,9 @@ class TestUISetupMethods:
             tab._create_right_panel = MagicMock(return_value=MagicMock())
             tab.setLayout = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"), patch(
-                "argus_overview.ui.characters_teams_tab.QSplitter"
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QSplitter"),
             ):
                 tab._setup_ui()
 
@@ -1629,15 +1793,13 @@ class TestUISetupMethods:
             tab._edit_character = MagicMock()
             tab._delete_character = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ) as mock_vlayout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.ToolbarBuilder"
-            ) as mock_builder_cls, patch(
-                "argus_overview.ui.characters_teams_tab.CharacterTable"
-            ) as mock_table_cls:
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls,
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout") as mock_vlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.ToolbarBuilder") as mock_builder_cls,
+                patch("argus_overview.ui.characters_teams_tab.CharacterTable") as mock_table_cls,
+            ):
                 mock_panel = MagicMock()
                 mock_widget_cls.return_value = mock_panel
 
@@ -1679,11 +1841,13 @@ class TestUISetupMethods:
             tab._delete_character = MagicMock()
             tab._scan_eve_folder = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget"), patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ), patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"), patch(
-                "argus_overview.ui.characters_teams_tab.ToolbarBuilder"
-            ) as mock_builder_cls, patch("argus_overview.ui.characters_teams_tab.CharacterTable"):
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget"),
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.ToolbarBuilder") as mock_builder_cls,
+                patch("argus_overview.ui.characters_teams_tab.CharacterTable"),
+            ):
                 mock_builder = MagicMock()
                 mock_builder.create_button.return_value = MagicMock()
                 mock_builder_cls.return_value = mock_builder
@@ -1706,13 +1870,13 @@ class TestUISetupMethods:
             tab._edit_character = MagicMock()
             tab._delete_character = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ), patch(
-                "argus_overview.ui.characters_teams_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.ToolbarBuilder"
-            ) as mock_builder_cls, patch("argus_overview.ui.characters_teams_tab.CharacterTable"):
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls,
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.ToolbarBuilder") as mock_builder_cls,
+                patch("argus_overview.ui.characters_teams_tab.CharacterTable"),
+            ):
                 mock_panel = MagicMock()
                 mock_widget_cls.return_value = mock_panel
 
@@ -1743,15 +1907,14 @@ class TestUISetupMethods:
             tab._on_team_modified = MagicMock()
             tab._refresh_teams = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ) as mock_vlayout_cls, patch(
-                "argus_overview.ui.characters_teams_tab.QHBoxLayout"
-            ) as mock_hlayout_cls, patch("argus_overview.ui.characters_teams_tab.QLabel"), patch(
-                "argus_overview.ui.characters_teams_tab.QComboBox"
-            ) as mock_combo_cls, patch(
-                "argus_overview.ui.characters_teams_tab.TeamBuilder"
-            ) as mock_builder_cls:
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget") as mock_widget_cls,
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout") as mock_vlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout") as mock_hlayout_cls,
+                patch("argus_overview.ui.characters_teams_tab.QLabel"),
+                patch("argus_overview.ui.characters_teams_tab.QComboBox") as mock_combo_cls,
+                patch("argus_overview.ui.characters_teams_tab.TeamBuilder") as mock_builder_cls,
+            ):
                 mock_panel = MagicMock()
                 mock_widget_cls.return_value = mock_panel
 
@@ -1794,13 +1957,14 @@ class TestUISetupMethods:
             tab._on_team_modified = MagicMock()
             tab._refresh_teams = MagicMock()
 
-            with patch("argus_overview.ui.characters_teams_tab.QWidget"), patch(
-                "argus_overview.ui.characters_teams_tab.QVBoxLayout"
-            ), patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"), patch(
-                "argus_overview.ui.characters_teams_tab.QLabel"
-            ), patch("argus_overview.ui.characters_teams_tab.QComboBox"), patch(
-                "argus_overview.ui.characters_teams_tab.TeamBuilder"
-            ) as mock_builder_cls:
+            with (
+                patch("argus_overview.ui.characters_teams_tab.QWidget"),
+                patch("argus_overview.ui.characters_teams_tab.QVBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QHBoxLayout"),
+                patch("argus_overview.ui.characters_teams_tab.QLabel"),
+                patch("argus_overview.ui.characters_teams_tab.QComboBox"),
+                patch("argus_overview.ui.characters_teams_tab.TeamBuilder") as mock_builder_cls,
+            ):
                 mock_team_builder = MagicMock()
                 mock_builder_cls.return_value = mock_team_builder
 

@@ -1,6 +1,6 @@
-> **STATUS: FROZEN as of 2026-06-22**  
-> This repository is no longer actively developed. See [AreteDriver/notes/decisions/2026-04-21-portfolio-triage.md](https://github.com/AreteDriver/notes/blob/main/decisions/2026-04-21-portfolio-triage.md) for context.  
-> Archived for reference. No new deploys or feature work.
+> **STATUS: ACTIVELY MAINTAINED**
+> Version 3.3.0 is an unreleased release candidate. Runtime validation and
+> platform-hardening work remain tracked in [ROADMAP.md](ROADMAP.md).
 >
 > ---
 >
@@ -33,9 +33,19 @@ tar -xzf Argus-Overview-*-Linux.tar.gz && cd argus-overview-linux
 
 **Windows:** Download the `.exe` from [Releases](https://github.com/AreteDriver/Argus_Overview/releases) and run it.
 
-**1,875 tests · 96% coverage · 2,500+ downloads**
+**2,580+ tests · 96% coverage · 2,500+ downloads**
 
 > Cross-platform support (Windows native, Mac) planned for v3. Community interest in Qt/Rust port welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## First Launch
+
+Argus is designed to get you from launch to usable cycling quickly:
+
+1. Start Argus with your EVE clients already running when possible.
+2. Let Argus auto-import detected clients on startup, or click `Import Windows` in the `Overview` tab.
+3. Use `Cycle Control` to tune hotkeys and groups only after the windows you care about are visible.
+
+If you prefer a hands-on setup flow, use `Add Window` in `Overview` for manual control and disable startup auto-import in `Settings`.
 
 ---
 

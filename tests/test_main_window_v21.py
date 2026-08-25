@@ -33,6 +33,33 @@ def create_mock_window():
     # Create a MagicMock that uses the real methods from MainWindowV21
     window = MagicMock(spec=MainWindowV21)
     window.logger = MagicMock()
+    window._is_quitting = False
+    window._auto_discovery_connected = False
+    window._tab_indexes = {}
+    window._bulk_import_active = False
+    window._bulk_import_dirty_characters = False
+    window._bulk_import_dirty_groups = False
+    window._pending_discovery_names = []
+    window.cycling_index = 0
+    window.close = MagicMock()
+    window._connect_auto_discovery = lambda: MainWindowV21._connect_auto_discovery(window)
+    window._disconnect_auto_discovery = lambda: MainWindowV21._disconnect_auto_discovery(window)
+    window._ensure_auto_discovery_state = lambda: MainWindowV21._ensure_auto_discovery_state(window)
+    window._run_startup_assistant = lambda: MainWindowV21._run_startup_assistant(window)
+    window._begin_bulk_import = lambda: MainWindowV21._begin_bulk_import(window)
+    window._finish_bulk_import = lambda: MainWindowV21._finish_bulk_import(window)
+    window._queue_discovery_notification = lambda name: MainWindowV21._queue_discovery_notification(
+        window, name
+    )
+    window._flush_discovery_notifications = lambda: MainWindowV21._flush_discovery_notifications(
+        window
+    )
+    window._queue_main_tab_status_refresh = lambda: MainWindowV21._queue_main_tab_status_refresh(
+        window
+    )
+    window._flush_main_tab_status_refresh = lambda: MainWindowV21._flush_main_tab_status_refresh(
+        window
+    )
 
     # Bind the real methods to our mock
     window._toggle_visibility = lambda: MainWindowV21._toggle_visibility(window)
@@ -61,6 +88,8 @@ def create_mock_window():
     window._activate_character = lambda char: MainWindowV21._activate_character(window, char)
     window._on_profile_selected = lambda name: MainWindowV21._on_profile_selected(window, name)
     window._show_settings = lambda: MainWindowV21._show_settings(window)
+    window._show_roster = lambda: MainWindowV21._show_roster(window)
+    window._show_cycle_control = lambda: MainWindowV21._show_cycle_control(window)
     window._reload_config = lambda: MainWindowV21._reload_config(window)
     window._quit_application = lambda: MainWindowV21._quit_application(window)
     window._apply_setting = lambda k, v: MainWindowV21._apply_setting(window, k, v)
@@ -86,6 +115,13 @@ def create_mock_window():
     mock_window_mgr.is_valid_window_id.return_value = True
     window.capture_system = MagicMock()
     window.capture_system._window_mgr = mock_window_mgr
+    window.cycle_controller = MagicMock()
+    window.cycle_controller.cycle.return_value = (0, None)
+    window.statusBar = MagicMock(return_value=MagicMock())
+    window.settings_manager = MagicMock()
+    window.character_manager = MagicMock()
+    window._discovery_notification_timer = MagicMock()
+    window._status_refresh_timer = MagicMock()
 
     # Pin _TAB_LABELS to the real class constant so test_show_settings
     # exercises the same lookup the production code uses (was 4; becomes
@@ -224,6 +260,7 @@ class TestCycling:
         """Test cycle_next advances cycling index"""
         window = create_mock_window()
         window.cycling_index = 0
+        window.cycle_controller.cycle.return_value = (1, "Char2")
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = {"Default": ["Char1", "Char2", "Char3"]}
         window.current_cycling_group = "Default"
@@ -245,6 +282,7 @@ class TestCycling:
         """Test cycle_next wraps to beginning"""
         window = create_mock_window()
         window.cycling_index = 2  # Last position
+        window.cycle_controller.cycle.return_value = (0, "Char1")
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = {"Default": ["Char1", "Char2", "Char3"]}
         window.current_cycling_group = "Default"
@@ -266,6 +304,7 @@ class TestCycling:
         """Test cycle_prev decrements cycling index"""
         window = create_mock_window()
         window.cycling_index = 2
+        window.cycle_controller.cycle.return_value = (1, "Char2")
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = {"Default": ["Char1", "Char2", "Char3"]}
         window.current_cycling_group = "Default"
@@ -288,27 +327,23 @@ class TestCycling:
 class TestActivateWindowBasic:
     """Tests for _activate_window method (basic)"""
 
-    def test_activate_window_calls_capture_system(self):
-        """Test that activate_window delegates to capture_system"""
+    def test_activate_window_delegates_to_cycle_controller(self):
+        """Test that activate_window delegates to CycleController."""
         window = create_mock_window()
-        window.settings_manager = MagicMock()
-        window.settings_manager.get.return_value = False  # auto_minimize off
 
         window._activate_window("0x12345")
 
-        window.capture_system.activate_window.assert_called_once_with("0x12345")
+        window.cycle_controller.activate_window.assert_called_once_with("0x12345")
 
-    def test_activate_window_handles_exception(self):
-        """Test that activate_window handles exceptions"""
+    def test_activate_window_handles_controller_failure(self):
+        """Test that activate_window still routes through controller on failure."""
         window = create_mock_window()
-        window.settings_manager = MagicMock()
-        window.settings_manager.get.return_value = False
-        window.capture_system.activate_window.side_effect = OSError("failed")
+        window.cycle_controller.activate_window.return_value = False
 
         # Should not raise
         window._activate_window("0x12345")
 
-        window.logger.error.assert_called()
+        window.cycle_controller.activate_window.assert_called_once_with("0x12345")
 
 
 # Test minimize/restore all windows
@@ -357,34 +392,26 @@ class TestActivateCharacter:
     """Tests for _activate_character method"""
 
     def test_activate_character_found(self):
-        """Test activating a found character"""
+        """Test activating a found character delegates to CycleController."""
         window = create_mock_window()
-        window.settings_manager = MagicMock()
-        window.settings_manager.get.return_value = False  # auto_minimize off
-
-        mock_frame = MagicMock()
-        mock_frame.character_name = "TestPilot"
-
-        window.main_tab = MagicMock()
-        window.main_tab.window_manager = MagicMock()
-        window.main_tab.window_manager.preview_frames = {"0x12345": mock_frame}
 
         window._activate_character("TestPilot")
 
-        # Should delegate to capture_system.activate_window via _activate_window
-        window.capture_system.activate_window.assert_called_once_with("0x12345")
+        window.cycle_controller.activate_character.assert_called_once_with(
+            "TestPilot",
+            window._get_window_id_for_character,
+        )
 
     def test_activate_character_not_found(self):
-        """Test activating a character not found"""
+        """Test activating a character still delegates lookup to controller."""
         window = create_mock_window()
-
-        window.main_tab = MagicMock()
-        window.main_tab.window_manager = MagicMock()
-        window.main_tab.window_manager.preview_frames = {}
 
         window._activate_character("Unknown")
 
-        window.logger.warning.assert_called()
+        window.cycle_controller.activate_character.assert_called_once_with(
+            "Unknown",
+            window._get_window_id_for_character,
+        )
 
 
 # Test profile selection
@@ -419,6 +446,7 @@ class TestShowSettings:
         window.show = MagicMock()
         window.raise_ = MagicMock()
         window.tabs = MagicMock()
+        window._tab_indexes = {"Settings": 5}
 
         window._show_settings()
 
@@ -496,10 +524,11 @@ class TestPhase4InformationArchitecture:
         window = MagicMock()
         window.tabs = MagicMock()
 
-        with patch("argus_overview.ui.tabs.command_tab.CommandTab"), patch(
-            "argus_overview.ui.tabs.fleet_tab.FleetTab"
-        ), patch("argus_overview.ui.tabs.layouts_tab.LayoutsContainer"), patch(
-            "argus_overview.ui.tabs.system_tab.SystemTab"
+        with (
+            patch("argus_overview.ui.tabs.command_tab.CommandTab"),
+            patch("argus_overview.ui.tabs.fleet_tab.FleetTab"),
+            patch("argus_overview.ui.tabs.layouts_tab.LayoutsContainer"),
+            patch("argus_overview.ui.tabs.system_tab.SystemTab"),
         ):
             MainWindowV21._create_command_tab(window)
             MainWindowV21._create_fleet_tab(window)
@@ -526,49 +555,25 @@ class TestPhase4InformationArchitecture:
         Post-Phase-4: the inner widget is exposed as
         ``window.presets_panel`` (the container owns ``window.layouts_tab``).
         """
-        from contextlib import ExitStack
         from unittest.mock import MagicMock, patch
 
         from argus_overview.ui.main_window_v21 import MainWindowV21
 
-        mod = "argus_overview.ui.main_window_v21"
-        with ExitStack() as stack:
-            stack.enter_context(patch("PySide6.QtWidgets.QMainWindow.__init__", return_value=None))
-            stack.enter_context(patch.object(MainWindowV21, "setWindowTitle"))
-            stack.enter_context(patch.object(MainWindowV21, "setMinimumSize"))
-            stack.enter_context(patch.object(MainWindowV21, "setCentralWidget"))
-            stack.enter_context(patch.object(MainWindowV21, "_set_window_icon"))
-            stack.enter_context(patch.object(MainWindowV21, "_apply_initial_settings"))
-            stack.enter_context(patch.object(MainWindowV21, "_create_menu_bar"))
-            stack.enter_context(patch.object(MainWindowV21, "_create_command_tab"))
-            stack.enter_context(patch.object(MainWindowV21, "_create_fleet_tab"))
-            stack.enter_context(patch.object(MainWindowV21, "_create_layouts_container"))
-            stack.enter_context(patch.object(MainWindowV21, "_create_system_tab"))
-            stack.enter_context(patch.object(MainWindowV21, "_connect_signals"))
-            stack.enter_context(patch.object(MainWindowV21, "_create_system_tray"))
-            stack.enter_context(patch.object(MainWindowV21, "_register_hotkeys"))
-            stack.enter_context(patch.object(MainWindowV21, "_init_location_tracker"))
-            stack.enter_context(patch(f"{mod}.QTabWidget"))
-            stack.enter_context(patch(f"{mod}.QVBoxLayout"))
-            stack.enter_context(patch(f"{mod}.QWidget"))
-            stack.enter_context(patch(f"{mod}.QTimer"))
+        window = MagicMock(spec=MainWindowV21)
+        window.main_tab = MagicMock(name="main_tab")
+        window.layout_manager = MagicMock(name="layout_manager")
+        window.settings_manager = MagicMock(name="settings_manager")
+        window.character_manager = MagicMock(name="character_manager")
 
-            window = MainWindowV21()
+        with patch("argus_overview.ui.layouts_tab.LayoutsTab") as layouts_tab:
+            MainWindowV21._create_layouts_tab(window)
 
-            # Manually invoke the real factory now that the surrounding
-            # init dance is patched out — this is what crashed in v1.
-            window.main_tab = MagicMock(name="main_tab")
-            window.layout_manager = MagicMock(name="layout_manager")
-            window.settings_manager = MagicMock(name="settings_manager")
-            window.character_manager = MagicMock(name="character_manager")
-
-            window._create_layouts_tab()
-
-            # Contract: LayoutsTab.main_tab is the same object as
-            # MainWindowV21.main_tab, not the character_manager.
-            # Post-Phase-4: the inner widget is ``presets_panel``.
-            assert window.presets_panel.main_tab is window.main_tab
-            assert window.presets_panel.main_tab is not window.character_manager
+        layouts_tab.assert_called_once_with(
+            window.layout_manager,
+            window.main_tab,
+            settings_manager=window.settings_manager,
+            character_manager=window.character_manager,
+        )
 
 
 # Test reload config
@@ -604,14 +609,14 @@ class TestReloadConfig:
 class TestQuitApplication:
     """Tests for _quit_application method"""
 
-    @patch("argus_overview.ui.main_window_v21.QApplication")
-    def test_quit_application_calls_quit(self, mock_app):
-        """Test that quit_application calls QApplication.quit"""
+    def test_quit_application_sets_flag_and_closes(self):
+        """Test that quit_application marks quitting and closes the window."""
         window = create_mock_window()
 
         window._quit_application()
 
-        mock_app.quit.assert_called_once()
+        assert window._is_quitting is True
+        window.close.assert_called_once()
 
 
 # Test apply setting
@@ -633,13 +638,23 @@ class TestOnCharacterDetected:
     """Tests for _on_character_detected slot"""
 
     def test_on_character_detected_assigns_window(self):
-        """Test that character detection assigns window"""
+        """Test that character detection bootstraps and assigns window state."""
         window = create_mock_window()
         window.character_manager = MagicMock()
+        window._add_to_default_cycling_group = MagicMock()
 
         window._on_character_detected("0x12345", "TestPilot")
 
-        window.character_manager.assign_window.assert_called_with("TestPilot", "0x12345")
+        window.character_manager.ensure_character.assert_called_with(
+            "TestPilot",
+            auto_save=True,
+        )
+        window.character_manager.assign_window.assert_called_with(
+            "TestPilot",
+            "0x12345",
+            auto_save=True,
+        )
+        window._add_to_default_cycling_group.assert_called_with("TestPilot", auto_save=True)
 
 
 # Test team selected
@@ -693,6 +708,29 @@ class TestCloseEvent:
 
         window.hide.assert_called_once()
         mock_event.ignore.assert_called_once()
+
+    def test_close_event_bypasses_tray_when_quitting(self):
+        """Test that explicit quit bypasses minimize-to-tray behavior."""
+        window = create_mock_window()
+        window._is_quitting = True
+
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.return_value = True
+
+        window.auto_discovery = MagicMock()
+        window.capture_system = MagicMock()
+        window.hotkey_manager = MagicMock()
+        window.system_tray = MagicMock()
+        window.character_manager = MagicMock()
+        window._disconnect_signals = MagicMock()
+        window._disconnect_auto_discovery = MagicMock()
+
+        mock_event = MagicMock()
+
+        window.closeEvent(mock_event)
+
+        window.hide.assert_not_called()
+        mock_event.accept.assert_called_once()
 
     def test_close_event_actually_closes(self):
         """Test that close actually closes when tray disabled"""
@@ -768,12 +806,12 @@ class TestNewCharacterDiscovered:
         """Test that new character adds window to main tab"""
         window = create_mock_window()
 
-        # Mock main_tab
-        mock_frame = MagicMock()
         window.main_tab = MagicMock()
         window.main_tab.window_manager = MagicMock()
         window.main_tab.window_manager.preview_frames = {}  # Not already there
-        window.main_tab.window_manager.add_window.return_value = mock_frame
+        window.main_tab.import_detected_window.return_value = True
+        window._queue_main_tab_status_refresh = MagicMock()
+        window._queue_discovery_notification = MagicMock()
 
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = True  # show_notifications
@@ -782,8 +820,9 @@ class TestNewCharacterDiscovered:
 
         window._on_new_character_discovered("NewPilot", "0x99999", "EVE - NewPilot")
 
-        window.main_tab.window_manager.add_window.assert_called_with("0x99999", "NewPilot")
-        window.system_tray.show_notification.assert_called()
+        window.main_tab.import_detected_window.assert_called_with("0x99999", "NewPilot")
+        window._queue_main_tab_status_refresh.assert_called_once()
+        window._queue_discovery_notification.assert_called_once_with("NewPilot")
 
 
 # Test toggle lock
@@ -856,7 +895,7 @@ class TestCycleEdgeCases:
     """Edge case tests for cycling methods"""
 
     def test_cycle_next_empty_group(self):
-        """Test cycle_next with empty group"""
+        """Test next-cycle delegates an empty group to CycleController."""
         window = create_mock_window()
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = {}
@@ -867,10 +906,10 @@ class TestCycleEdgeCases:
 
         window._cycle_next()
 
-        window.logger.warning.assert_called()
+        window.cycle_controller.cycle.assert_called_once()
 
     def test_cycle_prev_empty_group(self):
-        """Test cycle_prev with empty group"""
+        """Test previous-cycle delegates an empty group to CycleController."""
         window = create_mock_window()
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = {}
@@ -881,7 +920,7 @@ class TestCycleEdgeCases:
 
         window._cycle_prev()
 
-        window.logger.warning.assert_called()
+        window.cycle_controller.cycle.assert_called_once()
 
 
 # Test handle hotkey
@@ -917,12 +956,13 @@ class TestReloadConfigEdgeCases:
 
         window.theme_manager = MagicMock()
         window.auto_discovery = MagicMock()
+        window._ensure_auto_discovery_state = MagicMock()
         window.system_tray = MagicMock()
         window._apply_initial_settings = MagicMock()
 
         window._reload_config()
 
-        window.auto_discovery.stop.assert_called_once()
+        window._ensure_auto_discovery_state.assert_called_once()
 
     def test_reload_config_updates_running_auto_discovery(self):
         """Test reload_config updates interval when auto-discovery running"""
@@ -939,14 +979,145 @@ class TestReloadConfigEdgeCases:
         window.auto_discovery = MagicMock()
         window.auto_discovery.scan_timer = MagicMock()
         window.auto_discovery.scan_timer.isActive.return_value = True  # Already running
+        window._ensure_auto_discovery_state = MagicMock()
 
         window.system_tray = MagicMock()
         window._apply_initial_settings = MagicMock()
 
         window._reload_config()
 
-        window.auto_discovery.set_interval.assert_called_with(10)
-        window.auto_discovery.start.assert_not_called()  # Already running
+        window._ensure_auto_discovery_state.assert_called_once()
+
+
+class TestStartupAssistant:
+    """Tests for startup onboarding automation."""
+
+    def test_startup_assistant_auto_imports_running_clients(self):
+        """Test startup assistant auto-imports when enabled and overview is empty."""
+        window = create_mock_window()
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.window_manager.get_active_window_count.return_value = 0
+        window.main_tab.one_click_import.return_value = (2, 0, 2)
+        window.system_tray = MagicMock()
+
+        def get_side_effect(key, default=None):
+            values = {
+                "general.auto_import_on_startup": True,
+                "general.show_notifications": True,
+            }
+            return values.get(key, default)
+
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.side_effect = get_side_effect
+
+        window._run_startup_assistant()
+
+        window.main_tab.one_click_import.assert_called_once_with(show_dialogs=False)
+        window.statusBar.return_value.showMessage.assert_called_once()
+        window.system_tray.show_notification.assert_called_once()
+
+    def test_startup_assistant_flushes_batched_saves_once(self):
+        """Test startup assistant finishes deferred persistence after bulk import."""
+        window = create_mock_window()
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.window_manager.get_active_window_count.return_value = 0
+
+        def import_side_effect(*, show_dialogs=False):
+            window._bulk_import_dirty_characters = True
+            window._bulk_import_dirty_groups = True
+            return (3, 0, 3)
+
+        window.main_tab.one_click_import.side_effect = import_side_effect
+        window.system_tray = MagicMock()
+
+        def get_side_effect(key, default=None):
+            values = {
+                "general.auto_import_on_startup": True,
+                "general.show_notifications": False,
+            }
+            return values.get(key, default)
+
+        window.settings_manager.get.side_effect = get_side_effect
+
+        window._run_startup_assistant()
+
+        window.character_manager.save_data.assert_called_once()
+        window.settings_manager.save_settings.assert_called_once()
+
+
+class TestDiscoveryNotifications:
+    """Tests for batched auto-discovery notifications."""
+
+    def test_queue_discovery_notification_batches_names(self):
+        """Test queued names are accumulated and timer restarted."""
+        window = create_mock_window()
+
+        window._queue_discovery_notification("Pilot One")
+        window._queue_discovery_notification("Pilot Two")
+        window._queue_discovery_notification("Pilot One")
+
+        assert window._pending_discovery_names == ["Pilot One", "Pilot Two"]
+        assert window._discovery_notification_timer.start.call_count == 3
+
+    def test_flush_discovery_notifications_shows_single_summary(self):
+        """Test multiple queued discoveries are shown as one summary notification."""
+        window = create_mock_window()
+        window.system_tray = MagicMock()
+        window._pending_discovery_names = ["Pilot One", "Pilot Two", "Pilot Three", "Pilot Four"]
+
+        window._flush_discovery_notifications()
+
+        window.system_tray.show_notification.assert_called_once()
+        assert window._pending_discovery_names == []
+
+
+class TestStatusRefreshQueue:
+    """Tests for debounced main-tab status refreshes."""
+
+    def test_queue_main_tab_status_refresh_starts_timer(self):
+        """Test status refreshes are queued through the debounce timer."""
+        window = create_mock_window()
+
+        window._queue_main_tab_status_refresh()
+
+        window._status_refresh_timer.start.assert_called_once()
+
+    def test_flush_main_tab_status_refresh_updates_overview(self):
+        """Test flushing the queued refresh updates the overview once."""
+        window = create_mock_window()
+        window.main_tab = MagicMock()
+
+        window._flush_main_tab_status_refresh()
+
+        window.main_tab._update_status.assert_called_once()
+
+    def test_startup_assistant_shows_guidance_when_nothing_imported(self):
+        """Test startup assistant shows quick-start guidance when no clients are imported."""
+        window = create_mock_window()
+        window.main_tab = MagicMock()
+        window.main_tab.window_manager = MagicMock()
+        window.main_tab.window_manager.get_active_window_count.return_value = 0
+        window.main_tab.one_click_import.return_value = (0, 0, 0)
+        window.system_tray = MagicMock()
+
+        def get_side_effect(key, default=None):
+            values = {
+                "general.auto_import_on_startup": True,
+                "general.show_notifications": True,
+                "general.show_setup_guidance": True,
+            }
+            return values.get(key, default)
+
+        window.settings_manager = MagicMock()
+        window.settings_manager.get.side_effect = get_side_effect
+
+        window._run_startup_assistant()
+
+        window.main_tab.one_click_import.assert_called_once_with(show_dialogs=False)
+        window.statusBar.return_value.showMessage.assert_called_once()
+        window.system_tray.show_notification.assert_not_called()
 
 
 # Test apply setting edge cases
@@ -980,6 +1151,7 @@ class TestOnCharacterDetectedEdgeCases:
         """Test that character detection updates characters tab if available"""
         window = create_mock_window()
         window.character_manager = MagicMock()
+        window._add_to_default_cycling_group = MagicMock()
         window.characters_tab = MagicMock()
 
         window._on_character_detected("0x12345", "TestPilot")
@@ -1051,7 +1223,7 @@ class TestCyclingRecursion:
     """Tests for cycling recursion when character not found"""
 
     def test_cycle_next_recursion_on_not_found(self):
-        """Test _cycle_next recursively tries next when not found"""
+        """Test next-cycle delegates selection to CycleController."""
         window = create_mock_window()
         window.cycling_index = 0
         window.settings_manager = MagicMock()
@@ -1069,11 +1241,12 @@ class TestCyclingRecursion:
         }
 
         window._activate_window = MagicMock()
+        window.cycle_controller.cycle.return_value = (1, "FoundChar")
 
         window._cycle_next()
 
-        # Should have advanced to index 1 (FoundChar) after not finding NotFound
-        assert window.cycling_index == 1 or window._activate_window.called
+        assert window.cycling_index == 1
+        window.cycle_controller.cycle.assert_called_once()
 
     def test_cycle_prev_recursion_on_not_found(self):
         """Test _cycle_prev recursively tries prev when not found"""
@@ -1232,8 +1405,7 @@ class TestNewCharacterAlreadyExists:
 
         window._on_new_character_discovered("ExistingPilot", "0x99999", "EVE - ExistingPilot")
 
-        # add_window should NOT be called
-        window.main_tab.window_manager.add_window.assert_not_called()
+        window.main_tab.import_detected_window.assert_not_called()
 
 
 # Test new character discovered - no notification
@@ -1244,12 +1416,11 @@ class TestNewCharacterNoNotification:
         """Test that notification is skipped when disabled"""
         window = create_mock_window()
 
-        mock_frame = MagicMock()
         window.main_tab = MagicMock()
         window.main_tab.window_manager = MagicMock()
         window.main_tab.window_manager.preview_frames = {}
-        window.main_tab.window_manager.add_window.return_value = mock_frame
-        window.main_tab.preview_layout = MagicMock()
+        window.main_tab.import_detected_window.return_value = True
+        window._queue_main_tab_status_refresh = MagicMock()
 
         window.settings_manager = MagicMock()
         window.settings_manager.get.return_value = False  # show_notifications disabled
@@ -1258,29 +1429,30 @@ class TestNewCharacterNoNotification:
 
         window._on_new_character_discovered("NewPilot", "0x88888", "EVE - NewPilot")
 
-        # add_window should be called
-        window.main_tab.window_manager.add_window.assert_called_once()
+        window.main_tab.import_detected_window.assert_called_once_with("0x88888", "NewPilot")
+        window._queue_main_tab_status_refresh.assert_called_once()
         # But show_notification should NOT be called
         window.system_tray.show_notification.assert_not_called()
 
 
 # Test new character discovered - frame is None
 class TestNewCharacterFrameNone:
-    """Test _on_new_character_discovered when add_window returns None"""
+    """Test _on_new_character_discovered when shared import returns False"""
 
     def test_on_new_character_discovered_frame_none(self):
-        """Test handling when add_window returns None"""
+        """Test handling when shared import path fails."""
         window = create_mock_window()
 
         window.main_tab = MagicMock()
         window.main_tab.window_manager = MagicMock()
         window.main_tab.window_manager.preview_frames = {}
-        window.main_tab.window_manager.add_window.return_value = None  # Failed to create
+        window.main_tab.import_detected_window.return_value = False
+        window._queue_main_tab_status_refresh = MagicMock()
 
         window._on_new_character_discovered("NewPilot", "0x77777", "EVE - NewPilot")
 
-        # Should not try to connect signals on None
-        window.main_tab.preview_layout.addWidget.assert_not_called()
+        window.main_tab.import_detected_window.assert_called_once_with("0x77777", "NewPilot")
+        window._queue_main_tab_status_refresh.assert_not_called()
 
 
 # Test minimize/restore handles no main_tab
@@ -1309,13 +1481,13 @@ class TestActivateCharacterNoMainTab:
     """Test _activate_character when main_tab missing"""
 
     def test_activate_character_no_main_tab(self):
-        """Test activate_character handles missing main_tab"""
+        """Test activate_character still delegates even if main_tab is missing."""
         window = create_mock_window()
         del window.main_tab
 
         window._activate_character("SomeChar")
 
-        window.logger.warning.assert_called()
+        window.cycle_controller.activate_character.assert_called_once()
 
 
 # Test _register_hotkeys
@@ -1446,96 +1618,36 @@ class TestRegisterCyclingHotkeys:
 
 # Test _activate_window (platform abstraction layer)
 class TestActivateWindowPlatform:
-    """Tests for _activate_window method using capture_system abstraction"""
+    """Tests for _activate_window delegation to CycleController."""
 
-    def _make_window(self, *, auto_minimize=False, valid_id=True):
-        """Helper to create a mock window with capture_system."""
+    def _make_window(self):
+        """Helper to create a mock window with CycleController."""
         from argus_overview.ui.main_window_v21 import MainWindowV21
 
         window = MagicMock(spec=MainWindowV21)
         window.logger = MagicMock()
-        window.settings_manager = MagicMock()
-        window.settings_manager.get.return_value = auto_minimize
-        window.capture_system = MagicMock()
-        window.capture_system._window_mgr = MagicMock()
-        window.capture_system._window_mgr.is_valid_window_id.return_value = valid_id
+        window.cycle_controller = MagicMock()
         return window
 
     def test_activate_window_success(self):
-        """Test activating window delegates to capture_system"""
+        """Test activating window delegates to CycleController."""
         window = self._make_window()
 
         from argus_overview.ui.main_window_v21 import MainWindowV21
 
         MainWindowV21._activate_window(window, "0x12345")
 
-        window.capture_system.activate_window.assert_called_once_with("0x12345")
+        window.cycle_controller.activate_window.assert_called_once_with("0x12345")
 
     def test_activate_window_failure(self):
-        """Test activate window handles failure"""
+        """Test activate window does not swallow controller invocation."""
         window = self._make_window()
-        window.capture_system.activate_window.side_effect = OSError("failed")
 
         from argus_overview.ui.main_window_v21 import MainWindowV21
 
         MainWindowV21._activate_window(window, "0x12345")
 
-        window.logger.error.assert_called()
-
-    def test_activate_window_with_auto_minimize(self):
-        """Test activating window minimizes previous when auto-minimize enabled"""
-        window = self._make_window(auto_minimize=True)
-        window.settings_manager.get_last_activated_window.return_value = "0x99999"
-
-        from argus_overview.ui.main_window_v21 import MainWindowV21
-
-        MainWindowV21._activate_window(window, "0x12345")
-
-        # Verify minimize was called on previous window
-        window.capture_system.minimize_window.assert_called_once_with("0x99999")
-        # Verify activate was called on new window
-        window.capture_system.activate_window.assert_called_once_with("0x12345")
-
-    def test_activate_window_invalid_id_none(self):
-        """Test activate window rejects None window ID"""
-        window = self._make_window(valid_id=False)
-
-        from argus_overview.ui.main_window_v21 import MainWindowV21
-
-        MainWindowV21._activate_window(window, None)
-
-        window.logger.warning.assert_called()
-        window.capture_system.activate_window.assert_not_called()
-
-    def test_activate_window_invalid_id_format(self):
-        """Test activate window rejects invalid window ID format"""
-        window = self._make_window(valid_id=False)
-
-        from argus_overview.ui.main_window_v21 import MainWindowV21
-
-        # Test various invalid formats
-        for invalid_id in ["12345", "abc", "0xGGGG", "", "window123"]:
-            window.capture_system.activate_window.reset_mock()
-            window.logger.reset_mock()
-
-            MainWindowV21._activate_window(window, invalid_id)
-
-            window.logger.warning.assert_called()
-            window.capture_system.activate_window.assert_not_called()
-
-    def test_activate_window_valid_id_formats(self):
-        """Test activate window accepts valid window ID formats"""
-        window = self._make_window()
-
-        from argus_overview.ui.main_window_v21 import MainWindowV21
-
-        # Test various valid formats
-        for valid_id in ["0x12345", "0xABCDEF", "0x0", "0xFFFFFFFF"]:
-            window.capture_system.activate_window.reset_mock()
-
-            MainWindowV21._activate_window(window, valid_id)
-
-            window.capture_system.activate_window.assert_called_once_with(valid_id)
+        window.cycle_controller.activate_window.assert_called_once_with("0x12345")
 
 
 # Test _create_menu_bar
@@ -1572,7 +1684,7 @@ class TestCyclingCharNotFound:
     """Tests for cycling when character not found - covers recursive branches"""
 
     def test_cycle_next_char_not_found_logs_warning(self):
-        """Test _cycle_next logs warning when character not found and no recursion"""
+        """Test next-cycle delegates an inactive group to CycleController."""
         window = create_mock_window()
         window.cycling_index = 0
         window.settings_manager = MagicMock()
@@ -1597,11 +1709,10 @@ class TestCyclingCharNotFound:
 
         window._cycle_next()
 
-        # Should log warning about character not found
-        window.logger.warning.assert_called()
+        window.cycle_controller.cycle.assert_called_once()
 
     def test_cycle_prev_char_not_found_logs_warning(self):
-        """Test _cycle_prev logs warning when character not found and no recursion"""
+        """Test previous-cycle delegates an inactive group to CycleController."""
         window = create_mock_window()
         window.cycling_index = 0
         window.settings_manager = MagicMock()
@@ -1626,8 +1737,7 @@ class TestCyclingCharNotFound:
 
         window._cycle_prev()
 
-        # Should log warning about character not found
-        window.logger.warning.assert_called()
+        window.cycle_controller.cycle.assert_called_once()
 
 
 # Test _create_system_tray
@@ -2420,6 +2530,9 @@ class TestCloseEventMainTab:
         window.hotkey_manager = MagicMock()
         window.system_tray = MagicMock()
         window._disconnect_signals = MagicMock()
+        window._disconnect_auto_discovery = MagicMock()
+        window._is_quitting = False
+        window._pending_discovery_names = []
         window._already_closing = False
 
         # Call closeEvent
@@ -2449,6 +2562,9 @@ class TestCloseEventIntelTab:
         window.hotkey_manager = MagicMock()
         window.system_tray = MagicMock()
         window._disconnect_signals = MagicMock()
+        window._disconnect_auto_discovery = MagicMock()
+        window._is_quitting = False
+        window._pending_discovery_names = []
         window._already_closing = False
 
         # Call closeEvent

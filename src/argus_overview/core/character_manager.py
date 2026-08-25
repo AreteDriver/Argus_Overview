@@ -10,6 +10,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
 
+AUTO_CREATED_NOTE = "Auto-created from detected window"
+
 
 def sanitize_character_name(name: str) -> str:
     """Sanitize a character name to prevent path traversal and injection.
@@ -213,6 +215,34 @@ class CharacterManager:
         self.logger.info(f"Added character '{character.name}'")
         return True
 
+    def ensure_character(self, char_name: str, auto_save: bool = True) -> bool:
+        """Ensure a character exists, creating a minimal record if needed."""
+        try:
+            sanitized = sanitize_character_name(char_name)
+        except ValueError:
+            self.logger.error(f"Rejected invalid character name: '{char_name}'")
+            return False
+
+        if sanitized in self.characters:
+            return True
+
+        self.characters[sanitized] = Character(
+            name=sanitized,
+            notes=AUTO_CREATED_NOTE,
+        )
+        if auto_save:
+            self.save_data()
+        self.logger.info(f"Auto-created character '{sanitized}' from detected window")
+        return True
+
+    def get_characters_needing_setup(self) -> list[Character]:
+        """Return auto-created characters that likely still need review."""
+        return [
+            char
+            for char in self.characters.values()
+            if (char.notes or "").strip() == AUTO_CREATED_NOTE
+        ]
+
     def remove_character(self, char_name: str) -> bool:
         """Remove a character"""
         if char_name not in self.characters:
@@ -333,14 +363,15 @@ class CharacterManager:
         return [team for team in self.teams.values() if char_name in team.characters]
 
     # Window Assignment
-    def assign_window(self, char_name: str, window_id: str) -> bool:
+    def assign_window(self, char_name: str, window_id: str, auto_save: bool = True) -> bool:
         """Assign a window ID to a character"""
         if char_name not in self.characters:
             return False
 
         self.characters[char_name].window_id = window_id
         self.characters[char_name].last_seen = datetime.now().isoformat()
-        self.save_data()
+        if auto_save:
+            self.save_data()
         return True
 
     def unassign_window(self, char_name: str) -> bool:

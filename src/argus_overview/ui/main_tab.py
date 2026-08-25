@@ -11,7 +11,9 @@ import logging
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from datetime import datetime
+from typing import Any
 
 from PIL import Image
 from PySide6.QtCore import (
@@ -754,7 +756,7 @@ class WindowPreviewWidget(QWidget):
 
         self._replay_buffer: deque = deque(maxlen=REPLAY_BUFFER_SIZE)
         self._replay_last_sample_ms: int = 0
-        self._replay_strip = None  # type: ignore[var-annotated]
+        self._replay_strip: ReplayStrip | None = None
         self._replay_view_index: int | None = None  # None = live; int = buffered
 
         from argus_overview.ui.design_system import metrics as dm
@@ -1322,16 +1324,21 @@ class WindowPreviewWidget(QWidget):
         height and the flow grid never shifts when the strip is toggled.
         """
         if enabled and self._replay_strip is None:
-            self._replay_strip = ReplayStrip(parent=self._replay_container)
-            self._replay_strip.frame_hovered.connect(self._on_replay_frame_hovered)
-            self._replay_container.layout().addWidget(self._replay_strip)
-            self._replay_strip.set_frames(list(self._replay_buffer))
+            replay_strip = ReplayStrip(parent=self._replay_container)
+            replay_strip.frame_hovered.connect(self._on_replay_frame_hovered)
+            container_layout = self._replay_container.layout()
+            if container_layout is not None:
+                container_layout.addWidget(replay_strip)
+            replay_strip.set_frames(list(self._replay_buffer))
+            self._replay_strip = replay_strip
         elif not enabled and self._replay_strip is not None:
             try:
                 self._replay_strip.frame_hovered.disconnect(self._on_replay_frame_hovered)
             except (RuntimeError, TypeError):
                 pass
-            self._replay_container.layout().removeWidget(self._replay_strip)
+            container_layout = self._replay_container.layout()
+            if container_layout is not None:
+                container_layout.removeWidget(self._replay_strip)
             self._replay_strip.deleteLater()
             self._replay_strip = None
             # Drop any held buffered view.
@@ -1449,7 +1456,12 @@ class WindowPreviewWidget(QWidget):
             and self._threat_alpha > 0.0
             and self._flash_color is None
         ):
-            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            age_threat_level = self._threat_level
+            r, g, b = (
+                THREAT_BORDER_COLORS.get(age_threat_level, (255, 255, 255))
+                if age_threat_level is not None
+                else (255, 255, 255)
+            )
             base_alpha = int(220 * self._threat_alpha)
             pulse_boost = int(35 * self._pulse_phase)
             alpha = max(0, min(255, base_alpha + pulse_boost))
@@ -1586,7 +1598,12 @@ class WindowPreviewWidget(QWidget):
             and not health.startswith("STALE")
             and health not in ("ERROR", "DISCONNECTED")
         ):
-            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            threat_level = self._threat_level
+            r, g, b = (
+                THREAT_BORDER_COLORS.get(threat_level, (255, 255, 255))
+                if threat_level is not None
+                else (255, 255, 255)
+            )
             pill_parts = [self._threat_system]
             if self._threat_distance and self._threat_distance > 0:
                 pill_parts.append(f"+{self._threat_distance}j")
@@ -1609,7 +1626,12 @@ class WindowPreviewWidget(QWidget):
         if self._threat_alpha < 0.9 and self._threat_set_at > 0.0:
             age_secs = int(time.monotonic() - self._threat_set_at)
             age_text = f"{age_secs}s ago"
-            r, g, b = THREAT_BORDER_COLORS.get(self._threat_level, (255, 255, 255))
+            age_threat_level = self._threat_level
+            r, g, b = (
+                THREAT_BORDER_COLORS.get(age_threat_level, (255, 255, 255))
+                if age_threat_level is not None
+                else (255, 255, 255)
+            )
             alpha = max(0, min(255, int(220 * self._threat_alpha)))
             pill_rect = draw_pill(
                 painter,
@@ -1759,7 +1781,7 @@ class WindowPreviewWidget(QWidget):
         # Handler map for context actions. toggle_replay_strip was added
         # to the registry as a tier-3 WINDOW_CONTEXT action; it joins the
         # other handlers here.
-        handlers = {
+        handlers: dict[str, Callable] = {
             "focus_window": lambda: self.window_activated.emit(self.window_id),
             "minimize_window": self._minimize_window,
             "close_window": self._close_window,
@@ -2144,6 +2166,9 @@ class MainTab(QWidget):
     character_detected = Signal(str, str)  # window_id, char_name
     thumbnails_toggled = Signal(bool)  # visible
     layout_applied = Signal(str)  # pattern name
+    window_focus_requested = Signal(str)  # window_id
+    roster_navigation_requested = Signal()
+    cycle_control_navigation_requested = Signal()
 
     def __init__(
         self,
@@ -2173,6 +2198,14 @@ class MainTab(QWidget):
             if settings_manager
             else False
         )
+        self._status_override_text: str | None = None
+        self._recent_import_summary: str | None = None
+        self._status_override_timer = QTimer(self)
+        self._status_override_timer.setSingleShot(True)
+        self._status_override_timer.timeout.connect(self._clear_status_override)
+        self._import_summary_timer = QTimer(self)
+        self._import_summary_timer.setSingleShot(True)
+        self._import_summary_timer.timeout.connect(self._clear_import_completion_summary)
 
         # v2.3: Layout controls
         self._refresh_sources_timer = QTimer()
@@ -2244,6 +2277,8 @@ class MainTab(QWidget):
         self.preview_container = QWidget()
         self.preview_layout = FlowLayout(margin=15, spacing=15)  # Grid-style flow layout
         self.preview_container.setLayout(self.preview_layout)
+        self.empty_state_panel = self._create_empty_state_panel()
+        self.preview_layout.addWidget(self.empty_state_panel)
 
         scroll.setWidget(self.preview_container)
         layout.addWidget(scroll)
@@ -2255,6 +2290,159 @@ class MainTab(QWidget):
         # Status bar
         status_bar = self._create_status_bar()
         layout.addWidget(status_bar)
+        self._update_empty_state_visibility()
+
+    def _create_empty_state_panel(self) -> QWidget:
+        """Create a lightweight onboarding card for the empty Overview state."""
+        panel = QFrame()
+        panel.setFrameStyle(QFrame.Shape.StyledPanel | QFrame.Shadow.Raised)
+        panel.setStyleSheet("""
+            QFrame {
+                background-color: rgba(255, 140, 0, 0.08);
+                border: 1px solid rgba(255, 140, 0, 0.35);
+                border-radius: 10px;
+            }
+        """)
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(10)
+        panel.setLayout(layout)
+
+        title = QLabel("Get Your Clients Ready")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(title)
+
+        self.empty_state_hint = QLabel(self._get_empty_state_message())
+        self.empty_state_hint.setWordWrap(True)
+        self.empty_state_hint.setStyleSheet("color: #b8b8b8;")
+        layout.addWidget(self.empty_state_hint)
+
+        actions = QHBoxLayout()
+        actions.setSpacing(8)
+
+        self.empty_state_import_btn = QPushButton("Import Windows")
+        self.empty_state_import_btn.clicked.connect(self.one_click_import)
+        actions.addWidget(self.empty_state_import_btn)
+
+        self.empty_state_add_btn = QPushButton("Add Window")
+        self.empty_state_add_btn.clicked.connect(self.show_add_window_dialog)
+        actions.addWidget(self.empty_state_add_btn)
+        actions.addStretch()
+
+        layout.addLayout(actions)
+
+        self.empty_state_summary = QLabel("")
+        self.empty_state_summary.setWordWrap(True)
+        self.empty_state_summary.setStyleSheet("color: #f6d38b;")
+        self.empty_state_summary.hide()
+        layout.addWidget(self.empty_state_summary)
+
+        next_steps = QHBoxLayout()
+        next_steps.setSpacing(8)
+
+        self.empty_state_roster_btn = QPushButton("Open Roster")
+        self.empty_state_roster_btn.clicked.connect(self.roster_navigation_requested.emit)
+        self.empty_state_roster_btn.hide()
+        next_steps.addWidget(self.empty_state_roster_btn)
+
+        self.empty_state_cycle_btn = QPushButton("Open Cycle Control")
+        self.empty_state_cycle_btn.clicked.connect(self.cycle_control_navigation_requested.emit)
+        self.empty_state_cycle_btn.hide()
+        next_steps.addWidget(self.empty_state_cycle_btn)
+        next_steps.addStretch()
+        layout.addLayout(next_steps)
+        return panel
+
+    def _set_empty_state_busy(self, busy: bool, message: str | None = None):
+        """Update onboarding card controls during import/setup actions."""
+        import_btn = getattr(self, "empty_state_import_btn", None)
+        add_btn = getattr(self, "empty_state_add_btn", None)
+        hint = getattr(self, "empty_state_hint", None)
+        summary = getattr(self, "empty_state_summary", None)
+        roster_btn = getattr(self, "empty_state_roster_btn", None)
+        cycle_btn = getattr(self, "empty_state_cycle_btn", None)
+
+        if import_btn is not None:
+            import_btn.setEnabled(not busy)
+            import_btn.setText("Importing..." if busy else "Import Windows")
+
+        if add_btn is not None:
+            add_btn.setEnabled(not busy)
+
+        if roster_btn is not None:
+            roster_btn.setVisible(not busy and bool(self._recent_import_summary))
+
+        if cycle_btn is not None:
+            cycle_btn.setVisible(not busy and bool(self._recent_import_summary))
+
+        if summary is not None:
+            summary.setVisible(bool(self._recent_import_summary) and not busy)
+            if self._recent_import_summary and not busy:
+                summary.setText(self._recent_import_summary)
+
+        if hint is not None:
+            if busy:
+                hint.setText(message or "Scanning for EVE clients and preparing previews...")
+                if summary is not None:
+                    summary.hide()
+            else:
+                hint.setText(self._get_empty_state_message())
+
+    def _set_empty_state_progress(self, current: int, total: int, added: int, skipped: int):
+        """Surface import progress inside the onboarding card."""
+        hint = getattr(self, "empty_state_hint", None)
+        if hint is None:
+            return
+
+        remaining = max(total - current, 0)
+        hint.setText(
+            f"Processing clients... Imported {added} client(s), skipped {skipped}. "
+            f"{remaining} remaining."
+        )
+
+    def _update_empty_state_visibility(self):
+        """Show onboarding card only when no active preview windows are loaded."""
+        panel = getattr(self, "empty_state_panel", None)
+        if panel is None:
+            return
+
+        recent_summary = getattr(self, "_recent_import_summary", None)
+        count = self.window_manager.get_active_window_count()
+        panel.setVisible(count == 0 or bool(recent_summary))
+
+        hint = getattr(self, "empty_state_hint", None)
+        if hint is not None:
+            hint.setText(self._get_empty_state_message())
+
+        summary = getattr(self, "empty_state_summary", None)
+        if summary is not None:
+            summary.setVisible(bool(recent_summary))
+            if recent_summary:
+                summary.setText(recent_summary)
+
+        roster_btn = getattr(self, "empty_state_roster_btn", None)
+        if roster_btn is not None:
+            roster_btn.setVisible(bool(recent_summary))
+
+        cycle_btn = getattr(self, "empty_state_cycle_btn", None)
+        if cycle_btn is not None:
+            cycle_btn.setVisible(bool(recent_summary))
+
+    def _show_import_completion_summary(self, added: int, skipped: int, detected: int):
+        """Temporarily turn the onboarding card into a post-import next-steps card."""
+        self._recent_import_summary = (
+            f"Import complete: {added} added, {skipped} skipped, {detected} detected."
+        )
+        self._update_empty_state_visibility()
+        timer = getattr(self, "_import_summary_timer", None)
+        if timer is not None:
+            timer.start(12000)
+
+    def _clear_import_completion_summary(self):
+        """Clear temporary post-import guidance from the onboarding card."""
+        self._recent_import_summary = None
+        self._update_empty_state_visibility()
 
     def _sync_status_dock(self) -> None:
         """Mirror window_manager.preview_frames into the status dock."""
@@ -2282,7 +2470,7 @@ class MainTab(QWidget):
 
         # Build toolbar buttons from ActionRegistry
         toolbar_builder = ToolbarBuilder()
-        handlers = {
+        handlers: dict[str, Callable[..., Any]] = {
             "import_windows": self.one_click_import,
             "remove_all_windows": self._remove_all_windows,
             "lock_positions": self._toggle_lock,
@@ -2644,71 +2832,122 @@ class MainTab(QWidget):
         self._refresh_layout_sources()
         self._on_layout_source_changed()
 
-    def one_click_import(self):
+    def _set_status_message(self, message: str, timeout_ms: int = 5000):
+        """Show a transient status message without losing live status updates."""
+        self._status_override_text = message
+        status_label = getattr(self, "status_label", None)
+        if status_label is not None:
+            status_label.setText(message)
+        timer = getattr(self, "_status_override_timer", None)
+        if timer is not None:
+            timer.start(timeout_ms)
+
+    def _clear_status_override(self):
+        """Restore live status after a transient message expires."""
+        self._status_override_text = None
+        self._update_status()
+
+    def _get_empty_state_message(self) -> str:
+        """Return the most helpful empty-state guidance for the overview tab."""
+        settings_manager = getattr(self, "settings_manager", None)
+        if settings_manager and settings_manager.get("general.show_setup_guidance", True):
+            if settings_manager.get("general.auto_discovery", True):
+                return (
+                    "No windows in preview. Click 'Import Windows' to start, or launch EVE and "
+                    "let auto-discovery add clients for you."
+                )
+            return (
+                "No windows in preview. Click 'Import Windows' for fastest setup, or use "
+                "'Add Window' for manual control."
+            )
+        return "No windows in preview"
+
+    def one_click_import(
+        self,
+        _checked: bool = False,
+        *,
+        show_dialogs: bool = True,
+    ) -> tuple[int, int, int]:
         """
         v2.2 One-Click Import: Scan and import all EVE windows automatically
+
+        ``_checked`` absorbs the boolean emitted by ``QPushButton.clicked`` so
+        user-triggered imports retain the default dialog behavior. Startup
+        automation controls dialogs explicitly through the keyword-only flag.
         """
         self.logger.info("Starting one-click import...")
+        self._set_empty_state_busy(True)
 
-        # Scan for EVE windows
-        eve_windows = scan_eve_windows()
+        try:
+            # Scan for EVE windows
+            eve_windows = scan_eve_windows()
 
-        if not eve_windows:
-            QMessageBox.information(
-                self,
-                "No EVE Windows Found",
-                "No EVE Online windows were detected.\n\n"
-                "Make sure EVE Online clients are running and visible.",
+            if not eve_windows:
+                self._set_status_message(
+                    "No EVE windows detected yet. Launch clients, then try Import Windows again.",
+                    timeout_ms=7000,
+                )
+                if show_dialogs:
+                    QMessageBox.information(
+                        self,
+                        "No EVE Windows Found",
+                        "No EVE Online windows were detected.\n\n"
+                        "Make sure EVE Online clients are running and visible.",
+                    )
+                return 0, 0, 0
+
+            self._set_empty_state_busy(
+                True,
+                f"Found {len(eve_windows)} EVE client(s). Preparing previews...",
             )
-            return
 
-        # Count how many are new
-        added_count = 0
-        skipped_count = 0
+            # Count how many are new
+            added_count = 0
+            skipped_count = 0
 
-        for window_id, _window_title, char_name in eve_windows:
-            # Skip if already in preview
-            if window_id in self.window_manager.preview_frames:
-                skipped_count += 1
-                continue
+            for index, (window_id, _window_title, char_name) in enumerate(eve_windows, start=1):
+                # Skip if already in preview
+                if window_id in self.window_manager.preview_frames:
+                    skipped_count += 1
+                    self._set_empty_state_progress(
+                        current=index,
+                        total=len(eve_windows),
+                        added=added_count,
+                        skipped=skipped_count,
+                    )
+                    continue
 
-            # Add to window manager
-            frame = self.window_manager.add_window(window_id, char_name)
-            if frame:
-                # Connect signals
-                frame.window_activated.connect(
-                    self._on_window_activated, Qt.ConnectionType.UniqueConnection
-                )
-                frame.window_removed.connect(
-                    self._on_window_removed, Qt.ConnectionType.UniqueConnection
-                )
-                frame.focus_requested.connect(
-                    self._on_focus_requested, Qt.ConnectionType.UniqueConnection
-                )
-                frame.retry_requested.connect(
-                    self._on_retry_requested, Qt.ConnectionType.UniqueConnection
+                if self.import_detected_window(window_id, char_name):
+                    added_count += 1
+
+                self._set_empty_state_progress(
+                    current=index,
+                    total=len(eve_windows),
+                    added=added_count,
+                    skipped=skipped_count,
                 )
 
-                # Add to layout
-                self.preview_layout.addWidget(frame)
-                added_count += 1
+            # Show result
+            if added_count > 0:
+                self._set_status_message(f"Imported {added_count} character(s)")
+                self._show_import_completion_summary(
+                    added=added_count,
+                    skipped=skipped_count,
+                    detected=len(eve_windows),
+                )
+                self.logger.info(
+                    f"One-click import: Added {added_count}, skipped {skipped_count} duplicates"
+                )
+            elif skipped_count > 0:
+                self._set_status_message(f"All {skipped_count} EVE windows already imported")
+            else:
+                self._set_status_message("No new EVE windows found")
 
-                # Emit character detected signal
-                self.character_detected.emit(window_id, char_name)
-
-        # Show result
-        if added_count > 0:
-            self.status_label.setText(f"Imported {added_count} character(s)")
-            self.logger.info(
-                f"One-click import: Added {added_count}, skipped {skipped_count} duplicates"
-            )
-        elif skipped_count > 0:
-            self.status_label.setText(f"All {skipped_count} EVE windows already imported")
-        else:
-            self.status_label.setText("No new EVE windows found")
-
-        self._update_status()
-        self._sync_status_dock()
+            return added_count, skipped_count, len(eve_windows)
+        finally:
+            self._set_empty_state_busy(False)
+            self._update_status()
+            self._sync_status_dock()
 
     def _toggle_lock(self):
         """Toggle thumbnail position lock"""
@@ -2898,6 +3137,41 @@ class MainTab(QWidget):
             (wid, title) for wid, title in windows if wid not in self.window_manager.preview_frames
         ]
 
+    def import_detected_window(
+        self,
+        window_id: str,
+        character_name: str,
+        *,
+        emit_character_detected: bool = True,
+    ) -> bool:
+        """Add a detected character window using the shared preview-import path."""
+        frame = self.window_manager.add_window(window_id, character_name)
+        if not frame:
+            return False
+
+        frame.window_activated.connect(
+            self._on_window_activated,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        frame.window_removed.connect(
+            self._on_window_removed,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        frame.focus_requested.connect(
+            self._on_focus_requested,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        frame.retry_requested.connect(
+            self._on_retry_requested,
+            Qt.ConnectionType.UniqueConnection,
+        )
+        self.preview_layout.addWidget(frame)
+
+        if emit_character_detected:
+            self.character_detected.emit(window_id, character_name)
+
+        return True
+
     def _add_window_to_preview(self, window_id: str, window_title: str) -> bool:
         """Add a single window to preview. Returns True if successful."""
         # Extract character name from window title
@@ -2911,25 +3185,9 @@ class MainTab(QWidget):
             for detected_name, wid in assignments.items():
                 if wid == window_id:
                     char_name = detected_name
-                    self.character_detected.emit(window_id, char_name)
                     break
 
-        # Add to window manager
-        frame = self.window_manager.add_window(window_id, char_name)
-        if frame:
-            frame.window_activated.connect(
-                self._on_window_activated, Qt.ConnectionType.UniqueConnection
-            )
-            frame.window_removed.connect(
-                self._on_window_removed, Qt.ConnectionType.UniqueConnection
-            )
-            frame.focus_requested.connect(
-                self._on_focus_requested, Qt.ConnectionType.UniqueConnection
-            )
-            frame.retry_requested.connect(
-                self._on_retry_requested, Qt.ConnectionType.UniqueConnection
-            )
-            self.preview_layout.addWidget(frame)
+        if self.import_detected_window(window_id, char_name):
             self._sync_status_dock()
             return True
         return False
@@ -3033,39 +3291,8 @@ class MainTab(QWidget):
         self.window_manager.retry_window_capture(window_id)
 
     def _on_window_activated(self, window_id: str):
-        """Handle window activation with optional auto-minimize of previous window"""
-        from argus_overview.utils.window_utils import run_x11_subprocess
-
-        try:
-            # Check if auto-minimize is enabled
-            auto_minimize = (
-                self.settings_manager.get("performance.auto_minimize_inactive", False)
-                if self.settings_manager
-                else False
-            )
-
-            if auto_minimize and self.settings_manager:
-                # Get the last activated EVE window
-                last_window = self.settings_manager.get_last_activated_window()
-                if last_window and last_window != window_id:
-                    # Minimize the previous EVE window
-                    try:
-                        run_x11_subprocess(["xdotool", "windowminimize", last_window], timeout=2)
-                        self.logger.info(f"Auto-minimized previous EVE window: {last_window}")
-                    except (OSError, subprocess.SubprocessError) as e:
-                        self.logger.warning(f"Failed to auto-minimize window {last_window}: {e}")
-
-            # Track this as the last activated EVE window
-            if self.settings_manager:
-                self.settings_manager.set_last_activated_window(window_id)
-
-            result = self.capture_system.activate_window(window_id)
-            if result:
-                self.logger.info(f"Activated window: {window_id}")
-            else:
-                self.logger.warning(f"Failed to activate window: {window_id}")
-        except (OSError, RuntimeError, ValueError) as e:
-            self.logger.error(f"Error activating window: {e}")
+        """Forward window focus intent to the main window/controller."""
+        self.window_focus_requested.emit(window_id)
 
     def _on_window_removed(self, window_id: str):
         """Handle window removal — disconnect frame signals before deletion"""
@@ -3219,6 +3446,11 @@ class MainTab(QWidget):
         """Update status bar and dependent UI state."""
         count = self.window_manager.get_active_window_count()
         self.active_count_label.setText(f"Active: {count}")
+        self._update_empty_state_visibility()
+
+        if getattr(self, "_status_override_text", None):
+            self.status_label.setText(self._status_override_text)
+            return
 
         if count == 0:
             self.status_label.setText("No windows in preview - Click 'Import All' to start")
@@ -3291,12 +3523,9 @@ class MainTab(QWidget):
         windows = list(self.window_manager.preview_frames.items())
         if 0 <= index < len(windows):
             window_id, frame = windows[index]
-            # Activate the window
-            if self.capture_system.activate_window(window_id):
-                self.logger.info(f"Activated window {index + 1}: {frame.character_name}")
-                self.status_label.setText(f"Activated: {frame.character_name}")
-            else:
-                self.logger.warning(f"Failed to activate window {index + 1}")
+            self.window_focus_requested.emit(window_id)
+            self.logger.info(f"Requested activation for window {index + 1}: {frame.character_name}")
+            self.status_label.setText(f"Activating: {frame.character_name}")
         else:
             self.logger.debug(
                 f"Window index {index + 1} out of range (have {len(windows)} windows)"

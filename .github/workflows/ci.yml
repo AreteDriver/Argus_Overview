@@ -26,6 +26,13 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  RUFF_VERSION: "0.15.11"
+  MYPY_VERSION: "1.19.1"
+  PYTEST_VERSION: "9.0.3"
+  PYTEST_ASYNCIO_VERSION: "1.4.0"
+  PYTEST_COV_VERSION: "7.1.0"
+
 jobs:
   lint:
     name: Lint & Format
@@ -39,7 +46,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install ruff
-        run: pip install ruff
+        run: pip install "ruff==${RUFF_VERSION}"
 
       - name: Run ruff linter
         run: ruff check . --output-format=github
@@ -64,11 +71,10 @@ jobs:
           pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
-          pip install mypy types-requests types-cachetools
+          pip install "mypy==${MYPY_VERSION}" types-requests types-cachetools
 
       - name: Run mypy
-        run: mypy . --ignore-missing-imports --no-error-summary --exclude 'src/argus_overview/platform/windows.py'
-        continue-on-error: true  # Type checking is advisory, not blocking
+        run: mypy src/argus_overview --ignore-missing-imports --no-error-summary
 
   test:
     name: Test (Python ${{ matrix.python-version }})
@@ -96,7 +102,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -e ".[dev,linux]"
-          pip install pytest pytest-cov pytest-asyncio
+          pip install "pytest==${PYTEST_VERSION}" "pytest-asyncio==${PYTEST_ASYNCIO_VERSION}" "pytest-cov==${PYTEST_COV_VERSION}"
 
       - name: Run tests with coverage
         env:
