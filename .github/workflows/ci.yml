@@ -136,7 +136,7 @@ jobs:
           bandit -r src/ -c pyproject.toml -f sarif -o bandit-results.sarif || true
 
       - name: Upload bandit results
-        uses: github/codeql-action/upload-sarif@v4.37.7
+        uses: github/codeql-action/upload-sarif@v4.37.9
         if: always()
         with:
           sarif_file: bandit-results.sarif
